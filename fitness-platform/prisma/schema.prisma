@@ -39,7 +39,7 @@ model User {
   profilePic  String?
   bio         String?
   location    String
-  goal        Goal
+  goal        Goal?
   role        Role      @default(CUSTOMER)
   gyms        Gym[]
 
