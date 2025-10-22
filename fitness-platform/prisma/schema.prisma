@@ -9,7 +9,71 @@ generator client {
   output   = "../generated/prisma"
 }
 
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+// prisma/schema.prisma
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url  	    = env("DATABASE_URL")
+  // uncomment next line if you use Prisma <5.10
+  // directUrl = env("DATABASE_URL_UNPOOLED")
 }
+
+
+
+
+model User {
+  userId    Int       @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  userName    String    @unique
+  password    String?                                         //added password it didn't exist in erdiagram
+  birthDate   DateTime                                       //changed from age on erdiagram to birthdate
+  gender      Gender
+  email       String    @unique 
+  phoneNo     String?   @unique
+  profilePic  String?
+  bio         String?
+  location    String
+  goal        Goal
+  role        Role      @default(CUSTOMER)
+  gyms        Gym[]
+
+}
+
+
+enum Goal {
+  WEIGHTLOSS
+  YOGA
+  BODYBUILDING
+}
+
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  GYMOWNER
+  TRAINER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model Gym {
+  gymId           Int         @id @default(autoincrement())
+  gymName         String      @unique
+  contactNo       String?
+  location        String
+  workingHours    String?
+  verified        Boolean     @default(false)
+  gymOwner        User      @relation(fields: [gymOwnerId], references: [userId])
+  gymOwnerId      Int
+
+}
+
+
