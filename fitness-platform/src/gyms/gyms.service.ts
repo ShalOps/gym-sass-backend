@@ -21,7 +21,7 @@ export class GymsService {
   findOne(id: number) {
      return this.databaseservice.gym.findUnique({
       where: {
-        id,
+        gymId: id,
       }
     })
 
@@ -30,7 +30,7 @@ export class GymsService {
   update(id: number, updateGymDto: Prisma.GymUpdateInput) {
       return this.databaseservice.gym.update({
       where: {
-        id,
+        gymId: id,
       },
       data: updateGymDto,
     })
@@ -39,7 +39,7 @@ export class GymsService {
   remove(id: number) {
     return this.databaseservice.gym.delete({
       where: {
-        id,
+        gymId: id,
       }
     })
   }
