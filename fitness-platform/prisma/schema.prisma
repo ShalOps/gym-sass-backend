@@ -43,6 +43,13 @@ model User {
   role        Role      @default(CUSTOMER)
   gyms        Gym[]
 
+  @@index([location])     // For location filters
+  @@index([gender])       // For gender filters
+  @@index([goal])         // For goal filters
+  @@index([role])         // For role filters
+  @@index([firstName])    // For firstName searches
+  @@index([lastName])     // For lastName searches
+  @@index([birthDate])    // For birthDate ranges
 }
 
 
