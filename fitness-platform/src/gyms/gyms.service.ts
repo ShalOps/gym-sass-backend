@@ -14,11 +14,35 @@ export class GymsService {
   }
 
   async findAll(pagination: PaginationDto) {
-    const { page, limit, search } = pagination;
+    const {
+      page,
+      limit,
+      search,
+      location,
+      workingHours,
+      verified,
+      gymOwnerId,
+    } = pagination;
     const skip = (page - 1) * limit;
-    const where = search
-      ? { gymName: { contains: search, mode: 'insensitive' as const } }
-      : {};
+    const where: Prisma.GymWhereInput = {};
+    if (search)
+      where.gymName = {
+        contains: search,
+        mode: 'insensitive' as const,
+      };
+    if (location)
+      where.location = {
+        contains: location,
+        mode: 'insensitive' as const,
+      };
+    if (workingHours) {
+      where.workingHours = {
+        contains: workingHours,
+        mode: 'insensitive' as const,
+      };
+    }
+    if (verified !== undefined) where.verified = verified;
+    if (gymOwnerId) where.gymOwnerId = gymOwnerId; // For admin or owner use
     const [data, total] = await Promise.all([
       this.databaseservice.gym.findMany({
         where,
