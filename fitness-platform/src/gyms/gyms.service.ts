@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma';
 import { DatabaseService } from 'src/database/database.service';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class GymsService {
@@ -12,8 +13,23 @@ export class GymsService {
     });
   }
 
-  findAll() {
-    return this.databaseservice.gym.findMany();
+  async findAll(pagination: PaginationDto) {
+    const { page, limit } = pagination;
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.databaseservice.gym.findMany({
+        skip,
+        take: limit,
+      }),
+      this.databaseservice.gym.count(),
+    ]);
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   findOne(id: number) {
