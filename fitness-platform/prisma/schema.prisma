@@ -83,6 +83,7 @@ model Gym {
   gymOwnerId      Int
 
   @@index([location])
+  @@index([verified])
 }
 
 
