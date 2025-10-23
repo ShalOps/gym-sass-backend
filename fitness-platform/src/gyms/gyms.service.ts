@@ -14,14 +14,18 @@ export class GymsService {
   }
 
   async findAll(pagination: PaginationDto) {
-    const { page, limit } = pagination;
+    const { page, limit, search } = pagination;
     const skip = (page - 1) * limit;
+    const where = search
+      ? { gymName: { contains: search, mode: 'insensitive' as const } }
+      : {};
     const [data, total] = await Promise.all([
       this.databaseservice.gym.findMany({
+        where,
         skip,
         take: limit,
       }),
-      this.databaseservice.gym.count(),
+      this.databaseservice.gym.count({ where }),
     ]);
     return {
       data,
