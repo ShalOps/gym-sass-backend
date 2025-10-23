@@ -14,6 +14,7 @@ generator client {
 //   url      = env("DATABASE_URL")
 // }
 
+// EAST
 // prisma/schema.prisma
 datasource db {
   provider  = "postgresql"
@@ -38,7 +39,7 @@ model User {
   profilePic  String?
   bio         String?
   location    String
-  goal        Goal
+  goal        Goal?
   role        Role      @default(CUSTOMER)
   gyms        Gym[]
 
