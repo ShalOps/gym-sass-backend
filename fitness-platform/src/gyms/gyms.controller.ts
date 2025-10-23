@@ -1,6 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { GymsService } from './gyms.service';
-import { Prisma } from '../../generated/prisma'; 
+import { Prisma } from '../../generated/prisma';
 
 @Controller('gyms')
 export class GymsController {
