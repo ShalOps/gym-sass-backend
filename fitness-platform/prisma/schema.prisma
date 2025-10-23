@@ -82,6 +82,7 @@ model Gym {
   gymOwner        User      @relation(fields: [gymOwnerId], references: [userId])
   gymOwnerId      Int
 
+  @@index([location])
 }
 
 
