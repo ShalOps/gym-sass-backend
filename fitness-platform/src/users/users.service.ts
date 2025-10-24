@@ -14,17 +14,7 @@ export class UsersService {
   }
 
   async findAll(pagination: PaginationDto) {
-    const {
-      page,
-      limit,
-      search,
-      location,
-      gender,
-      goal,
-      role,
-      birthDateFrom,
-      birthDateTo,
-    } = pagination;
+    const { page, limit, search, location, gender, goal, role } = pagination;
     const skip = (page - 1) * limit;
     const where: Prisma.UserWhereInput = {};
     if (search) {
@@ -42,11 +32,6 @@ export class UsersService {
     if (gender) where.gender = gender;
     if (goal) where.goal = goal;
     if (role) where.role = role;
-    if (birthDateFrom || birthDateTo) {
-      where.birthDate = {};
-      if (birthDateFrom) where.birthDate.gte = new Date(birthDateFrom);
-      if (birthDateTo) where.birthDate.lte = new Date(birthDateTo);
-    }
     const [data, total] = await Promise.all([
       this.databaseservice.user.findMany({
         where,
