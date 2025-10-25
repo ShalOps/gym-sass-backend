@@ -42,7 +42,7 @@ model User {
   goal        Goal?
   role        Role      @default(CUSTOMER)
   gyms        Gym[]
-
+  gymclasses       GymClasses[]
 }
 
 
@@ -74,7 +74,48 @@ model Gym {
   verified        Boolean     @default(false)
   gymOwner        User      @relation(fields: [gymOwnerId], references: [userId])
   gymOwnerId      Int
+  services        Service[]
+  gymClasses      GymClasses[]
 
 }
+
+model Service {
+  serviceId   Int                 @id @default(autoincrement())
+  name        String
+  price       Float
+  duration    String              // days or monthly/yearly
+  category    String
+  target      String
+  options     ServiceOption[]
+  gym         Gym                 @relation(fields: [gymId], references: [gymId])
+  gymId       Int
+}
+
+model ServiceOption {
+  optionId    Int         @id   @default(autoincrement())
+  name        String
+  included    Boolean     @default(false)
+  service     Service     @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
+  serviceId   Int         
+}
+
+model GymClasses {
+  classId           Int         @id   @default(autoincrement())
+  className         String
+  price             Float
+  classSchedule     String
+  capacity          Int
+  duration          String
+  gym               Gym         @relation(fields: [gymId], references: [gymId])
+  gymId             Int
+  trainer           User        @relation(fields: [trainerId], references: [userId])
+  trainerId         Int
+}
+
+
+
+
+
+
 
 
