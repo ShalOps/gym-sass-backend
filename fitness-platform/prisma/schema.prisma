@@ -14,24 +14,6 @@ datasource db {
 
 
 model User {
-<<<<<<< HEAD
-  userId     Int          @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  userName   String        @unique
-  password   String
-  birthDate  DateTime 
-  gender     Gender
-  email      String?         @unique
-  phoneNo    String?        @unique
-  profilePic String?
-  bio        String?
-  location   String
-  goal       Goal?
-  role       Role            @default(CUSTOMER)
-  gyms       Gym[]
-  gymclasses GymClasses[]
-=======
   userId    Int       @id @default(autoincrement())
   firstName   String
   lastName    String
@@ -50,13 +32,13 @@ model User {
   isProfileComplete Boolean @default(false)
   googleId     String?  @unique
   gyms        Gym[]
->>>>>>> dbeb994 (authentication using google is done)
+  gymclasses       GymClasses[]
+  
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
   @@index([goal]) // For goal filters
   @@index([role]) // For role filters
-
 }
 
 
