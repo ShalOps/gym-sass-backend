@@ -1,46 +1,87 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma';
-import { DatabaseService } from 'src/database/database.service'; 
-
+import { DatabaseService } from 'src/database/database.service';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class GymsService {
-  constructor(private readonly databaseservice: DatabaseService){}
+  constructor(private readonly databaseservice: DatabaseService) {}
 
   create(createGymDto: Prisma.GymCreateInput) {
     return this.databaseservice.gym.create({
-      data: createGymDto
-    })
+      data: createGymDto,
+    });
   }
 
-  findAll() {
-    return this.databaseservice.gym.findMany()
-
+  async findAll(pagination: PaginationDto) {
+    const {
+      page,
+      limit,
+      search,
+      location,
+      workingHours,
+      verified,
+      gymOwnerId,
+    } = pagination;
+    const skip = (page - 1) * limit;
+    const where: Prisma.GymWhereInput = {};
+    if (search)
+      where.gymName = {
+        contains: search,
+        mode: 'insensitive' as const,
+      };
+    if (location)
+      where.location = {
+        contains: location,
+        mode: 'insensitive' as const,
+      };
+    if (workingHours) {
+      where.workingHours = {
+        contains: workingHours,
+        mode: 'insensitive' as const,
+      };
+    }
+    if (verified !== undefined) where.verified = verified;
+    if (gymOwnerId) where.gymOwnerId = gymOwnerId; // For admin or owner use
+    const [data, total] = await Promise.all([
+      this.databaseservice.gym.findMany({
+        where,
+        skip,
+        take: limit,
+      }),
+      this.databaseservice.gym.count({ where }),
+    ]);
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   findOne(id: number) {
-     return this.databaseservice.gym.findUnique({
+    return this.databaseservice.gym.findUnique({
       where: {
         gymId: id,
-      }
-    })
-
+      },
+    });
   }
 
   update(id: number, updateGymDto: Prisma.GymUpdateInput) {
-      return this.databaseservice.gym.update({
+    return this.databaseservice.gym.update({
       where: {
         gymId: id,
       },
       data: updateGymDto,
-    })
+    });
   }
 
   remove(id: number) {
     return this.databaseservice.gym.delete({
       where: {
         gymId: id,
-      }
-    })
+      },
+    });
   }
 }
