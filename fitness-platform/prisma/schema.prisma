@@ -35,7 +35,6 @@ model User {
   @@index([gender]) // For gender filters
   @@index([goal]) // For goal filters
   @@index([role]) // For role filters
-
 }
 
 
