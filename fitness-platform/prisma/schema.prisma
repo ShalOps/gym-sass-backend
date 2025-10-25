@@ -43,6 +43,14 @@ model User {
   role        Role      @default(CUSTOMER)
   gyms        Gym[]
   gymclasses       GymClasses[]
+
+  @@index([location])     // For location filters
+  @@index([gender])       // For gender filters
+  @@index([goal])         // For goal filters
+  @@index([role])         // For role filters
+  @@index([firstName])    // For firstName searches
+  @@index([lastName])     // For lastName searches
+  @@index([birthDate])    // For birthDate ranges
 }
 
 
@@ -76,6 +84,8 @@ model Gym {
   gymOwnerId      Int
   services        Service[]
   gymClasses      GymClasses[]
+  @@index([location])
+  @@index([verified])
 
 }
 
@@ -111,7 +121,6 @@ model GymClasses {
   trainer           User        @relation(fields: [trainerId], references: [userId])
   trainerId         Int
 }
-
 
 
 
