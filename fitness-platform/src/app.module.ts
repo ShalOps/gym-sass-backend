@@ -10,10 +10,16 @@ import { ServicesModule } from './services/services.module';
 import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
+import googleOauthConfig from './config/google-oauth.config';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ConfigModule.forRoot(), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule],
+  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ConfigModule.forRoot({
+    isGlobal: true,
+    load:[googleOauthConfig]
+  }), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+
+
