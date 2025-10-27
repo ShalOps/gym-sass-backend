@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { AuthGuard } from '@thallesp/nestjs-better-auth';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -18,9 +18,10 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
-  @UseGuards(AuthGuard) 
+  @UseGuards(JwtAuthGuard) 
   @Get('me')
   me(@Req() req: any) {
-    return req.user;
+    const userId = req.user.id; 
+    return this.auth.getProfile(userId);
   }
 }

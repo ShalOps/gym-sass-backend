@@ -13,11 +13,11 @@ model User {
   firstName   String
   lastName    String
   userName    String    @unique
-  password    String?
+  password    String
   birthDate   DateTime
   gender      Gender
-  email       String    @unique
-  phoneNo     String?   @unique
+  email       String?    @unique
+  phoneNo     String   @unique
   profilePic  String?
   bio         String?
   location    String

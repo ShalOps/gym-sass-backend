@@ -1,51 +1,41 @@
+// auth.module.ts
+
 import { Module } from '@nestjs/common';
-import { AuthModule as BetterAuthLibraryModule } from '@thallesp/nestjs-better-auth';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { DatabaseModule } from '../database/database.module';
-
+import { JwtStrategy } from './guards/jwt.strategy'; 
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
     DatabaseModule,
-    BetterAuthLibraryModule.forRootAsync({
-      imports: [ConfigModule], 
+    PassportModule,
+    ConfigModule, // <-- Make sure ConfigModule is imported
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-
-        const databaseUrl = configService.get<string>('DATABASE_URL');
         const jwtSecret = configService.get<string>('JWT_SECRET');
-
-        if (!databaseUrl || !jwtSecret) {
-          throw new Error('FATAL: DATABASE_URL or JWT_SECRET is missing from environment variables.');
+        if (!jwtSecret) {
+          throw new Error('FATAL: JWT_SECRET is missing from environment variables.');
         }
-
         return {
-          auth: {
-            options: {}, 
-            
-            database: {
-              provider: 'prisma',
-              url: databaseUrl, 
-            },
-            tokens: {
-              jwt: {
-                secret: jwtSecret,
-                expiresIn: '7d',
-              },
-            },
-            adapter: {
-              prisma: {
-                userModel: 'user',
-              },
-            },
-          },
+          secret: jwtSecret,
+          signOptions: { expiresIn: '7d' }, // <-- Set expiration here
         };
       },
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService],
-  controllers: [AuthController], 
+  providers: [
+    AuthService, 
+    JwtStrategy, // <-- Add Strategy to providers
+    JwtAuthGuard // <-- Add Guard to providers
+  ],
+  controllers: [AuthController],
+  exports: [AuthService], // <-- Good practice to export the service
 })
 export class AuthModule {}
