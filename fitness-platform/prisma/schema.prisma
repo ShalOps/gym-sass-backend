@@ -1,50 +1,39 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
-// datasource db {
-//   provider = "postgresql"
-//   url      = env("DATABASE_URL")
-// }
-
-// EAST
-// prisma/schema.prisma
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url  	    = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
-  userId     Int      @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  userName   String   @unique
-  password   String? //added password it didn't exist in erdiagram
-  birthDate  DateTime //changed from age on erdiagram to birthdate
-  gender     Gender
-  email      String   @unique
-  phoneNo    String?  @unique
-  profilePic String?
-  bio        String?
-  location   String
-  goal       Goal?
-  role       Role     @default(CUSTOMER)
-  gyms       Gym[]
+  userId    Int       @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  userName    String    @unique
+  password    String                                         //added password it didn't exist in erdiagram
+  birthDate   DateTime                                       //changed from age on erdiagram to birthdate
+  gender      Gender
+  email       String?    @unique 
+  phoneNo     String     @unique
+  profilePic  String?
+  bio         String?
+  location    String
+  goal        Goal?
+  role        Role      @default(CUSTOMER)
+  gyms        Gym[]
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
   @@index([goal]) // For goal filters
   @@index([role]) // For role filters
+
 }
+
 
 enum Goal {
   WEIGHTLOSS
@@ -65,15 +54,18 @@ enum Gender {
 }
 
 model Gym {
-  gymId        Int     @id @default(autoincrement())
-  gymName      String  @unique
-  contactNo    String?
-  location     String
-  workingHours String?
-  verified     Boolean @default(false)
-  gymOwner     User    @relation(fields: [gymOwnerId], references: [userId])
-  gymOwnerId   Int
+  gymId           Int         @id @default(autoincrement())
+  gymName         String      @unique
+  contactNo       String?
+  location        String
+  workingHours    String?
+  verified        Boolean     @default(false)
+  gymOwner        User      @relation(fields: [gymOwnerId], references: [userId])
+  gymOwnerId      Int
 
   @@index([location])
   @@index([verified])
+
 }
+
+

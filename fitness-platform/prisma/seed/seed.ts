@@ -59,7 +59,7 @@ async function main() {
           gymName: `Gym${i}`,
           location: `City${i}`,
           verified: true,
-          gymOwnerId: users[ownerIndex].userId,
+          gymOwnerId: users[ownerIndex].id,
         },
       });
     }

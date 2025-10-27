@@ -8,15 +8,21 @@ import {
   Delete,
   Query,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
 import { Prisma } from '../../generated/prisma';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/roles.decorator';
 
 @Controller('gyms')
 export class GymsController {
   constructor(private readonly gymsService: GymsService) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('GYMOWNER', 'ADMIN')
   @Post()
   create(@Body() createGymDto: Prisma.GymCreateInput) {
     return this.gymsService.create(createGymDto);
