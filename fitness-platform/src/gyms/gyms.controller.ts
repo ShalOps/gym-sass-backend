@@ -1,9 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { GymsService } from './gyms.service';
-import { Prisma } from '../../generated/prisma'; 
-import { Roles } from 'src/auth/roles.decorator';
-import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Prisma } from '../../generated/prisma';
+import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 
 @Controller('gyms')
 export class GymsController {
@@ -17,8 +27,13 @@ export class GymsController {
   }
 
   @Get()
-  findAll() {
-    return this.gymsService.findAll();
+  findAll(@Query() query: any) {
+    try {
+      const pagination: PaginationDto = PaginationSchema.parse(query);
+      return this.gymsService.findAll(pagination);
+    } catch {
+      throw new BadRequestException('Invalid pagination parameters');
+    }
   }
 
   @Get(':id')
