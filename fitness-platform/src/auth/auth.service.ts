@@ -85,7 +85,7 @@ export class AuthService {
     }
 
     const payload = { 
-      sub: user!.id, 
+      sub: user!.userId, 
       role: user!.role 
     };
     const accessToken = this.jwtService.sign(payload);
@@ -94,9 +94,9 @@ export class AuthService {
   }
   async getProfile(userId: number) {
     const user = await this.db.user.findUnique({
-      where: { id: userId },
+      where: { userId: userId },
       select: {
-        id: true,
+        userId: true,
         email: true,
         phoneNo: true,
         firstName: true,
@@ -109,7 +109,6 @@ export class AuthService {
         role: true,
         gender: true,
         goal: true,
-        createdAt: true,
       },
     });
 
