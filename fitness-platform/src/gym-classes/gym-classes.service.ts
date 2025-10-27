@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma';
 import { DatabaseService } from 'src/database/database.service'; 
 import { CreateGymClassesDto } from './dto/create-gym-classes.dto';
 import { UpdateGymClassesDto } from './dto/update-gym-classes.dto';
@@ -12,9 +11,23 @@ export class GymClassesService {
 
   async create(createGymClassesDto: CreateGymClassesDto) {
 
+    const gym= await this.databaseservice.gym.findUnique({
+      where: {
+        gymId: createGymClassesDto.gymId
+      },
+      select: {
+        gymId: true,
+      },
+    })
+
+    if (!gym){
+      throw new NotFoundException(`Gym with ID ${createGymClassesDto.gymId} not found`)
+    }
+
     const trainer = await this.databaseservice.user.findUnique({
       where: { 
-        userId: createGymClassesDto.trainerId },
+        userId: createGymClassesDto.trainerId
+       },
       select:
        {
          userId: true, 
@@ -68,15 +81,36 @@ export class GymClassesService {
 
   async update(id: number, updateGymClassesDto: UpdateGymClassesDto) {
 
-    const trainer = await this.databaseservice.user.findUnique({
+    if (updateGymClassesDto.gymId){
+
+      const gym= await this.databaseservice.gym.findUnique({
+      where: {
+        gymId: updateGymClassesDto.gymId
+      },
+      select: {
+        gymId: true,
+        },
+      })
+
+      if (!gym){
+        throw new NotFoundException(`Gym with ID ${updateGymClassesDto.gymId} not found`)
+      }
+
+    }
+    
+    
+    if (updateGymClassesDto.trainerId){
+
+      const trainer = await this.databaseservice.user.findUnique({
       where: { 
-        userId: updateGymClassesDto.trainerId },
+        userId: updateGymClassesDto.trainerId 
+      },
       select:
        {
          userId: true, 
          role: true 
         },
-    });
+      });
 
     if (!trainer) {
       throw new NotFoundException(`User with ID ${updateGymClassesDto.trainerId} not found`);
@@ -84,6 +118,9 @@ export class GymClassesService {
     if (trainer.role !== 'TRAINER') {
       throw new ForbiddenException(`User with ID ${updateGymClassesDto.trainerId} is not a trainer`);
     }
+
+    }
+    
 
 
     const gymClass = await this.databaseservice.gymClasses.findUnique({
