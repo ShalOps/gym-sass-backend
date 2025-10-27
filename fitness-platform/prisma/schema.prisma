@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  // output   = "../generated/prisma"
 }
 
 // datasource db {
@@ -18,7 +18,7 @@ generator client {
 // prisma/schema.prisma
 datasource db {
   provider  = "postgresql"
-  url  	    = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
@@ -44,22 +44,17 @@ model User {
   gyms        Gym[]
   gymclasses       GymClasses[]
 
-  @@index([location])     // For location filters
-  @@index([gender])       // For gender filters
-  @@index([goal])         // For goal filters
-  @@index([role])         // For role filters
-  @@index([firstName])    // For firstName searches
-  @@index([lastName])     // For lastName searches
-  @@index([birthDate])    // For birthDate ranges
+  @@index([location]) // For location filters
+  @@index([gender]) // For gender filters
+  @@index([goal]) // For goal filters
+  @@index([role]) // For role filters
 }
-
 
 enum Goal {
   WEIGHTLOSS
   YOGA
   BODYBUILDING
 }
-
 
 enum Role {
   CUSTOMER
@@ -73,6 +68,11 @@ enum Gender {
   FEMALE
 }
 
+
+
+
+
+
 model Gym {
   gymId           Int         @id @default(autoincrement())
   gymName         String      @unique
@@ -84,9 +84,9 @@ model Gym {
   gymOwnerId      Int
   services        Service[]
   gymClasses      GymClasses[]
+
   @@index([location])
   @@index([verified])
-
 }
 
 model Service {
@@ -94,7 +94,7 @@ model Service {
   name        String
   price       Float
   duration    String              // days or monthly/yearly
-  category    String
+  category    Category
   target      String
   options     ServiceOption[]
   gym         Gym                 @relation(fields: [gymId], references: [gymId])
@@ -122,9 +122,9 @@ model GymClasses {
   trainerId         Int
 }
 
-
-
-
-
-
-
+enum Category {
+  STRENGTH
+  CARDIO
+  CROSSFIT
+  YOGA
+}

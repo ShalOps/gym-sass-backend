@@ -1,6 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode } from '@nestjs/common';
 import { GymClassesService } from './gym-classes.service';
-import { Prisma } from '../../generated/prisma'; 
 import { CreateGymClassesDto } from './dto/create-gym-classes.dto';
 import { UpdateGymClassesDto } from './dto/update-gym-classes.dto';
 
