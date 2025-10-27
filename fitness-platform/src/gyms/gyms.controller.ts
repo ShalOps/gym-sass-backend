@@ -8,9 +8,12 @@ import {
   Delete,
   Query,
   BadRequestException,
+  HttpCode
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
-import { Prisma } from '../../generated/prisma';
+import { Prisma } from '@prisma/client';
+import { CreateGymsDto } from './dto/create-gyms.dto';
+import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 
 @Controller('gyms')
@@ -18,8 +21,8 @@ export class GymsController {
   constructor(private readonly gymsService: GymsService) {}
 
   @Post()
-  create(@Body() createGymDto: Prisma.GymCreateInput) {
-    return this.gymsService.create(createGymDto);
+  create(@Body() createGymsDto: CreateGymsDto) {
+    return this.gymsService.create(createGymsDto);
   }
 
   @Get()
@@ -38,12 +41,13 @@ export class GymsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateGymDto: Prisma.GymUpdateInput) {
-    return this.gymsService.update(+id, updateGymDto);
+  update(@Param('id') id: string, @Body() updateGymsDto: UpdateGymsDto) {
+    return this.gymsService.update(+id, updateGymsDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.gymsService.remove(+id);
+  @HttpCode(204)
+  async remove(@Param('id') id: string) {
+    await this.gymsService.remove(+id);
   }
 }
