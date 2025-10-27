@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode } from '@nestjs/common';
 import { ServicesService } from './services.service';
-import { Prisma } from '../../generated/prisma'; 
 import { CreateServiceDto } from './dto/create-services.dto';
 import { UpdateServiceDto } from './dto/update-services.dto';
+import { UpdateSingleServiceOptionDto } from 'src/services/dto/update-single-service-option.dto';
 
 
 @Controller('services')
@@ -34,4 +34,14 @@ export class ServicesController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.servicesService.remove(id);
   }
+
+  @Patch(':id/options')
+  updateServiceOptions(
+     @Param('id', ParseIntPipe) id: number,
+     @Body() updateSingleServiceOptionDto: UpdateSingleServiceOptionDto,
+  ) 
+  {
+    return this.servicesService.updateServiceOptions(id, updateSingleServiceOptionDto);
+  }
+
 }
