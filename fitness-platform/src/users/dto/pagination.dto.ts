@@ -8,8 +8,6 @@ export const PaginationSchema = z.object({
   gender: z.enum(['MALE', 'FEMALE']).optional(),
   goal: z.enum(['WEIGHTLOSS', 'YOGA', 'BODYBUILDING']).optional(),
   role: z.enum(['CUSTOMER', 'ADMIN', 'GYMOWNER', 'TRAINER']).optional(),
-  birthDateFrom: z.string().optional(), // ISO date string
-  birthDateTo: z.string().optional(),
 });
 
 export type PaginationDto = z.infer<typeof PaginationSchema>;

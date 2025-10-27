@@ -8,20 +8,16 @@ import {
   Delete,
   Query,
   BadRequestException,
+  HttpCode
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-// import { Prisma } from '@prisma/client';
-import { Prisma } from '../../generated/prisma';
+import { Prisma } from '@prisma/client';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
+import { UpdateUsersDto } from './dto/update-users.dto';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  @Post()
-  create(@Body() createUserDto: Prisma.UserCreateInput) {
-    return this.usersService.create(createUserDto);
-  }
 
   @Get()
   findAll(@Query() query: any) {
@@ -41,13 +37,14 @@ export class UsersController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() updateUserDto: Prisma.UserUpdateInput,
+    @Body() updateUsersDto: UpdateUsersDto,
   ) {
-    return this.usersService.update(+id, updateUserDto);
+    return this.usersService.update(+id, updateUsersDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+  @HttpCode(204)
+  async remove(@Param('id') id: string) {
+    await this.usersService.remove(+id);
   }
 }
