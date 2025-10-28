@@ -17,49 +17,45 @@ async function main() {
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
 
-    // Seed 50 users sequentially inside transaction
+    // Seed 50 users with varied data
     for (let i = 1; i <= 50; i++) {
+      const goals = ['WEIGHTLOSS', 'YOGA', 'BODYBUILDING'] as const;
+      const roles = ['CUSTOMER', 'ADMIN', 'GYMOWNER', 'TRAINER'] as const;
+      const genders = ['MALE', 'FEMALE'] as const;
+
       const user = await tx.user.create({
         data: {
           firstName: `User${i}`,
           lastName: `Last${i}`,
           userName: `user${i}`,
           password: 'password123', // Hash in production!
-          birthDate: new Date(1990, 0, (i % 28) + 1),
-          gender: i % 2 === 0 ? 'MALE' : 'FEMALE',
-          email: `user${i}@example.com`,
-          phoneNo: `123456789${i}`,
+          birthDate: new Date(1990 + (i % 10), i % 12, (i % 28) + 1),
+          gender: genders[i % 2],
+          email: i % 5 === 0 ? null : `user${i}@example.com`, // Some without email
+          phoneNo: `123456789${String(i).padStart(2, '0')}`, // Ensure unique
+          profilePic: i % 10 === 0 ? `https://example.com/pic${i}.jpg` : null,
+          bio: i % 8 === 0 ? `Bio for user ${i}` : null,
           location: `Location${i}`,
-          goal: 'WEIGHTLOSS',
-          role: 'CUSTOMER',
+          goal: i % 4 === 0 ? null : goals[i % 3], // Some without goal
+          role: roles[i % 4],
         },
       });
       users.push(user);
     }
 
-    const totalUsers = users.length;
-
-    // Seed 50 gyms with complex round-robin diversified gymOwnerId allocation
-    for (let i = 1; i <= 50; i++) {
-      let ownerIndex: number;
-
-      if (i <= 15) {
-        // First 5 users get 3 gyms each (gyms #1-15)
-        ownerIndex = Math.floor((i - 1) / 3);
-      } else if (i <= 25) {
-        // Next 5 users get 2 gyms each (gyms #16-25)
-        ownerIndex = 5 + Math.floor((i - 16) / 2);
-      } else {
-        // Remaining gyms distributed one-to-one cycling over users from index 10 onward
-        ownerIndex = 10 + ((i - 26) % (totalUsers - 10));
-      }
+    // Seed 10 gyms with varied data
+    for (let i = 1; i <= 10; i++) {
+      const gymOwners = users.filter((u) => u.role === 'GYMOWNER');
+      const owner = gymOwners[i % gymOwners.length] || users[0]; // Fallback
 
       await tx.gym.create({
         data: {
           gymName: `Gym${i}`,
+          contactNo: i % 3 === 0 ? null : `987654321${i}`,
           location: `City${i}`,
-          verified: true,
-          gymOwnerId: users[ownerIndex].userId,
+          workingHours: i % 2 === 0 ? '9AM-9PM' : null,
+          verified: i % 4 !== 0, // Some unverified
+          gymOwnerId: owner.userId,
         },
       });
     }
