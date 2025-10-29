@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GymsService } from './gyms.service';
 import { GymsController } from './gyms.controller';
-import { DatabaseModule } from 'src/database/database.module';
-
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
   imports: [DatabaseModule],
