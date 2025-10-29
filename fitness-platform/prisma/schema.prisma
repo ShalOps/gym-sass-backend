@@ -64,7 +64,7 @@ model Gym {
   location        String
   workingHours    String?
   verified        Boolean    @default(false)
-  gymOwner        User       @relation(fields: [gymOwnerId], references: [userId])
+  gymOwner        User       @relation(fields: [gymOwnerId], references: [userId], onDelete: Restrict)
   gymOwnerId      Int
   services        Service[]
   gymClasses      GymClasses[]
@@ -83,7 +83,7 @@ model Service {
   category            Category
   target              String
   optionAssignments   ServiceOptionAssignment[]  
-  gym                 Gym                        @relation(fields: [gymId], references: [gymId])
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   gymId               Int
 
   @@unique([name, gymId])
@@ -93,7 +93,7 @@ model ServiceOption {
   optionId            Int                        @id   @default(autoincrement())
   name                String                     
   serviceAssignments  ServiceOptionAssignment[]  
-  gym                 Gym                        @relation(fields: [gymId], references: [gymId])
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   gymId               Int
 
   @@unique([name, gymId])
@@ -106,7 +106,7 @@ model ServiceOptionAssignment {
   gymId               Int
   service             Service         @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
   option              ServiceOption   @relation(fields: [optionId], references: [optionId], onDelete: Cascade)
-  gym                 Gym             @relation(fields: [gymId], references: [gymId])
+  gym                 Gym             @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   
   @@unique([serviceId, optionId, gymId])
 }
@@ -118,9 +118,9 @@ model GymClasses {
   classSchedule     String
   capacity          Int
   duration          String
-  gym               Gym         @relation(fields: [gymId], references: [gymId])
+  gym               Gym         @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   gymId             Int
-  trainer           User        @relation(fields: [trainerId], references: [userId])
+  trainer           User        @relation(fields: [trainerId], references: [userId], onDelete: Restrict)
   trainerId         Int
 }
 
