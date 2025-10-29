@@ -16,7 +16,7 @@ export class ServiceOptionService {
   async findAll() {
     return this.databaseservice.serviceOption.findMany({
       include: {
-        service: true,
+        gym: true,
     },
     });
   }
@@ -37,7 +37,7 @@ export class ServiceOptionService {
         optionId: id,
       },
       include: {
-        service: true,
+        gym: true,
     },
     });
   }
