@@ -21,7 +21,7 @@ model User {
   password   String
   birthDate  DateTime 
   gender     Gender
-  email      String         @unique
+  email      String?         @unique
   phoneNo    String?        @unique
   profilePic String?
   bio        String?
