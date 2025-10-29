@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/prisma';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -59,7 +59,7 @@ async function main() {
           gymName: `Gym${i}`,
           location: `City${i}`,
           verified: true,
-          gymOwnerId: users[ownerIndex].id,
+          gymOwnerId: users[ownerIndex].userId,
         },
       });
     }

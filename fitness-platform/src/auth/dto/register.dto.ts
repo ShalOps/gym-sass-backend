@@ -1,11 +1,11 @@
 import { IsEmail, IsNotEmpty, IsString, IsEnum, IsOptional, IsIn, MinLength } from 'class-validator';
-import { Gender, Goal, Role } from '../../../generated/prisma';
+import { Gender, Goal, Role } from '@prisma/client';
 
 export class RegisterDto {
   @IsNotEmpty() @IsString() firstName: string;
   @IsNotEmpty() @IsString() lastName: string;
   @IsNotEmpty() @IsString() userName: string;
-  @IsOptional() @IsEmail() email?: string;
+  @IsEmail() email: string;
   @IsNotEmpty() @IsString() @MinLength(8) password: string;
   @IsNotEmpty() birthDate: Date | string;
   @IsNotEmpty() @IsEnum(Gender) gender: Gender;
