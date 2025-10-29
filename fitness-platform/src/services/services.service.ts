@@ -2,8 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateServiceDto } from './dto/create-services.dto';
 import { UpdateServiceDto } from './dto/update-services.dto'; 
-import { UpdateSingleServiceOptionDto } from 'src/services/dto/update-single-service-option.dto';
-
 
 
 @Injectable()
@@ -36,7 +34,7 @@ export class ServicesService {
     return this.databaseservice.service.findMany({
       include: {
         gym: true,
-        options: true,
+        optionAssignments: true,
     },
     });
   }
@@ -57,7 +55,7 @@ export class ServicesService {
       },
       include: {
         gym: true,
-        options: true,
+        optionAssignments: true,
     },
     });
   }
@@ -112,42 +110,6 @@ export class ServicesService {
         serviceId: id,
       }
     })
-  }
-
-  async updateServiceOptions(id: number, updateSingleServiceOptionDto: UpdateSingleServiceOptionDto) {
-    const service = await this.databaseservice.service.findUnique({
-      where: { serviceId: id },
-      include: { options: true },
-    });
-
-    if (!service) {
-      throw new NotFoundException(`Service with ID ${id} not found`);
-    }
-
-    const existingOption = await this.databaseservice.serviceOption.findUnique({
-      where: { optionId: updateSingleServiceOptionDto.optionId },
-    });
-
-    if (!existingOption || existingOption.serviceId !== id) {
-      throw new NotFoundException(
-        `Service option with ID ${updateSingleServiceOptionDto.optionId} not found or does not belong to service ${id}`,
-      );
-    }
-
-    const updatedOption = await this.databaseservice.serviceOption.update({
-      where: { optionId: updateSingleServiceOptionDto.optionId },
-      data: {
-        name: updateSingleServiceOptionDto.name,
-        included: updateSingleServiceOptionDto.included,
-      },
-    });
-
-    const updatedService = await this.databaseservice.service.findUnique({
-      where: { serviceId: id },
-      include: { options: true },
-    });
-
-  return updatedService
   }
 
 
