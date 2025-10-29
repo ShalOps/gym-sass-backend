@@ -57,22 +57,6 @@ enum Gender {
   FEMALE
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 model Gym {
   gymId           Int        @id @default(autoincrement())
   gymName         String     @unique
@@ -84,29 +68,47 @@ model Gym {
   gymOwnerId      Int
   services        Service[]
   gymClasses      GymClasses[]
+  serviceOptions  ServiceOption[]   
+  serviceOptionAssignment ServiceOptionAssignment[]
 
   @@index([location])
   @@index([verified])
 }
 
 model Service {
-  serviceId   Int                 @id @default(autoincrement())
-  name        String
-  price       Float
-  duration    String              // days or monthly/yearly
-  category    Category
-  target      String
-  options     ServiceOption[]
-  gym         Gym                 @relation(fields: [gymId], references: [gymId])
-  gymId       Int
+  serviceId           Int                       @id @default(autoincrement())
+  name                String                    
+  price               Float
+  duration            String                    // days or monthly/yearly
+  category            Category
+  target              String
+  optionAssignments   ServiceOptionAssignment[]  
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId])
+  gymId               Int
+
+  @@unique([name, gymId])
 }
 
 model ServiceOption {
-  optionId    Int         @id   @default(autoincrement())
-  name        String
-  included    Boolean     @default(false)
-  service     Service     @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
-  serviceId   Int         
+  optionId            Int                        @id   @default(autoincrement())
+  name                String                     
+  serviceAssignments  ServiceOptionAssignment[]  
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId])
+  gymId               Int
+
+  @@unique([name, gymId])
+}
+
+model ServiceOptionAssignment {
+  optionAssignmentId  Int             @id   @default(autoincrement())
+  serviceId           Int
+  optionId            Int
+  gymId               Int
+  service             Service         @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
+  option              ServiceOption   @relation(fields: [optionId], references: [optionId], onDelete: Cascade)
+  gym                 Gym             @relation(fields: [gymId], references: [gymId])
+  
+  @@unique([serviceId, optionId, gymId])
 }
 
 model GymClasses {
