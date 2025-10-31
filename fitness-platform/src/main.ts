@@ -5,13 +5,24 @@ import { ValidationPipe } from '@nestjs/common';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { mkdir } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
 
 async function bootstrap() {
+  // Ensure uploads directory exists
+  const fullUploadsPath = join(process.cwd(), UPLOADS_DIR);
+  await mkdir(fullUploadsPath, { recursive: true });
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
   app.useGlobalFilters(new PrismaExceptionFilter());
+
+  // Serve static files from uploads directory
+  app.useStaticAssets(join(__dirname, '..', UPLOADS_DIR), {
+    prefix: '/uploads/',
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Gym Platform API')
@@ -35,8 +46,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-
-  app.useStaticAssets(join(__dirname, '..', UPLOADS_DIR));
 
   await app.listen(process.env.PORT ?? 3000);
 }
