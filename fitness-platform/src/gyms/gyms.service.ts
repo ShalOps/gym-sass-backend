@@ -1,15 +1,36 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
+import { CreateGymsDto } from './dto/create-gyms.dto';
+import { UpdateGymsDto } from './dto/update-gyms.dto';
 
 @Injectable()
 export class GymsService {
   constructor(private readonly databaseservice: DatabaseService) {}
 
-  create(createGymDto: Prisma.GymCreateInput) {
+  async create(createGymsDto: CreateGymsDto) {
+
+    const gymOwner = await this.databaseservice.user.findUnique({
+          where: { 
+            userId: createGymsDto.gymOwnerId
+           },
+          select:
+           {
+             userId: true, 
+             role: true 
+            },
+        });
+    
+        if (!gymOwner) {
+          throw new NotFoundException(`User with ID ${createGymsDto.gymOwnerId} not found`);
+        }
+        if (gymOwner.role !== 'GYMOWNER') {
+          throw new ForbiddenException(`User with ID ${createGymsDto.gymOwnerId} is not a Gym owner`);
+        }
+    
     return this.databaseservice.gym.create({
-      data: createGymDto,
+      data: createGymsDto,
     });
   }
 
@@ -60,7 +81,21 @@ export class GymsService {
     };
   }
 
-  findOne(id: number) {
+  async findOne(id: number) {
+    
+    const gym= await this.databaseservice.gym.findUnique({
+          where: {
+            gymId: id
+          },
+          select: {
+            gymId: true,
+          },
+        })
+    
+        if (!gym){
+          throw new NotFoundException(`Gym with ID ${id} not found`)
+        }
+
     return this.databaseservice.gym.findUnique({
       where: {
         gymId: id,
@@ -68,17 +103,65 @@ export class GymsService {
     });
   }
 
-  update(id: number, updateGymDto: Prisma.GymUpdateInput) {
+  async update(id: number, updateGymsDto: UpdateGymsDto) {
+
+     const gym= await this.databaseservice.gym.findUnique({
+          where: {
+            gymId: id
+          },
+          select: {
+            gymId: true,
+          },
+        })
+    
+        if (!gym){
+          throw new NotFoundException(`Gym with ID ${id} not found`)
+        }
+
+      if (updateGymsDto.gymOwnerId){
+      const gymOwner = await this.databaseservice.user.findUnique({
+          where: { 
+            userId: updateGymsDto.gymOwnerId
+           },
+          select:
+           {
+             userId: true, 
+             role: true 
+            },
+        });
+    
+        if (!gymOwner) {
+          throw new NotFoundException(`User with ID ${updateGymsDto.gymOwnerId} not found`);
+        }
+        if (gymOwner.role !== 'GYMOWNER') {
+          throw new ForbiddenException(`User with ID ${updateGymsDto.gymOwnerId} is not a Gym owner`);
+        }
+      }
+
     return this.databaseservice.gym.update({
       where: {
         gymId: id,
       },
-      data: updateGymDto,
+      data: updateGymsDto,
     });
   }
 
-  remove(id: number) {
-    return this.databaseservice.gym.delete({
+  async remove(id: number) {
+
+    const gym= await this.databaseservice.gym.findUnique({
+          where: {
+            gymId: id
+          },
+          select: {
+            gymId: true,
+          },
+        })
+    
+        if (!gym){
+          throw new NotFoundException(`Gym with ID ${id} not found`)
+        }
+
+    await this.databaseservice.gym.delete({
       where: {
         gymId: id,
       },

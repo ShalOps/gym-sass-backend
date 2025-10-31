@@ -1,31 +1,35 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  // output   = "../generated/prisma"
 }
 
 datasource db {
   provider  = "postgresql"
-  url  	    = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
+
+
+
 model User {
-  userId    Int       @id @default(autoincrement())
-  firstName   String
-  lastName    String
-  userName    String    @unique
-  password    String                                         //added password it didn't exist in erdiagram
-  birthDate   DateTime                                       //changed from age on erdiagram to birthdate
-  gender      Gender
-  email       String?    @unique 
-  phoneNo     String     @unique
-  profilePic  String?
-  bio         String?
-  location    String
-  goal        Goal?
-  role        Role      @default(CUSTOMER)
-  gyms        Gym[]
+  userId     Int          @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  userName   String        @unique
+  password   String
+  birthDate  DateTime 
+  gender     Gender
+  email      String?         @unique
+  phoneNo    String?        @unique
+  profilePic String?
+  bio        String?
+  location   String
+  goal       Goal?
+  role       Role            @default(CUSTOMER)
+  gyms       Gym[]
+  gymclasses GymClasses[]
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
@@ -54,18 +58,75 @@ enum Gender {
 }
 
 model Gym {
-  gymId           Int         @id @default(autoincrement())
-  gymName         String      @unique
+  gymId           Int        @id @default(autoincrement())
+  gymName         String     @unique
   contactNo       String?
   location        String
   workingHours    String?
-  verified        Boolean     @default(false)
-  gymOwner        User      @relation(fields: [gymOwnerId], references: [userId])
+  verified        Boolean    @default(false)
+  gymOwner        User       @relation(fields: [gymOwnerId], references: [userId], onDelete: Restrict)
   gymOwnerId      Int
+  services        Service[]
+  gymClasses      GymClasses[]
+  serviceOptions  ServiceOption[]   
+  serviceOptionAssignment ServiceOptionAssignment[]
 
   @@index([location])
   @@index([verified])
-
 }
 
+model Service {
+  serviceId           Int                       @id @default(autoincrement())
+  name                String                    
+  price               Float
+  duration            String                    // days or monthly/yearly
+  category            Category
+  target              String
+  optionAssignments   ServiceOptionAssignment[]  
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId               Int
 
+  @@unique([name, gymId])
+}
+
+model ServiceOption {
+  optionId            Int                        @id   @default(autoincrement())
+  name                String                     
+  serviceAssignments  ServiceOptionAssignment[]  
+  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId               Int
+
+  @@unique([name, gymId])
+}
+
+model ServiceOptionAssignment {
+  optionAssignmentId  Int             @id   @default(autoincrement())
+  serviceId           Int
+  optionId            Int
+  gymId               Int
+  service             Service         @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
+  option              ServiceOption   @relation(fields: [optionId], references: [optionId], onDelete: Cascade)
+  gym                 Gym             @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  
+  @@unique([serviceId, optionId, gymId])
+}
+
+model GymClasses {
+  classId           Int         @id   @default(autoincrement())
+  className         String
+  price             Float
+  classSchedule     String
+  capacity          Int
+  duration          String
+  gym               Gym         @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId             Int
+  trainer           User        @relation(fields: [trainerId], references: [userId], onDelete: Restrict)
+  trainerId         Int
+}
+
+enum Category {
+  STRENGTH
+  CARDIO
+  CROSSFIT
+  YOGA
+}

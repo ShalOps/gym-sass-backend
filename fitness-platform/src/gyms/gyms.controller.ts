@@ -8,10 +8,13 @@ import {
   Delete,
   Query,
   BadRequestException,
+  HttpCode,
   UseGuards,
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
-import { Prisma } from '../../generated/prisma';
+import { Prisma } from '@prisma/client';
+import { CreateGymsDto } from './dto/create-gyms.dto';
+import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
@@ -30,8 +33,8 @@ export class GymsController {
   @ApiResponse({ status: 201, description: 'Gym created' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  create(@Body() createGymDto: Prisma.GymCreateInput) {
-    return this.gymsService.create(createGymDto);
+  create(@Body() createGymsDto: CreateGymsDto) {
+    return this.gymsService.create(createGymsDto);
   }
 
   @Get()
@@ -61,8 +64,8 @@ export class GymsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Gym not found' })
-  update(@Param('id') id: string, @Body() updateGymDto: Prisma.GymUpdateInput) {
-    return this.gymsService.update(+id, updateGymDto);
+  update(@Param('id') id: string, @Body() updateGymsDto: UpdateGymsDto) {
+    return this.gymsService.update(+id, updateGymsDto);
   }
 
   @Delete(':id')
@@ -71,7 +74,8 @@ export class GymsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Gym not found' })
-  remove(@Param('id') id: string) {
-    return this.gymsService.remove(+id);
+  @HttpCode(204)
+  async remove(@Param('id') id: string) {
+    await this.gymsService.remove(+id);
   }
 }
