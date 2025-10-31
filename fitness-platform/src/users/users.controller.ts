@@ -34,13 +34,13 @@ export class UsersController {
     }
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiResponse({ status: 200, description: 'User data' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
-  }
+  // @Get(':id')
+  // @ApiOperation({ summary: 'Get user by ID' })
+  // @ApiResponse({ status: 200, description: 'User data' })
+  // @ApiResponse({ status: 404, description: 'User not found' })
+  // findOne(@Param('id') id: string) {
+  //   return this.usersService.findOne(+id);
+  // }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update user by ID' })
