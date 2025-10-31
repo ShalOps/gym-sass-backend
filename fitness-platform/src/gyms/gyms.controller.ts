@@ -19,7 +19,7 @@ import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('gyms')
 @Controller('gyms')
@@ -33,6 +33,7 @@ export class GymsController {
   @ApiResponse({ status: 201, description: 'Gym created' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiBearerAuth('JWT-auth')
   create(@Body() createGymsDto: CreateGymsDto) {
     return this.gymsService.create(createGymsDto);
   }
@@ -58,22 +59,28 @@ export class GymsController {
     return this.gymsService.findOne(+id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('GYMOWNER', 'ADMIN')
   @Patch(':id')
   @ApiOperation({ summary: 'Update gym by ID' })
   @ApiResponse({ status: 200, description: 'Gym updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Gym not found' })
+  @ApiBearerAuth('JWT-auth')
   update(@Param('id') id: string, @Body() updateGymsDto: UpdateGymsDto) {
     return this.gymsService.update(+id, updateGymsDto);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('GYMOWNER', 'ADMIN')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete gym by ID' })
   @ApiResponse({ status: 200, description: 'Gym deleted' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Gym not found' })
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
   async remove(@Param('id') id: string) {
     await this.gymsService.remove(+id);
