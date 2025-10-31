@@ -16,6 +16,11 @@ async function bootstrap() {
     .addTag('auth', 'Authentication endpoints')
     .addTag('users', 'User management endpoints')
     .addTag('gyms', 'Gym management endpoints')
+    .addTag('services', 'Services management endpoints')
+    .addTag('service-option', 'Service option management endpoints')
+    .addTag('service-option-assignment', 'Service option assignment management endpoints')
+    .addTag('gym-classes', 'Gym classes management endpoint')
+
     .addBearerAuth(
       {
         type: 'http',
