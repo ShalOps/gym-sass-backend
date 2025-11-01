@@ -59,6 +59,7 @@ export class GymsController {
   @ApiResponse({ status: 201, description: 'Gym created' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 409, description: 'Conflict' })
   create(@Body() createGymsDto: CreateGymsDto) {
     return this.gymsService.create(createGymsDto);
   }
