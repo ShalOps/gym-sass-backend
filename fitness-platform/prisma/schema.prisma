@@ -4,30 +4,27 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   // uncomment next line if you use Prisma <5.10
   // directUrl = env("DATABASE_URL_UNPOOLED")
 }
-
-
-
 
 model User {
   userId     Int          @id @default(autoincrement())
   firstName  String
   lastName   String
-  userName   String        @unique
+  userName   String       @unique
   password   String
-  birthDate  DateTime 
+  birthDate  DateTime
   gender     Gender
-  email      String?         @unique
-  phoneNo    String?        @unique
+  email      String?      @unique
+  phoneNo    String?      @unique
   profilePic String?
   bio        String?
   location   String
   goal       Goal?
-  role       Role            @default(CUSTOMER)
+  role       Role         @default(CUSTOMER)
   gyms       Gym[]
   gymclasses GymClasses[]
 
@@ -35,9 +32,7 @@ model User {
   @@index([gender]) // For gender filters
   @@index([goal]) // For goal filters
   @@index([role]) // For role filters
-
 }
-
 
 enum Goal {
   WEIGHTLOSS
@@ -58,17 +53,17 @@ enum Gender {
 }
 
 model Gym {
-  gymId           Int        @id @default(autoincrement())
-  gymName         String     @unique
-  contactNo       String?
-  location        String
-  workingHours    String?
-  verified        Boolean    @default(false)
-  gymOwner        User       @relation(fields: [gymOwnerId], references: [userId], onDelete: Restrict)
-  gymOwnerId      Int
-  services        Service[]
-  gymClasses      GymClasses[]
-  serviceOptions  ServiceOption[]   
+  gymId                   Int                       @id @default(autoincrement())
+  gymName                 String                    @unique
+  contactNo               String?
+  location                String
+  workingHours            String?
+  verified                Boolean                   @default(false)
+  gymOwner                User                      @relation(fields: [gymOwnerId], references: [userId], onDelete: Restrict)
+  gymOwnerId              Int
+  services                Service[]
+  gymClasses              GymClasses[]
+  serviceOptions          ServiceOption[]
   serviceOptionAssignment ServiceOptionAssignment[]
   coverPhoto              Photo?                    @relation("gymCover", fields: [coverPhotoId], references: [id])
   coverPhotoId            Int?                      @unique
@@ -78,38 +73,38 @@ model Gym {
 }
 
 model Service {
-  serviceId           Int                       @id @default(autoincrement())
-  name                String                    
-  price               Float
-  duration            String                    // days or monthly/yearly
-  category            Category
-  target              String
-  optionAssignments   ServiceOptionAssignment[]  
-  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
-  gymId               Int
+  serviceId         Int                       @id @default(autoincrement())
+  name              String
+  price             Float
+  duration          String // days or monthly/yearly
+  category          Category
+  target            String
+  optionAssignments ServiceOptionAssignment[]
+  gym               Gym                       @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId             Int
 
   @@unique([name, gymId])
 }
 
 model ServiceOption {
-  optionId            Int                        @id   @default(autoincrement())
-  name                String                     
-  serviceAssignments  ServiceOptionAssignment[]  
-  gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
-  gymId               Int
+  optionId           Int                       @id @default(autoincrement())
+  name               String
+  serviceAssignments ServiceOptionAssignment[]
+  gym                Gym                       @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId              Int
 
   @@unique([name, gymId])
 }
 
 model ServiceOptionAssignment {
-  optionAssignmentId  Int             @id   @default(autoincrement())
-  serviceId           Int
-  optionId            Int
-  gymId               Int
-  service             Service         @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
-  option              ServiceOption   @relation(fields: [optionId], references: [optionId], onDelete: Cascade)
-  gym                 Gym             @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
-  
+  optionAssignmentId Int           @id @default(autoincrement())
+  serviceId          Int
+  optionId           Int
+  gymId              Int
+  service            Service       @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
+  option             ServiceOption @relation(fields: [optionId], references: [optionId], onDelete: Cascade)
+  gym                Gym           @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+
   @@unique([serviceId, optionId, gymId])
 }
 
@@ -129,15 +124,16 @@ model GymClasses {
 }
 
 model Photo {
-  id         Int             @id @default(autoincrement())
-  url        String
-  altText    String?
-  entityType PhotoEntityType
-  entityId   Int
-  isCover    Boolean         @default(false)
-  order      Int?
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id           Int             @id @default(autoincrement())
+  url          String
+  thumbnailUrl String?
+  altText      String?
+  entityType   PhotoEntityType
+  entityId     Int
+  isCover      Boolean         @default(false)
+  order        Int?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   gymCover   Gym?        @relation("gymCover")
   classCover GymClasses? @relation("classCover")
