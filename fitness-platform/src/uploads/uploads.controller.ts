@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Param,
   UseInterceptors,
   UploadedFile,
@@ -108,5 +109,16 @@ export class UploadsController {
       filePath,
       currentUserId,
     );
+  }
+
+  @Get('profile/:userId')
+  @ApiOperation({ summary: 'Get user profile picture URL' })
+  @ApiParam({ name: 'userId', description: 'ID of the user' })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found or no profile picture',
+  })
+  async getProfilePic(@Param('userId') userId: string) {
+    return await this.uploadsService.getUserProfilePic(+userId);
   }
 }

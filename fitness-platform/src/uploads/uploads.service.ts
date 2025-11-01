@@ -1,4 +1,9 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 @Injectable()
@@ -26,6 +31,21 @@ export class UploadsService {
     return {
       message: 'Profile picture updated successfully',
       profilePic: filePath,
+    };
+  }
+
+  async getUserProfilePic(userId: number) {
+    const user = await this.db.user.findUnique({
+      where: { userId },
+      select: { profilePic: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      profilePic: user.profilePic || null,
     };
   }
 }
