@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { unlink } from 'fs/promises';
+import { mkdir } from 'fs/promises';
+import sharp from 'sharp';
 
 @Injectable()
 export class UploadsService {
@@ -82,6 +84,11 @@ export class UploadsService {
       );
     }
 
+    // Ensure thumbnails directory exists
+    await mkdir(process.env.THUMBNAIL_DIR || './uploads/thumbnails', {
+      recursive: true,
+    });
+
     // Create photo records
     const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
     for (let i = 0; i < filePaths.length; i++) {
@@ -94,6 +101,29 @@ export class UploadsService {
         },
       });
       photos.push(photo);
+    }
+
+    // Generate thumbnails
+    for (const photo of photos) {
+      const originalPath = `.${photo.url}`;
+      const filename = photo.url.split('/').pop();
+      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
+      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
+
+      try {
+        await sharp(originalPath)
+          .resize(300, 300, { fit: 'cover' })
+          .jpeg({ quality: 80 })
+          .toFile(`.${thumbnailPath}`);
+
+        await this.db.photo.update({
+          where: { id: photo.id },
+          data: { thumbnailUrl: thumbnailPath },
+        });
+      } catch (error) {
+        console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
+        // Continue without thumbnail
+      }
     }
 
     // Update gym coverPhotoId if coverIndex provided
@@ -172,6 +202,11 @@ export class UploadsService {
       );
     }
 
+    // Ensure thumbnails directory exists
+    await mkdir(process.env.THUMBNAIL_DIR || './uploads/thumbnails', {
+      recursive: true,
+    });
+
     // Create photo records
     const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
     for (let i = 0; i < filePaths.length; i++) {
@@ -184,6 +219,29 @@ export class UploadsService {
         },
       });
       photos.push(photo);
+    }
+
+    // Generate thumbnails
+    for (const photo of photos) {
+      const originalPath = `.${photo.url}`;
+      const filename = photo.url.split('/').pop();
+      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
+      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
+
+      try {
+        await sharp(originalPath)
+          .resize(300, 300, { fit: 'cover' })
+          .jpeg({ quality: 80 })
+          .toFile(`.${thumbnailPath}`);
+
+        await this.db.photo.update({
+          where: { id: photo.id },
+          data: { thumbnailUrl: thumbnailPath },
+        });
+      } catch (error) {
+        console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
+        // Continue without thumbnail
+      }
     }
 
     // Update class coverPhotoId if coverIndex provided
@@ -239,7 +297,12 @@ export class UploadsService {
     // Find the photo
     const photo = await this.db.photo.findUnique({
       where: { id: photoId },
-      select: { entityType: true, entityId: true, url: true },
+      select: {
+        entityType: true,
+        entityId: true,
+        url: true,
+        thumbnailUrl: true,
+      },
     });
 
     if (!photo || photo.entityType !== 'GYM' || photo.entityId !== gymId) {
@@ -257,12 +320,22 @@ export class UploadsService {
       where: { id: photoId },
     });
 
-    // Delete the file from disk
+    // Delete the files from disk
     try {
       await unlink(`.${photo.url}`);
     } catch (error) {
-      // Log error but don't fail the operation
       console.warn(`Failed to delete file: ${photo.url}`, error);
+    }
+
+    if (photo.thumbnailUrl) {
+      try {
+        await unlink(`.${photo.thumbnailUrl}`);
+      } catch (error) {
+        console.warn(
+          `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
+          error,
+        );
+      }
     }
 
     return { message: 'Photo deleted successfully' };
@@ -300,7 +373,12 @@ export class UploadsService {
     // Find the photo
     const photo = await this.db.photo.findUnique({
       where: { id: photoId },
-      select: { entityType: true, entityId: true, url: true },
+      select: {
+        entityType: true,
+        entityId: true,
+        url: true,
+        thumbnailUrl: true,
+      },
     });
 
     if (!photo || photo.entityType !== 'CLASS' || photo.entityId !== classId) {
@@ -318,12 +396,22 @@ export class UploadsService {
       where: { id: photoId },
     });
 
-    // Delete the file from disk
+    // Delete the files from disk
     try {
       await unlink(`.${photo.url}`);
     } catch (error) {
-      // Log error but don't fail the operation
       console.warn(`Failed to delete file: ${photo.url}`, error);
+    }
+
+    if (photo.thumbnailUrl) {
+      try {
+        await unlink(`.${photo.thumbnailUrl}`);
+      } catch (error) {
+        console.warn(
+          `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
+          error,
+        );
+      }
     }
 
     return { message: 'Photo deleted successfully' };
