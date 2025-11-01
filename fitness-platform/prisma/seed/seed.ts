@@ -11,6 +11,7 @@ async function main() {
     await tx.serviceOption.deleteMany({});
     await tx.service.deleteMany({});
     await tx.gymClasses.deleteMany({});
+    await tx.photo.deleteMany({});
     await tx.gym.deleteMany({});
     await tx.user.deleteMany({});
 
@@ -22,6 +23,7 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "ServiceOption_optionId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "ServiceOptionAssignment_optionAssignmentId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "GymClasses_classId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "Photo_id_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -69,6 +71,26 @@ async function main() {
         },
       });
       gyms.push(gym);
+    }
+
+    // Seed photos for gyms
+    for (const gym of gyms) {
+      const photos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
+      for (let k = 1; k <= 3; k++) {
+        const photo = await tx.photo.create({
+          data: {
+            url: `https://example.com/gym${gym.gymId}-photo${k}.jpg`,
+            entityType: 'GYM',
+            entityId: gym.gymId,
+            isCover: k === 1,
+          },
+        });
+        photos.push(photo);
+      }
+      await tx.gym.update({
+        where: { gymId: gym.gymId },
+        data: { coverPhotoId: photos.find((p) => p.isCover)?.id },
+      });
     }
 
     // Seed services for each gym
@@ -126,11 +148,12 @@ async function main() {
 
     // Seed gym classes
     const trainers = users.filter((u) => u.role === 'TRAINER');
+    const gymClasses: Awaited<ReturnType<typeof tx.gymClasses.create>>[] = [];
     for (const gym of gyms) {
       for (let j = 1; j <= 2; j++) {
         // 2 classes per gym
         const trainer = trainers[(gym.gymId + j) % trainers.length] || users[0];
-        await tx.gymClasses.create({
+        const gymClass = await tx.gymClasses.create({
           data: {
             className: `Class${gym.gymId}-${j}`,
             price: 20 + j * 5,
@@ -141,7 +164,28 @@ async function main() {
             trainerId: trainer.userId,
           },
         });
+        gymClasses.push(gymClass);
       }
+    }
+
+    // Seed photos for gym classes
+    for (const gymClass of gymClasses) {
+      const photos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
+      for (let k = 1; k <= 2; k++) {
+        const photo = await tx.photo.create({
+          data: {
+            url: `https://example.com/class${gymClass.classId}-photo${k}.jpg`,
+            entityType: 'CLASS',
+            entityId: gymClass.classId,
+            isCover: k === 1,
+          },
+        });
+        photos.push(photo);
+      }
+      await tx.gymClasses.update({
+        where: { classId: gymClass.classId },
+        data: { coverPhotoId: photos.find((p) => p.isCover)?.id },
+      });
     }
   }); // end transaction
 
