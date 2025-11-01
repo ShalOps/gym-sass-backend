@@ -6,7 +6,6 @@ import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
-import { mkdir } from 'fs/promises';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
 
@@ -16,7 +15,11 @@ async function bootstrap() {
   await mkdir(fullUploadsPath, { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  );
+
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Serve static files from uploads directory
