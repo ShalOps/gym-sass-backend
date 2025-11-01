@@ -44,6 +44,7 @@ $ cp .env.example .env
 - `DATABASE_URL`: PostgreSQL connection string for Prisma
 - `JWT_SECRET`: Secret key for JWT token signing (use a strong random string in production)
 - `UPLOADS_DIR`: Directory path for file uploads (defaults to `./uploads`)
+- `THUMBNAIL_DIR`: Directory path for image thumbnails (defaults to `./uploads/thumbnails`)
 - `PORT`: Application port (defaults to 3000)
 
 ## Compile and run the project
