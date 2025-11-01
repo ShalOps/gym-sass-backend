@@ -3,8 +3,10 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { unlink } from 'fs/promises';
 
 @Injectable()
 export class UploadsService {
@@ -47,5 +49,391 @@ export class UploadsService {
     return {
       profilePic: user.profilePic || null,
     };
+  }
+
+  async uploadGymPhotos(
+    gymId: number,
+    filePaths: string[],
+    coverIndex: number | undefined,
+    currentUserId: number,
+  ) {
+    // Check if gym exists and user is the owner
+    const gym = await this.db.gym.findUnique({
+      where: { gymId },
+      select: { gymOwnerId: true },
+    });
+
+    if (!gym) {
+      throw new NotFoundException('Gym not found');
+    }
+
+    if (gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException('Only the gym owner can upload photos');
+    }
+
+    // Check current photo count
+    const currentCount = await this.db.photo.count({
+      where: { entityType: 'GYM', entityId: gymId },
+    });
+
+    if (currentCount + filePaths.length > 10) {
+      throw new BadRequestException(
+        `Maximum 10 photos allowed for gyms. Current: ${currentCount}, trying to add: ${filePaths.length}`,
+      );
+    }
+
+    // Create photo records
+    const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
+    for (let i = 0; i < filePaths.length; i++) {
+      const photo = await this.db.photo.create({
+        data: {
+          url: filePaths[i],
+          entityType: 'GYM',
+          entityId: gymId,
+          isCover: coverIndex !== undefined && i === coverIndex,
+        },
+      });
+      photos.push(photo);
+    }
+
+    // Update gym coverPhotoId if coverIndex provided
+    if (coverIndex !== undefined && photos[coverIndex]) {
+      await this.db.gym.update({
+        where: { gymId },
+        data: { coverPhotoId: photos[coverIndex].id },
+      });
+    }
+
+    return {
+      message: 'Photos uploaded successfully',
+      photos,
+    };
+  }
+
+  async getGymPhotos(gymId: number) {
+    const gym = await this.db.gym.findUnique({
+      where: { gymId },
+      select: { gymId: true },
+    });
+
+    if (!gym) {
+      throw new NotFoundException('Gym not found');
+    }
+
+    const photos = await this.db.photo.findMany({
+      where: {
+        entityType: 'GYM',
+        entityId: gymId,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return { photos };
+  }
+
+  async uploadClassPhotos(
+    classId: number,
+    filePaths: string[],
+    coverIndex: number | undefined,
+    currentUserId: number,
+  ) {
+    // Check if class exists and user has permission (gym owner or trainer)
+    const gymClass = await this.db.gymClasses.findUnique({
+      where: { classId },
+      select: {
+        trainerId: true,
+        gym: {
+          select: { gymOwnerId: true },
+        },
+      },
+    });
+
+    if (!gymClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    if (
+      gymClass.gym.gymOwnerId !== currentUserId &&
+      gymClass.trainerId !== currentUserId
+    ) {
+      throw new ForbiddenException(
+        'Only the gym owner or trainer can upload photos',
+      );
+    }
+
+    // Check current photo count
+    const currentCount = await this.db.photo.count({
+      where: { entityType: 'CLASS', entityId: classId },
+    });
+
+    if (currentCount + filePaths.length > 5) {
+      throw new BadRequestException(
+        `Maximum 5 photos allowed for classes. Current: ${currentCount}, trying to add: ${filePaths.length}`,
+      );
+    }
+
+    // Create photo records
+    const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
+    for (let i = 0; i < filePaths.length; i++) {
+      const photo = await this.db.photo.create({
+        data: {
+          url: filePaths[i],
+          entityType: 'CLASS',
+          entityId: classId,
+          isCover: coverIndex !== undefined && i === coverIndex,
+        },
+      });
+      photos.push(photo);
+    }
+
+    // Update class coverPhotoId if coverIndex provided
+    if (coverIndex !== undefined && photos[coverIndex]) {
+      await this.db.gymClasses.update({
+        where: { classId },
+        data: { coverPhotoId: photos[coverIndex].id },
+      });
+    }
+
+    return {
+      message: 'Photos uploaded successfully',
+      photos,
+    };
+  }
+
+  async getClassPhotos(classId: number) {
+    const gymClass = await this.db.gymClasses.findUnique({
+      where: { classId },
+      select: { classId: true },
+    });
+
+    if (!gymClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    const photos = await this.db.photo.findMany({
+      where: {
+        entityType: 'CLASS',
+        entityId: classId,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return { photos };
+  }
+
+  async deleteGymPhoto(gymId: number, photoId: number, currentUserId: number) {
+    // Check if gym exists and user is the owner
+    const gym = await this.db.gym.findUnique({
+      where: { gymId },
+      select: { gymOwnerId: true },
+    });
+
+    if (!gym) {
+      throw new NotFoundException('Gym not found');
+    }
+
+    if (gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException('Only the gym owner can delete photos');
+    }
+
+    // Find the photo
+    const photo = await this.db.photo.findUnique({
+      where: { id: photoId },
+      select: { entityType: true, entityId: true, url: true },
+    });
+
+    if (!photo || photo.entityType !== 'GYM' || photo.entityId !== gymId) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    // If this is the cover photo, remove the cover reference
+    await this.db.gym.updateMany({
+      where: { gymId, coverPhotoId: photoId },
+      data: { coverPhotoId: null },
+    });
+
+    // Delete the photo record
+    await this.db.photo.delete({
+      where: { id: photoId },
+    });
+
+    // Delete the file from disk
+    try {
+      await unlink(`.${photo.url}`);
+    } catch (error) {
+      // Log error but don't fail the operation
+      console.warn(`Failed to delete file: ${photo.url}`, error);
+    }
+
+    return { message: 'Photo deleted successfully' };
+  }
+
+  async deleteClassPhoto(
+    classId: number,
+    photoId: number,
+    currentUserId: number,
+  ) {
+    // Check if class exists and user has permission
+    const gymClass = await this.db.gymClasses.findUnique({
+      where: { classId },
+      select: {
+        trainerId: true,
+        gym: {
+          select: { gymOwnerId: true },
+        },
+      },
+    });
+
+    if (!gymClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    if (
+      gymClass.gym.gymOwnerId !== currentUserId &&
+      gymClass.trainerId !== currentUserId
+    ) {
+      throw new ForbiddenException(
+        'Only the gym owner or trainer can delete photos',
+      );
+    }
+
+    // Find the photo
+    const photo = await this.db.photo.findUnique({
+      where: { id: photoId },
+      select: { entityType: true, entityId: true, url: true },
+    });
+
+    if (!photo || photo.entityType !== 'CLASS' || photo.entityId !== classId) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    // If this is the cover photo, remove the cover reference
+    await this.db.gymClasses.updateMany({
+      where: { classId, coverPhotoId: photoId },
+      data: { coverPhotoId: null },
+    });
+
+    // Delete the photo record
+    await this.db.photo.delete({
+      where: { id: photoId },
+    });
+
+    // Delete the file from disk
+    try {
+      await unlink(`.${photo.url}`);
+    } catch (error) {
+      // Log error but don't fail the operation
+      console.warn(`Failed to delete file: ${photo.url}`, error);
+    }
+
+    return { message: 'Photo deleted successfully' };
+  }
+
+  async updateGymCoverPhoto(
+    gymId: number,
+    photoId: number,
+    currentUserId: number,
+  ) {
+    // Check if gym exists and user is the owner
+    const gym = await this.db.gym.findUnique({
+      where: { gymId },
+      select: { gymOwnerId: true },
+    });
+
+    if (!gym) {
+      throw new NotFoundException('Gym not found');
+    }
+
+    if (gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException('Only the gym owner can update cover photo');
+    }
+
+    // Check if photo exists and belongs to this gym
+    const photo = await this.db.photo.findUnique({
+      where: { id: photoId },
+      select: { entityType: true, entityId: true },
+    });
+
+    if (!photo || photo.entityType !== 'GYM' || photo.entityId !== gymId) {
+      throw new NotFoundException('Photo not found for this gym');
+    }
+
+    // Update cover photo: set this photo as cover, unset others
+    await this.db.photo.updateMany({
+      where: { entityType: 'GYM', entityId: gymId },
+      data: { isCover: false },
+    });
+
+    await this.db.photo.update({
+      where: { id: photoId },
+      data: { isCover: true },
+    });
+
+    // Update gym's coverPhotoId
+    await this.db.gym.update({
+      where: { gymId },
+      data: { coverPhotoId: photoId },
+    });
+
+    return { message: 'Cover photo updated successfully' };
+  }
+
+  async updateClassCoverPhoto(
+    classId: number,
+    photoId: number,
+    currentUserId: number,
+  ) {
+    // Check if class exists and user has permission
+    const gymClass = await this.db.gymClasses.findUnique({
+      where: { classId },
+      select: {
+        trainerId: true,
+        gym: {
+          select: { gymOwnerId: true },
+        },
+      },
+    });
+
+    if (!gymClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    if (
+      gymClass.gym.gymOwnerId !== currentUserId &&
+      gymClass.trainerId !== currentUserId
+    ) {
+      throw new ForbiddenException(
+        'Only the gym owner or trainer can update cover photo',
+      );
+    }
+
+    // Check if photo exists and belongs to this class
+    const photo = await this.db.photo.findUnique({
+      where: { id: photoId },
+      select: { entityType: true, entityId: true },
+    });
+
+    if (!photo || photo.entityType !== 'CLASS' || photo.entityId !== classId) {
+      throw new NotFoundException('Photo not found for this class');
+    }
+
+    // Update cover photo: set this photo as cover, unset others
+    await this.db.photo.updateMany({
+      where: { entityType: 'CLASS', entityId: classId },
+      data: { isCover: false },
+    });
+
+    await this.db.photo.update({
+      where: { id: photoId },
+      data: { isCover: true },
+    });
+
+    // Update class's coverPhotoId
+    await this.db.gymClasses.update({
+      where: { classId },
+      data: { coverPhotoId: photoId },
+    });
+
+    return { message: 'Cover photo updated successfully' };
   }
 }
