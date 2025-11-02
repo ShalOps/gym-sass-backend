@@ -91,19 +91,39 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
-    for (let i = 0; i < filePaths.length; i++) {
-      const photo = await this.db.photo.create({
-        data: {
-          url: filePaths[i],
-          entityType: 'GYM',
-          entityId: gymId,
-          isCover: coverIndex !== undefined && i === coverIndex,
-          order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
-        },
-      });
-      photos.push(photo);
-    }
+    const photos = await this.db.$transaction(async (tx) => {
+      // Reset existing cover if setting a new one
+      if (coverIndex !== undefined) {
+        await tx.photo.updateMany({
+          where: { entityType: 'GYM', entityId: gymId },
+          data: { isCover: false },
+        });
+      }
+
+      const createdPhotos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
+      for (let i = 0; i < filePaths.length; i++) {
+        const photo = await tx.photo.create({
+          data: {
+            url: filePaths[i],
+            entityType: 'GYM',
+            entityId: gymId,
+            isCover: coverIndex !== undefined && i === coverIndex,
+            order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
+          },
+        });
+        createdPhotos.push(photo);
+      }
+
+      // Update gym coverPhotoId if coverIndex provided
+      if (coverIndex !== undefined && createdPhotos[coverIndex]) {
+        await tx.gym.update({
+          where: { gymId },
+          data: { coverPhotoId: createdPhotos[coverIndex].id },
+        });
+      }
+
+      return createdPhotos;
+    });
 
     // Generate thumbnails
     for (const photo of photos) {
@@ -126,14 +146,6 @@ export class UploadsService {
         console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
         // Continue without thumbnail
       }
-    }
-
-    // Update gym coverPhotoId if coverIndex provided
-    if (coverIndex !== undefined && photos[coverIndex]) {
-      await this.db.gym.update({
-        where: { gymId },
-        data: { coverPhotoId: photos[coverIndex].id },
-      });
     }
 
     return {
@@ -211,19 +223,39 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos: Awaited<ReturnType<typeof this.db.photo.create>>[] = [];
-    for (let i = 0; i < filePaths.length; i++) {
-      const photo = await this.db.photo.create({
-        data: {
-          url: filePaths[i],
-          entityType: 'CLASS',
-          entityId: classId,
-          isCover: coverIndex !== undefined && i === coverIndex,
-          order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
-        },
-      });
-      photos.push(photo);
-    }
+    const photos = await this.db.$transaction(async (tx) => {
+      // Reset existing cover if setting a new one
+      if (coverIndex !== undefined) {
+        await tx.photo.updateMany({
+          where: { entityType: 'CLASS', entityId: classId },
+          data: { isCover: false },
+        });
+      }
+
+      const createdPhotos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
+      for (let i = 0; i < filePaths.length; i++) {
+        const photo = await tx.photo.create({
+          data: {
+            url: filePaths[i],
+            entityType: 'CLASS',
+            entityId: classId,
+            isCover: coverIndex !== undefined && i === coverIndex,
+            order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
+          },
+        });
+        createdPhotos.push(photo);
+      }
+
+      // Update class coverPhotoId if coverIndex provided
+      if (coverIndex !== undefined && createdPhotos[coverIndex]) {
+        await tx.gymClasses.update({
+          where: { classId },
+          data: { coverPhotoId: createdPhotos[coverIndex].id },
+        });
+      }
+
+      return createdPhotos;
+    });
 
     // Generate thumbnails
     for (const photo of photos) {
@@ -246,14 +278,6 @@ export class UploadsService {
         console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
         // Continue without thumbnail
       }
-    }
-
-    // Update class coverPhotoId if coverIndex provided
-    if (coverIndex !== undefined && photos[coverIndex]) {
-      await this.db.gymClasses.update({
-        where: { classId },
-        data: { coverPhotoId: photos[coverIndex].id },
-      });
     }
 
     return {
