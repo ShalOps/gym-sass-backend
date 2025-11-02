@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
+// /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   ForbiddenException,
@@ -58,6 +58,7 @@ export class UploadsService {
     filePaths: string[],
     coverIndex: number | undefined,
     currentUserId: number,
+    orders?: number[],
   ) {
     // Check if gym exists and user is the owner
     const gym = await this.db.gym.findUnique({
@@ -98,6 +99,7 @@ export class UploadsService {
           entityType: 'GYM',
           entityId: gymId,
           isCover: coverIndex !== undefined && i === coverIndex,
+          order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
         },
       });
       photos.push(photo);
@@ -155,7 +157,7 @@ export class UploadsService {
         entityType: 'GYM',
         entityId: gymId,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
     });
 
     return { photos };
@@ -166,6 +168,7 @@ export class UploadsService {
     filePaths: string[],
     coverIndex: number | undefined,
     currentUserId: number,
+    orders?: number[],
   ) {
     // Check if class exists and user has permission (gym owner or trainer)
     const gymClass = await this.db.gymClasses.findUnique({
@@ -216,6 +219,7 @@ export class UploadsService {
           entityType: 'CLASS',
           entityId: classId,
           isCover: coverIndex !== undefined && i === coverIndex,
+          order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
         },
       });
       photos.push(photo);
@@ -273,7 +277,7 @@ export class UploadsService {
         entityType: 'CLASS',
         entityId: classId,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { order: 'asc' },
     });
 
     return { photos };
@@ -523,5 +527,107 @@ export class UploadsService {
     });
 
     return { message: 'Cover photo updated successfully' };
+  }
+
+  async updateGymPhotoOrders(
+    gymId: number,
+    photoOrders: { photoId: number; order: number }[],
+    currentUserId: number,
+  ) {
+    // Check if gym exists and user is the owner
+    const gym = await this.db.gym.findUnique({
+      where: { gymId },
+      select: { gymOwnerId: true },
+    });
+
+    if (!gym) {
+      throw new NotFoundException('Gym not found');
+    }
+
+    if (gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException('Only the gym owner can reorder photos');
+    }
+
+    // Update orders in a transaction
+    await this.db.$transaction(async (tx) => {
+      for (const { photoId, order } of photoOrders) {
+        // Verify photo belongs to this gym
+        const photo = await tx.photo.findUnique({
+          where: { id: photoId },
+          select: { entityType: true, entityId: true },
+        });
+
+        if (!photo || photo.entityType !== 'GYM' || photo.entityId !== gymId) {
+          throw new NotFoundException(
+            `Photo ${photoId} not found for this gym`,
+          );
+        }
+
+        await tx.photo.update({
+          where: { id: photoId },
+          data: { order },
+        });
+      }
+    });
+
+    return { message: 'Photo orders updated successfully' };
+  }
+
+  async updateClassPhotoOrders(
+    classId: number,
+    photoOrders: { photoId: number; order: number }[],
+    currentUserId: number,
+  ) {
+    // Check if class exists and user has permission
+    const gymClass = await this.db.gymClasses.findUnique({
+      where: { classId },
+      select: {
+        trainerId: true,
+        gym: {
+          select: { gymOwnerId: true },
+        },
+      },
+    });
+
+    if (!gymClass) {
+      throw new NotFoundException('Class not found');
+    }
+
+    if (
+      gymClass.gym.gymOwnerId !== currentUserId &&
+      gymClass.trainerId !== currentUserId
+    ) {
+      throw new ForbiddenException(
+        'Only the gym owner or trainer can reorder photos',
+      );
+    }
+
+    // Update orders in a transaction
+    await this.db.$transaction(async (tx) => {
+      for (const { photoId, order } of photoOrders) {
+        // Verify photo belongs to this class
+        const photo = await tx.photo.findUnique({
+          where: { id: photoId },
+          select: { entityType: true, entityId: true },
+        });
+
+        if (
+          !photo ||
+          photo.entityType !== 'CLASS' ||
+          photo.entityId !== classId
+        ) {
+          throw new NotFoundException(
+            `Photo ${photoId} not found for this class`,
+          );
+        }
+
+        await tx.photo.update({
+          where: { id: photoId },
+          data: { order },
+        });
+      }
+    });
+
+    return { message: 'Photo orders updated successfully' };
   }
 }
