@@ -131,7 +131,7 @@ export class UploadsController {
   @ApiParam({ name: 'id', description: 'ID of the gym' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'Photos and cover index',
+    description: 'Photos, cover index, and optional orders',
     schema: {
       type: 'object',
       properties: {
@@ -143,6 +143,12 @@ export class UploadsController {
         coverIndex: {
           type: 'number',
           description: 'Index of the cover photo (0-based, optional)',
+        },
+        orders: {
+          type: 'array',
+          items: { type: 'number' },
+          description:
+            'Order values for each photo (optional, defaults to sequential)',
         },
       },
     },
@@ -191,10 +197,24 @@ export class UploadsController {
     }
 
     const filePaths = files.map((file) => `/uploads/${file.filename}`);
-    const body = req.body as { coverIndex?: string };
+    const body = req.body as { coverIndex?: string; orders?: string };
     const coverIndex = body.coverIndex
       ? parseInt(body.coverIndex, 10)
       : undefined;
+
+    let orders: number[] | undefined;
+    if (body.orders) {
+      try {
+        orders = JSON.parse(body.orders);
+        if (!Array.isArray(orders) || orders.length !== files.length) {
+          throw new BadRequestException(
+            'Orders must be an array matching the number of files',
+          );
+        }
+      } catch {
+        throw new BadRequestException('Invalid orders format');
+      }
+    }
 
     if (
       coverIndex !== undefined &&
@@ -210,6 +230,7 @@ export class UploadsController {
       filePaths,
       coverIndex,
       currentUserId,
+      orders,
     );
   }
 
@@ -233,7 +254,7 @@ export class UploadsController {
   @ApiParam({ name: 'id', description: 'ID of the class' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'Photos and cover index',
+    description: 'Photos, cover index, and optional orders',
     schema: {
       type: 'object',
       properties: {
@@ -245,6 +266,12 @@ export class UploadsController {
         coverIndex: {
           type: 'number',
           description: 'Index of the cover photo (0-based, optional)',
+        },
+        orders: {
+          type: 'array',
+          items: { type: 'number' },
+          description:
+            'Order values for each photo (optional, defaults to sequential)',
         },
       },
     },
@@ -293,10 +320,24 @@ export class UploadsController {
     }
 
     const filePaths = files.map((file) => `/uploads/${file.filename}`);
-    const body = req.body as { coverIndex?: string };
+    const body = req.body as { coverIndex?: string; orders?: string };
     const coverIndex = body.coverIndex
       ? parseInt(body.coverIndex, 10)
       : undefined;
+
+    let orders: number[] | undefined;
+    if (body.orders) {
+      try {
+        orders = JSON.parse(body.orders);
+        if (!Array.isArray(orders) || orders.length !== files.length) {
+          throw new BadRequestException(
+            'Orders must be an array matching the number of files',
+          );
+        }
+      } catch {
+        throw new BadRequestException('Invalid orders format');
+      }
+    }
 
     if (
       coverIndex !== undefined &&
@@ -312,6 +353,7 @@ export class UploadsController {
       filePaths,
       coverIndex,
       currentUserId,
+      orders,
     );
   }
 
@@ -442,6 +484,92 @@ export class UploadsController {
     return await this.uploadsService.updateClassCoverPhoto(
       +classId,
       +photoId,
+      currentUserId,
+    );
+  }
+
+  @Put('gym/:id/photos/order')
+  @ApiOperation({ summary: 'Update photo order for a gym' })
+  @ApiParam({ name: 'id', description: 'ID of the gym' })
+  @ApiBody({
+    description: 'Photo order updates',
+    schema: {
+      type: 'object',
+      properties: {
+        photoOrders: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              photoId: { type: 'number' },
+              order: { type: 'number' },
+            },
+          },
+          description: 'Array of photo ID and order pairs',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Photo orders updated successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - only gym owner can reorder',
+  })
+  async updateGymPhotoOrders(
+    @Param('id') gymId: string,
+    @Body() body: { photoOrders: { photoId: number; order: number }[] },
+    @Req() req: Request,
+  ) {
+    const currentUserId = (req.user as User).userId;
+    return await this.uploadsService.updateGymPhotoOrders(
+      +gymId,
+      body.photoOrders,
+      currentUserId,
+    );
+  }
+
+  @Put('class/:id/photos/order')
+  @ApiOperation({ summary: 'Update photo order for a gym class' })
+  @ApiParam({ name: 'id', description: 'ID of the class' })
+  @ApiBody({
+    description: 'Photo order updates',
+    schema: {
+      type: 'object',
+      properties: {
+        photoOrders: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              photoId: { type: 'number' },
+              order: { type: 'number' },
+            },
+          },
+          description: 'Array of photo ID and order pairs',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Photo orders updated successfully',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - only gym owner or trainer can reorder',
+  })
+  async updateClassPhotoOrders(
+    @Param('id') classId: string,
+    @Body() body: { photoOrders: { photoId: number; order: number }[] },
+    @Req() req: Request,
+  ) {
+    const currentUserId = (req.user as User).userId;
+    return await this.uploadsService.updateClassPhotoOrders(
+      +classId,
+      body.photoOrders,
       currentUserId,
     );
   }
