@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/create-services.dto';
 import { UpdateServiceDto } from './dto/update-services.dto';
@@ -21,8 +21,8 @@ export class ServicesController {
   @ApiResponse({status: 400, description: 'Invalid input data.' })
   @ApiResponse({ status: 409, description: 'Service with this name already exists in the gym.' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createServiceDto: CreateServiceDto) {
-    return this.servicesService.create(createServiceDto);
+  create(@Body() createServiceDto: CreateServiceDto, @Req() req: any) {
+    return this.servicesService.create(createServiceDto, req.user.userId);
   }
 
   @Get()
@@ -49,8 +49,8 @@ export class ServicesController {
   @ApiResponse({ status: 404, description: 'Service not found.' })
   @ApiResponse({ status: 409, description: 'Updated name conflicts with existing service in the same gym.' })
   @ApiBearerAuth('JWT-auth')
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceDto: UpdateServiceDto) {
-    return this.servicesService.update(id, updateServiceDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceDto: UpdateServiceDto, @Req() req: any) {
+    return this.servicesService.update(id, updateServiceDto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -61,8 +61,8 @@ export class ServicesController {
   @ApiResponse({ status: 404, description: 'Service not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.servicesService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    await this.servicesService.remove(id, req.user.userId);
   }
 
 }
