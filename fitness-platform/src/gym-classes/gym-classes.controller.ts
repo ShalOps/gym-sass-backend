@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { GymClassesService } from './gym-classes.service';
 import { CreateGymClassesDto } from './dto/create-gym-classes.dto';
 import { UpdateGymClassesDto } from './dto/update-gym-classes.dto';
@@ -21,8 +21,8 @@ export class GymClassesController {
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 404, description: 'Gym or trainer not found.' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createGymClassesDto: CreateGymClassesDto) {
-    return this.gymClassesService.create(createGymClassesDto);
+  create(@Body() createGymClassesDto: CreateGymClassesDto, @Req() req: any) {
+    return this.gymClassesService.create(createGymClassesDto, req.user.userId);
   }
 
   @Get()
@@ -48,8 +48,8 @@ export class GymClassesController {
   @ApiResponse({ status: 400, description: 'Invalid update data.' })
   @ApiResponse({ status: 404, description: 'Gym class or referenced gym/trainer not found.' })
   @ApiBearerAuth('JWT-auth')
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateGymClassesDto: UpdateGymClassesDto) {
-    return this.gymClassesService.update(id, updateGymClassesDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateGymClassesDto: UpdateGymClassesDto,  @Req() req: any) {
+    return this.gymClassesService.update(id, updateGymClassesDto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,7 +60,7 @@ export class GymClassesController {
   @ApiResponse({ status: 404, description: 'Gym class not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.gymClassesService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    await this.gymClassesService.remove(id, req.user.userId);
   }
 }
