@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { ServiceOptionAssignmentService } from './service-option-assignment.service';
 import { CreateServiceOptionAssignmentDto } from './dto/create-service-option-assignment.dto';
 import { UpdateServiceOptionAssignmentDto } from './dto/update-service-option-assignment.dto';
@@ -20,8 +20,8 @@ export class ServiceOptionAssignmentController {
   @ApiResponse({ status: 400, description: 'Invalid payload.' })
   @ApiResponse({ status: 409, description: 'Assignment already exists.' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createServiceOptionAssignmentDto: CreateServiceOptionAssignmentDto) {
-    return this.serviceOptionAssignmentService.create(createServiceOptionAssignmentDto);
+  create(@Body() createServiceOptionAssignmentDto: CreateServiceOptionAssignmentDto, @Req() req: any) {
+    return this.serviceOptionAssignmentService.create(createServiceOptionAssignmentDto, req.user.userId);
   }
 
   @Get()
@@ -49,8 +49,8 @@ export class ServiceOptionAssignmentController {
   @ApiResponse({ status: 409, description: 'New combination violates unique constraint.',
   })
   @ApiBearerAuth('JWT-auth')
-  update(@Param('id') id: string, @Body() updateServiceOptionAssignmentDto: UpdateServiceOptionAssignmentDto) {
-    return this.serviceOptionAssignmentService.update(+id, updateServiceOptionAssignmentDto);
+  update(@Param('id') id: string, @Body() updateServiceOptionAssignmentDto: UpdateServiceOptionAssignmentDto, @Req() req: any) {
+    return this.serviceOptionAssignmentService.update(+id, updateServiceOptionAssignmentDto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -61,7 +61,7 @@ export class ServiceOptionAssignmentController {
   @ApiResponse({ status: 404, description: 'Assignment not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  remove(@Param('id') id: string) {
-    return this.serviceOptionAssignmentService.remove(+id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.serviceOptionAssignmentService.remove(+id, req.user.userId);
   }
 }
