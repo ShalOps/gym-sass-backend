@@ -41,12 +41,12 @@ export class CreateGymsDto {
   @IsBoolean()
   verified?: boolean;
 
-  @ApiProperty({
-    description: 'ID of the gym owner (User with role GYMOWNER)',
-    example: 5,
-  })
-  @IsInt()
-  gymOwnerId: number;
+  // @ApiProperty({
+  //   description: 'ID of the gym owner (User with role GYMOWNER)',
+  //   example: 5,
+  // })
+  // @IsInt()
+  // gymOwnerId: number;
 }
 
 export class PaginationDto {
