@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { ServiceOptionService } from './service-option.service';
 import { Prisma } from '@prisma/client'; 
 import { CreateServiceOptionDto } from './dto/create-service-option.dto';
@@ -21,8 +21,8 @@ export class ServiceOptionController {
   @ApiResponse({ status: 400, description: 'Invalid request payload.' })
   @ApiResponse({ status: 409, description: 'Option name already exists for this gym ' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createServiceOptionDto: CreateServiceOptionDto) {
-    return this.serviceOptionService.create(createServiceOptionDto);
+  create(@Body() createServiceOptionDto: CreateServiceOptionDto, @Req() req: any) {
+    return this.serviceOptionService.create(createServiceOptionDto, req.user.userId);
   }
 
   @Get()
@@ -49,8 +49,8 @@ export class ServiceOptionController {
   @ApiResponse({ status: 404, description: 'Service option not found.' })
   @ApiResponse({ status: 409, description: 'Updated name conflicts with another option in the same gym.' })
   @ApiBearerAuth('JWT-auth')
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceOptionDto: UpdateServiceOptionDto) {
-    return this.serviceOptionService.update(id, updateServiceOptionDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateServiceOptionDto: UpdateServiceOptionDto, @Req() req: any) {
+    return this.serviceOptionService.update(id, updateServiceOptionDto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -61,7 +61,7 @@ export class ServiceOptionController {
   @ApiResponse({ status: 404, description: 'Service option not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.serviceOptionService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    await this.serviceOptionService.remove(id, req.user.userId);
   }
 }
