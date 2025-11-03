@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUsersDto } from './dto/update-users.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -66,11 +67,11 @@ export class UsersService {
     });
   }
 
-  async update(id: number, updateUsersDto: UpdateUsersDto) {
+  async update(updateUsersDto: UpdateUsersDto, currentUserId: number) {
 
     const user = await this.databaseservice.user.findUnique({
       where: {
-        userId: id,
+        userId: currentUserId,
       },
       select: {
         userId: true
@@ -78,22 +79,26 @@ export class UsersService {
     })
 
     if(!user){
-      throw new NotFoundException(`User with ID ${id} id not found`)
+      throw new NotFoundException(`User with ID ${currentUserId} id not found`)
     }
     
+    if (updateUsersDto.password){
+        updateUsersDto.password = await bcrypt.hash(updateUsersDto.password, 10);
+    }
+
     return this.databaseservice.user.update({
       where: {
-        userId: id,
+        userId: currentUserId,
       },
       data: updateUsersDto,
     });
   }
 
-  async remove(id: number) {
+  async remove(currentUserId: number) {
 
     const user = await this.databaseservice.user.findUnique({
       where: {
-        userId: id,
+        userId: currentUserId,
       },
       select: {
         userId: true
@@ -101,13 +106,13 @@ export class UsersService {
     })
 
     if(!user){
-      throw new NotFoundException(`User with ID ${id} id not found`)
+      throw new NotFoundException(`User with ID ${currentUserId} id not found`)
     }
 
 
     await this.databaseservice.user.delete({
       where: {
-        userId: id,
+        userId: currentUserId,
       },
     });
   }

@@ -9,7 +9,8 @@ import {
   Query,
   BadRequestException,
   HttpCode,
-  UseGuards
+  UseGuards,
+  Req
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
@@ -17,6 +18,8 @@ import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateUsersDto } from './dto/update-users.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/roles.decorator';
 
 
 @ApiTags('users')
@@ -24,10 +27,13 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Get()
   @ApiOperation({ summary: 'Get paginated list of users' })
   @ApiResponse({ status: 200, description: 'List of users' })
   @ApiResponse({ status: 400, description: 'Invalid parameters' })
+  @ApiBearerAuth('JWT-auth')
   findAll(@Query() query: any) {
     try {
       const pagination: PaginationDto = PaginationSchema.parse(query);
@@ -46,26 +52,23 @@ export class UsersController {
   // }
 
   @UseGuards(JwtAuthGuard)
-  @Patch(':id')
+  @Patch()
   @ApiOperation({ summary: 'Update user by ID' })
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth('JWT-auth')
-  update(
-    @Param('id') id: string,
-    @Body() updateUsersDto: UpdateUsersDto,
-  ) {
-    return this.usersService.update(+id, updateUsersDto);
+  update(@Body() updateUsersDto: UpdateUsersDto, @Req() req: any) {
+    return this.usersService.update(updateUsersDto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Delete(':id')
+  @Delete()
   @ApiOperation({ summary: 'Delete user by ID' })
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id') id: string) {
-    await this.usersService.remove(+id);
+  async remove(@Req() req: any) {
+    await this.usersService.remove(req.user.userId);
   }
 }
