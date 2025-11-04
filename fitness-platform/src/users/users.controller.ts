@@ -7,6 +7,9 @@ import {
   Delete,
   Query,
   BadRequestException,
+  HttpCode,
+  UseGuards,
+  Req
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
@@ -18,14 +21,21 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UpdateUsersDto } from './dto/update-users.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/roles.decorator';
+
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Get()
   @ApiOperation({ summary: 'Get paginated list of users' })
   @ApiQuery({
@@ -72,6 +82,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'List of users' })
   @ApiResponse({ status: 400, description: 'Invalid parameters' })
+  @ApiBearerAuth('JWT-auth')
   findAll(@Query() query: any) {
     try {
       const pagination: PaginationDto = PaginationSchema.parse(query);
@@ -81,16 +92,16 @@ export class UsersController {
     }
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiParam({ name: 'id', type: Number, description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'User data' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
-  }
+  // @Get(':id')
+  // @ApiOperation({ summary: 'Get user by ID' })
+  // @ApiResponse({ status: 200, description: 'User data' })
+  // @ApiResponse({ status: 404, description: 'User not found' })
+  // findOne(@Param('id') id: string) {
+  //   return this.usersService.findOne(+id);
+  // }
 
-  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @Patch()
   @ApiOperation({ summary: 'Update user by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiBody({
@@ -140,16 +151,20 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  update(@Param('id') id: string, @Body() updateUsersDto: UpdateUsersDto) {
-    return this.usersService.update(+id, updateUsersDto);
+  @ApiBearerAuth('JWT-auth')
+  update(@Body() updateUsersDto: UpdateUsersDto, @Req() req: any) {
+    return this.usersService.update(updateUsersDto, req.user.userId);
   }
 
-  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @Delete()
   @ApiOperation({ summary: 'Delete user by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(+id);
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(204)
+  async remove(@Req() req: any) {
+    await this.usersService.remove(req.user.userId);
   }
 }

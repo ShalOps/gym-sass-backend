@@ -9,7 +9,7 @@ import { UpdateGymClassesDto } from './dto/update-gym-classes.dto';
 export class GymClassesService {
   constructor(private readonly databaseservice: DatabaseService){}
 
-  async create(createGymClassesDto: CreateGymClassesDto) {
+  async create(createGymClassesDto: CreateGymClassesDto, currentUserId: number) {
 
     const gym= await this.databaseservice.gym.findUnique({
       where: {
@@ -17,6 +17,7 @@ export class GymClassesService {
       },
       select: {
         gymId: true,
+        gymOwnerId: true,
       },
     })
 
@@ -40,6 +41,23 @@ export class GymClassesService {
     }
     if (trainer.role !== 'TRAINER') {
       throw new ForbiddenException(`User with ID ${createGymClassesDto.trainerId} is not a trainer`);
+    }
+    
+    const ownerOrAdmin = await this.databaseservice.user.findUnique({
+      where: { 
+        userId: currentUserId
+       },
+      select:
+       {
+         userId: true, 
+         role: true 
+        },
+    });
+        
+    if (ownerOrAdmin?.role !== "ADMIN"){
+      if(gym?.gymOwnerId !== currentUserId){
+              throw new ForbiddenException('Cannot create class for gym you do not own')
+          }
     }
 
     return this.databaseservice.gymClasses.create({
@@ -79,59 +97,95 @@ export class GymClassesService {
     });
   }
 
-  async update(id: number, updateGymClassesDto: UpdateGymClassesDto) {
+  async update(id: number, updateGymClassesDto: UpdateGymClassesDto, currentUserId: number) {
 
+    let gym: { gymId: number, gymOwnerId: number } | null = null;
+    
     if (updateGymClassesDto.gymId){
 
-      const gym= await this.databaseservice.gym.findUnique({
-      where: {
-        gymId: updateGymClassesDto.gymId
-      },
-      select: {
-        gymId: true,
+      gym = await this.databaseservice.gym.findUnique({
+        where: {
+          gymId: updateGymClassesDto.gymId
         },
+        select: {
+          gymId: true,
+          gymOwnerId: true,
+          },
+        })
+
+        if (!gym){
+          throw new NotFoundException(`Gym with ID ${updateGymClassesDto.gymId} not found`)
+        }
+
+    }
+    else {
+      const result = await this.databaseservice.gymClasses.findUnique({
+        where: {
+          classId: id
+        },
+        select: {
+          gym: {
+            select: {
+              gymId: true,      
+              gymOwnerId: true,  
+            }
+          }
+        }
+
       })
-
-      if (!gym){
-        throw new NotFoundException(`Gym with ID ${updateGymClassesDto.gymId} not found`)
-      }
-
+      gym = result?.gym ?? null;
     }
     
     
     if (updateGymClassesDto.trainerId){
 
       const trainer = await this.databaseservice.user.findUnique({
-      where: { 
-        userId: updateGymClassesDto.trainerId 
-      },
-      select:
-       {
-         userId: true, 
-         role: true 
+        where: { 
+          userId: updateGymClassesDto.trainerId 
         },
-      });
+        select: {
+          userId: true, 
+          role: true 
+          },
+        });
 
-    if (!trainer) {
-      throw new NotFoundException(`User with ID ${updateGymClassesDto.trainerId} not found`);
-    }
-    if (trainer.role !== 'TRAINER') {
-      throw new ForbiddenException(`User with ID ${updateGymClassesDto.trainerId} is not a trainer`);
-    }
-
-    }
-    
-
-
-    const gymClass = await this.databaseservice.gymClasses.findUnique({
-      where: {
-        classId: id
+      if (!trainer) {
+        throw new NotFoundException(`User with ID ${updateGymClassesDto.trainerId} not found`);
       }
-    });
+      if (trainer.role !== 'TRAINER') {
+        throw new ForbiddenException(`User with ID ${updateGymClassesDto.trainerId} is not a trainer`);
+      }
+
+      }
+
+      const gymClass = await this.databaseservice.gymClasses.findUnique({
+        where: {
+          classId: id
+        }
+      });
 
       if (!gymClass) {
         throw new NotFoundException(`Gym class with ID ${id} not found`)
       }
+
+        
+      const ownerOrAdmin = await this.databaseservice.user.findUnique({
+        where: {
+          userId: currentUserId
+        },
+        select: {
+          userId: true,
+          role: true,
+        }
+      })
+
+
+      if(ownerOrAdmin?.role !== "ADMIN"){
+          if (gym?.gymOwnerId !== currentUserId){
+            throw new ForbiddenException(`Cannot update gym you do not own`)
+          }
+            
+        }
       
       return this.databaseservice.gymClasses.update({
         where: {
@@ -141,16 +195,42 @@ export class GymClassesService {
       });
   }
 
-  async remove(id: number) {
+  async remove(id: number, currentUserId: number) {
     const gymClass = await this.databaseservice.gymClasses.findUnique({
       where: {
         classId: id
-      }
+      },
+        select: {
+          gym: {
+            select: {
+              gymId: true,      
+              gymOwnerId: true,  
+            }
+          }
+        }
     });
 
     if (!gymClass) {
       throw new NotFoundException(`Gym class with ID ${id} not found`)
     }
+
+    const ownerOrAdmin = await this.databaseservice.user.findUnique({
+        where: {
+          userId: currentUserId
+        },
+        select: {
+          userId: true,
+          role: true,
+        }
+      })
+
+
+      if(ownerOrAdmin?.role !== "ADMIN"){
+          if (gymClass?.gym.gymOwnerId !== currentUserId){
+            throw new ForbiddenException(`Cannot delete a gym you do not own`)
+          }
+            
+        }
 
     await this.databaseservice.gymClasses.delete({
       where: {
