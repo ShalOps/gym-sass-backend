@@ -30,6 +30,8 @@ model User {
   role       Role            @default(CUSTOMER)
   gyms       Gym[]
   gymclasses GymClasses[]
+  reviews         GymReview[]
+  reviewResponses GymReviewResponse[]
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
@@ -69,6 +71,8 @@ model Gym {
   gymClasses      GymClasses[]
   serviceOptions  ServiceOption[]   
   serviceOptionAssignment ServiceOptionAssignment[]
+  reviews GymReview[]
+
 
   @@index([location])
   @@index([verified])
@@ -160,3 +164,4 @@ model GymReviewResponse {
   owner       User       @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
   ownerId     Int
 }
+
