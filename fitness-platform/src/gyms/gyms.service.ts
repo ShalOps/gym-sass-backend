@@ -9,11 +9,11 @@ import { UpdateGymsDto } from './dto/update-gyms.dto';
 export class GymsService {
   constructor(private readonly databaseservice: DatabaseService) {}
 
-  async create(createGymsDto: CreateGymsDto) {
+  async create(createGymsDto: CreateGymsDto, currentUserId: number) {
 
     const gymOwner = await this.databaseservice.user.findUnique({
           where: { 
-            userId: createGymsDto.gymOwnerId
+            userId: currentUserId
            },
           select:
            {
@@ -23,14 +23,16 @@ export class GymsService {
         });
     
         if (!gymOwner) {
-          throw new NotFoundException(`User with ID ${createGymsDto.gymOwnerId} not found`);
+          throw new NotFoundException(`User with ID ${currentUserId} not found`);
         }
         if (gymOwner.role !== 'GYMOWNER') {
-          throw new ForbiddenException(`User with ID ${createGymsDto.gymOwnerId} is not a Gym owner`);
+          throw new ForbiddenException(`User with ID ${currentUserId} is not a Gym owner`);
         }
     
     return this.databaseservice.gym.create({
-      data: createGymsDto,
+      data: { ...createGymsDto,
+         gymOwnerId: currentUserId
+        }
     });
   }
 
@@ -83,7 +85,7 @@ export class GymsService {
 
   async findOne(id: number) {
     
-    const gym= await this.databaseservice.gym.findUnique({
+    const gym = await this.databaseservice.gym.findUnique({
           where: {
             gymId: id
           },
@@ -103,7 +105,7 @@ export class GymsService {
     });
   }
 
-  async update(id: number, updateGymsDto: UpdateGymsDto) {
+  async update(id: number, updateGymsDto: UpdateGymsDto, currentUserId: number) {
 
      const gym= await this.databaseservice.gym.findUnique({
           where: {
@@ -111,6 +113,7 @@ export class GymsService {
           },
           select: {
             gymId: true,
+            gymOwnerId: true
           },
         })
     
@@ -118,10 +121,9 @@ export class GymsService {
           throw new NotFoundException(`Gym with ID ${id} not found`)
         }
 
-      if (updateGymsDto.gymOwnerId){
-      const gymOwner = await this.databaseservice.user.findUnique({
+      const ownerOrAdmin = await this.databaseservice.user.findUnique({
           where: { 
-            userId: updateGymsDto.gymOwnerId
+            userId: currentUserId
            },
           select:
            {
@@ -130,12 +132,21 @@ export class GymsService {
             },
         });
     
-        if (!gymOwner) {
-          throw new NotFoundException(`User with ID ${updateGymsDto.gymOwnerId} not found`);
+        if (!ownerOrAdmin) {
+          throw new NotFoundException(`User with ID ${currentUserId} not found`);
         }
-        if (gymOwner.role !== 'GYMOWNER') {
-          throw new ForbiddenException(`User with ID ${updateGymsDto.gymOwnerId} is not a Gym owner`);
+
+        if (ownerOrAdmin.role !== "ADMIN"){
+
+          if (gym?.gymOwnerId !== currentUserId){
+            throw new ForbiddenException('Cannot update gym you do not own')
+          }
+        
+
+        if (ownerOrAdmin.role !== 'GYMOWNER') {
+          throw new ForbiddenException(`User with ID ${currentUserId} is not a Gym owner`);
         }
+
       }
 
     return this.databaseservice.gym.update({
@@ -146,20 +157,39 @@ export class GymsService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, currentUserId: number) {
 
-    const gym= await this.databaseservice.gym.findUnique({
+    const gym = await this.databaseservice.gym.findUnique({
           where: {
             gymId: id
           },
           select: {
             gymId: true,
+            gymOwnerId: true
           },
         })
     
         if (!gym){
           throw new NotFoundException(`Gym with ID ${id} not found`)
         }
+
+        const adminRole = await this.databaseservice.user.findUnique({
+            where: { 
+              userId: currentUserId
+            },
+            select:
+            {
+              userId: true, 
+              role: true 
+              },
+          });
+
+        
+      if (adminRole?.role !== "ADMIN"){
+        if (gym?.gymOwnerId !== currentUserId){
+                throw new ForbiddenException('Cannot delete gym you do not own')
+              }
+      }
 
     await this.databaseservice.gym.delete({
       where: {
