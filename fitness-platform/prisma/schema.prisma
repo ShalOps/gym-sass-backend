@@ -129,3 +129,23 @@ enum Category {
   CROSSFIT
   YOGA
 }
+
+model GymReview {
+  reviewId   Int       @id @default(autoincrement())
+  rating     Int       @default(1)
+  comment    String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  gym        Gym       @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+  gymId      Int
+  user       User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  userId     Int
+  response   GymReviewResponse?
+  isFlagged  Boolean   @default(false)
+
+
+
+  @@unique([gymId, userId])
+  @@index([rating])
+  @@index([createdAt])
+}
