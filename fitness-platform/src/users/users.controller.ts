@@ -19,7 +19,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { UpdateUsersDto } from './dto/update-users.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/auth/roles.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 
 @ApiTags('users')

@@ -6,7 +6,7 @@ import { UpdateServiceOptionDto } from './dto/update-service-option.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/auth/roles.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @ApiTags('service-option')
 @Controller('service-option')
