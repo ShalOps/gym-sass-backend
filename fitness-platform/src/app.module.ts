@@ -11,12 +11,13 @@ import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
 import googleOauthConfig from './config/google-oauth.config';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ConfigModule.forRoot({
     isGlobal: true,
     load:[googleOauthConfig]
-  }), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule],
+  }), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, ReviewsModule],
   controllers: [AppController],
   providers: [AppService],
 })
