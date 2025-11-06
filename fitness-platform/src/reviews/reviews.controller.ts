@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
 import { ReviewsService } from "./reviews.service";
 import { CreateReviewDto } from "./dto/create-review.dto";
@@ -30,6 +30,14 @@ export class ReviewsController {
         @Body() dto: UpdateReviewDto,
     ) {
         return this.reviewsService.updateReview(userId, +id, dto);
+    }
+
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.CUSTOMER, Role.ADMIN)
+    @Delete(':id')
+    delete(@GetUser() user, @Param('id') id: string) {
+        const isAdmin = user.role === Role.ADMIN;
+        return this.reviewsService.deleteReview(user.userId, +id, isAdmin);
     }
 
 }

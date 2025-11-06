@@ -24,7 +24,9 @@ export class ReviewsService {
 
   
   async updateReview(userId: number, reviewId: number, dto: UpdateReviewDto) {
+
     const review = await this.databaseservice.gymReview.findUnique({ where: { id: reviewId } });
+    
     if (!review) throw new NotFoundException('Review not found');
     if (review.userId !== userId) throw new ForbiddenException('You can edit only your own review');
 
@@ -32,5 +34,16 @@ export class ReviewsService {
       where: { id: reviewId },
       data: dto,
     });
+  }
+
+   async deleteReview(userId: number, reviewId: number, isAdmin = false) {
+
+    const review = await this.databaseservice.gymReview.findUnique({ where: { id: reviewId } });
+    if (!review) throw new NotFoundException('Review not found');
+
+    if (!isAdmin && review.userId !== userId)
+      throw new ForbiddenException('You can delete only your own review');
+
+    return this.databaseservice.gymReview.delete({ where: { id: reviewId } });
   }
 }
