@@ -7,6 +7,10 @@ async function main() {
   // Wrapped the entire seeding logic inside a transaction for atomicity.
   await prisma.$transaction(async (tx) => {
     // Delete in reverse dependency order
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    await tx.serviceBooking.deleteMany({});
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+    await tx.classBooking.deleteMany({});
     await tx.serviceOptionAssignment.deleteMany({});
     await tx.serviceOption.deleteMany({});
     await tx.service.deleteMany({});
@@ -24,6 +28,8 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "ServiceOptionAssignment_optionAssignmentId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "GymClasses_classId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "Photo_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "ClassBooking_classBookingId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "ServiceBooking_serviceBookingId_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -186,6 +192,53 @@ async function main() {
         where: { classId: gymClass.classId },
         data: { coverPhotoId: photos.find((p) => p.isCover)?.id },
       });
+    }
+
+    // Seed class bookings
+    const customers = users.filter((u) => u.role === 'CUSTOMER');
+    for (const gymClass of gymClasses) {
+      const numBookings = Math.min(3, customers.length); // Up to 3 bookings per class
+      for (let b = 0; b < numBookings; b++) {
+        const customer = customers[(gymClass.classId + b) % customers.length];
+        await tx.classBooking.create({
+          data: {
+            userId: customer.userId,
+            classId: gymClass.classId,
+            status: b % 2 === 0 ? 'CONFIRMED' : 'PENDING',
+            bookedAt: new Date(),
+            startTime: new Date(Date.now() + (b + 1) * 60 * 60 * 1000), // Future times
+            endTime: new Date(Date.now() + (b + 2) * 60 * 60 * 1000),
+            notes: b % 3 === 0 ? `Note for booking ${b}` : null,
+            paymentStatus: 'PENDING',
+          },
+        });
+      }
+    }
+
+    // Seed service bookings
+    for (const service of services) {
+      const numBookings = Math.min(2, customers.length); // Up to 2 bookings per service
+      for (let b = 0; b < numBookings; b++) {
+        const customer = customers[(service.serviceId + b) % customers.length];
+        await tx.serviceBooking.create({
+          data: {
+            userId: customer.userId,
+            serviceId: service.serviceId,
+            status: b % 2 === 0 ? 'CONFIRMED' : 'PENDING',
+            bookedAt: new Date(),
+            startTime:
+              b % 2 === 0
+                ? new Date(Date.now() + (b + 1) * 24 * 60 * 60 * 1000)
+                : null, // Some with times
+            endTime:
+              b % 2 === 0
+                ? new Date(Date.now() + (b + 30) * 24 * 60 * 60 * 1000)
+                : null,
+            notes: b % 3 === 0 ? `Service booking note ${b}` : null,
+            paymentStatus: 'PENDING',
+          },
+        });
+      }
     }
   }); // end transaction
 
