@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
 import { ReviewsService } from "./reviews.service";
 import { CreateReviewDto } from "./dto/create-review.dto";
@@ -7,6 +7,7 @@ import { RolesGuard } from "src/auth/guards/roles.guard";
 import { Roles } from "src/common/decorators/roles.decorator";
 import { Role } from "generated/prisma";
 import { UpdateReviewDto } from "./dto/update-review.dto";
+import { CreateResponseDto } from "./dto/create-response.dto";
 
 @Controller('reviews')
 export class ReviewsController {
@@ -39,5 +40,23 @@ export class ReviewsController {
         const isAdmin = user.role === Role.ADMIN;
         return this.reviewsService.deleteReview(user.userId, +id, isAdmin);
     }
+
+    
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GYMOWNER)
+  @Post(':id/response')
+  addResponse(
+    @GetUser('userId') ownerId: number,
+    @Param('id') reviewId: string,
+    @Body() dto: CreateResponseDto,
+  ) {
+    return this.reviewsService.addResponse(ownerId, +reviewId, dto);
+  }
+
+
+  @Get('gym/:gymId')
+  getGymReviews(@Param('gymId') gymId: string) {
+    return this.reviewsService.getGymReviews(+gymId);
+  }
 
 }

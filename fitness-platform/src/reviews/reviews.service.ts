@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { DatabaseService } from "src/database/database.service";
 import { CreateReviewDto } from "./dto/create-review.dto";
 import { UpdateReviewDto } from "./dto/update-review.dto";
+import { CreateResponseDto } from "./dto/create-response.dto";
 
 @Injectable()
 export class ReviewsService {
@@ -26,7 +27,7 @@ export class ReviewsService {
   async updateReview(userId: number, reviewId: number, dto: UpdateReviewDto) {
 
     const review = await this.databaseservice.gymReview.findUnique({ where: { id: reviewId } });
-    
+
     if (!review) throw new NotFoundException('Review not found');
     if (review.userId !== userId) throw new ForbiddenException('You can edit only your own review');
 
@@ -46,4 +47,35 @@ export class ReviewsService {
 
     return this.databaseservice.gymReview.delete({ where: { id: reviewId } });
   }
+
+
+  async addResponse(ownerId: number, reviewId: number, dto: CreateResponseDto) {
+    const review = await this.databaseservice.gymReview.findUnique({
+      where: { id: reviewId },
+      include: { gym: true },
+    });
+    if (!review) throw new NotFoundException('Review not found');
+    if (review.gym.gymOwnerId !== ownerId)
+      throw new ForbiddenException('You can only respond to reviews for your own gym');
+
+    return this.databaseservice.gymReviewResponse.create({
+      data: {
+        message: dto.message,
+        reviewId,
+        ownerId,
+      },
+    });
+  }
+
+  async getGymReviews(gymId: number) {
+    return this.databaseservice.gymReview.findMany({
+      where: { gymId },
+      include: {
+        user: { select: { userName: true, profilePic: true } },
+        response: { include: { owner: { select: { userName: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
 }
