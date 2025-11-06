@@ -9,7 +9,7 @@ import {
   BadRequestException,
   HttpCode,
   UseGuards,
-  Req
+  Req,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Prisma } from '@prisma/client';
@@ -27,7 +27,6 @@ import { UpdateUsersDto } from './dto/update-users.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
-
 
 @ApiTags('users')
 @Controller('users')

@@ -1,4 +1,4 @@
-import { Injectable,NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
@@ -46,18 +46,17 @@ export class UsersService {
   }
 
   async findOne(id: number) {
-
     const user = await this.databaseservice.user.findUnique({
       where: {
         userId: id,
       },
       select: {
-        userId: true
-      }
-    })
+        userId: true,
+      },
+    });
 
-    if(!user){
-      throw new NotFoundException(`User with ID ${id} id not found`)
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} id not found`);
     }
 
     return this.databaseservice.user.findUnique({
@@ -68,22 +67,21 @@ export class UsersService {
   }
 
   async update(updateUsersDto: UpdateUsersDto, currentUserId: number) {
-
     const user = await this.databaseservice.user.findUnique({
       where: {
         userId: currentUserId,
       },
       select: {
-        userId: true
-      }
-    })
+        userId: true,
+      },
+    });
 
-    if(!user){
-      throw new NotFoundException(`User with ID ${currentUserId} id not found`)
+    if (!user) {
+      throw new NotFoundException(`User with ID ${currentUserId} id not found`);
     }
-    
-    if (updateUsersDto.password){
-        updateUsersDto.password = await bcrypt.hash(updateUsersDto.password, 10);
+
+    if (updateUsersDto.password) {
+      updateUsersDto.password = await bcrypt.hash(updateUsersDto.password, 10);
     }
 
     return this.databaseservice.user.update({
@@ -95,20 +93,18 @@ export class UsersService {
   }
 
   async remove(currentUserId: number) {
-
     const user = await this.databaseservice.user.findUnique({
       where: {
         userId: currentUserId,
       },
       select: {
-        userId: true
-      }
-    })
+        userId: true,
+      },
+    });
 
-    if(!user){
-      throw new NotFoundException(`User with ID ${currentUserId} id not found`)
+    if (!user) {
+      throw new NotFoundException(`User with ID ${currentUserId} id not found`);
     }
-
 
     await this.databaseservice.user.delete({
       where: {

@@ -10,7 +10,7 @@ import {
   BadRequestException,
   HttpCode,
   UseGuards,
-  Req
+  Req,
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
 import { Prisma } from '@prisma/client';
@@ -155,7 +155,11 @@ export class GymsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Gym not found' })
   @ApiBearerAuth('JWT-auth')
-  update(@Param('id') id: string, @Body() updateGymsDto: UpdateGymsDto, @Req() req: any) {
+  update(
+    @Param('id') id: string,
+    @Body() updateGymsDto: UpdateGymsDto,
+    @Req() req: any,
+  ) {
     return this.gymsService.update(+id, updateGymsDto, req.user.userId);
   }
 
@@ -170,7 +174,7 @@ export class GymsController {
   @ApiResponse({ status: 404, description: 'Gym not found' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id') id: string,  @Req() req: any) {
+  async remove(@Param('id') id: string, @Req() req: any) {
     await this.gymsService.remove(+id, req.user.userId);
   }
 }

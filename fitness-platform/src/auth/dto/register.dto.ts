@@ -1,39 +1,46 @@
-import { IsEmail, IsNotEmpty, IsString, IsEnum, IsOptional, IsIn, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsIn,
+  MinLength,
+} from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
-  
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'User first name',
-    example: 'John', 
+    example: 'John',
   })
   @IsNotEmpty()
-  @IsString() 
+  @IsString()
   firstName: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'User last name',
-    example: 'Doe'
+    example: 'Doe',
   })
   @IsNotEmpty()
-  @IsString() 
+  @IsString()
   lastName: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Unique username',
-    example: 'johndoe123'
-   })
-  @IsNotEmpty() 
-  @IsString() 
+    example: 'johndoe123',
+  })
+  @IsNotEmpty()
+  @IsString()
   userName: string;
 
   @ApiPropertyOptional({
-     description: 'Email address', 
-     example: 'johndoe@example.com',
-     format: 'email',
-    })
-  @IsEmail() 
+    description: 'Email address',
+    example: 'johndoe@example.com',
+    format: 'email',
+  })
+  @IsEmail()
   email: string;
 
   @ApiProperty({
@@ -50,24 +57,24 @@ export class RegisterDto {
     description: 'Birth date in ISO format (YYYY-MM-DD)',
     example: '1990-05-15',
   })
-  @IsNotEmpty() 
+  @IsNotEmpty()
   birthDate: Date | string;
 
-  @ApiProperty({ 
-    description: 'User gender', 
+  @ApiProperty({
+    description: 'User gender',
     enum: Gender,
     example: Gender.MALE,
   })
-  @IsNotEmpty() 
-  @IsEnum(Gender) 
+  @IsNotEmpty()
+  @IsEnum(Gender)
   gender: Gender;
 
   @ApiProperty({
     description: 'User location at the given time ',
     example: 'GPS Coordinates',
   })
-  @IsNotEmpty() 
-  @IsString() 
+  @IsNotEmpty()
+  @IsString()
   location: string;
 
   @ApiPropertyOptional({
@@ -75,7 +82,7 @@ export class RegisterDto {
     example: '+1234567890',
   })
   @IsOptional()
-  @IsString() 
+  @IsString()
   phoneNo: string;
 
   @ApiPropertyOptional({
@@ -95,7 +102,7 @@ export class RegisterDto {
     example: Goal.WEIGHTLOSS,
   })
   @IsOptional()
-  @IsEnum(Goal) 
+  @IsEnum(Goal)
   goal?: Goal;
 
   @ApiPropertyOptional({
@@ -110,7 +117,7 @@ export class RegisterDto {
     description: 'Short bio or description',
     example: 'Fitness enthusiast ',
   })
-  @IsOptional() 
-  @IsString() 
+  @IsOptional()
+  @IsString()
   bio?: string;
 }

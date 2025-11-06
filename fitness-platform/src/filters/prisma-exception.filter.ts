@@ -1,7 +1,11 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpStatus,
+} from '@nestjs/common';
 // import { Prisma } from '../../generated/prisma';
 import { Prisma } from '@prisma/client';
-
 
 @Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaExceptionFilter implements ExceptionFilter {
@@ -13,16 +17,15 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message = 'An unexpected error occurred';
 
     switch (exception.code) {
-      case 'P2002': 
+      case 'P2002':
         status = HttpStatus.CONFLICT;
         message = `A record with this ${exception.meta?.target} already exists`;
         break;
-      case 'P2003': 
+      case 'P2003':
         status = HttpStatus.BAD_REQUEST;
         message = `Invalid foreign key provided`;
         break;
       default:
-        
         break;
     }
 

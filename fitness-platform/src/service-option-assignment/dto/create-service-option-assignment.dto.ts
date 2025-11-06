@@ -1,25 +1,25 @@
-import { IsInt } from "class-validator"
-import { ApiProperty } from "@nestjs/swagger";
+import { IsInt } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateServiceOptionAssignmentDto {
-    @ApiProperty({
+  @ApiProperty({
     description: 'ID of the service to assign the option to',
     example: 7,
-    })
-    @IsInt()
-    serviceId: number;
+  })
+  @IsInt()
+  serviceId: number;
 
-    @ApiProperty({
+  @ApiProperty({
     description: 'ID of the service option to assign',
     example: 12,
-    })
-    @IsInt()
-    optionId: number;
+  })
+  @IsInt()
+  optionId: number;
 
-    @ApiProperty({
+  @ApiProperty({
     description: 'ID of the gym (must match both service and option)',
     example: 3,
-    })
-    @IsInt()
-    gymId: number;
+  })
+  @IsInt()
+  gymId: number;
 }
