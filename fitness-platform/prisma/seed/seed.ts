@@ -200,6 +200,7 @@ async function main() {
       const numBookings = Math.min(3, customers.length); // Up to 3 bookings per class
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(gymClass.classId + b) % customers.length];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await tx.classBooking.create({
           data: {
             userId: customer.userId,
@@ -220,6 +221,7 @@ async function main() {
       const numBookings = Math.min(2, customers.length); // Up to 2 bookings per service
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(service.serviceId + b) % customers.length];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         await tx.serviceBooking.create({
           data: {
             userId: customer.userId,
