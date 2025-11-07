@@ -27,15 +27,54 @@ export class ClassBookingsService extends BookingsService {
     // Auto-complete past bookings before returning results
     await this.autoCompletePastBookings();
 
-    const where: {
-      userId: number;
+    // Get current user's role to determine what they can see
+    const currentUser = await this.databaseService.user.findUnique({
+      where: { userId },
+      select: { role: true },
+    });
+
+    if (!currentUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    let where: {
+      userId?: number;
       status?: BookingStatus;
       bookedAt?: {
         gte?: Date;
         lte?: Date;
       };
-    } = { userId };
+      class?: {
+        gymId: {
+          in: number[];
+        };
+      };
+    } = {};
 
+    // Role-based filtering
+    if (currentUser.role === 'ADMIN') {
+      // Admin can see all bookings
+      where = {};
+    } else if (currentUser.role === 'GYMOWNER') {
+      // Gym owner can see bookings for classes in gyms they own
+      const ownedGyms = await this.databaseService.gym.findMany({
+        where: { gymOwnerId: userId },
+        select: { gymId: true },
+      });
+      const gymIds = ownedGyms.map((g) => g.gymId);
+
+      if (gymIds.length === 0) {
+        // If they don't own any gyms, return empty result
+        return [];
+      }
+
+      where.class = { gymId: { in: gymIds } };
+    } else {
+      // Regular users (CUSTOMER, TRAINER) can only see their own bookings
+      where.userId = userId;
+    }
+
+    // Apply additional filters
     if (filters?.status) {
       where.status = filters.status;
     }
@@ -63,6 +102,7 @@ export class ClassBookingsService extends BookingsService {
             trainer: true,
           },
         },
+        user: currentUser.role !== 'CUSTOMER', // Include user info for admins/gym owners
       },
       orderBy: { bookedAt: 'desc' },
       skip,
