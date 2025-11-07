@@ -14,9 +14,48 @@ export class ClassBookingsService extends BookingsService {
     super(databaseService);
   }
 
-  async findAll(userId: number) {
+  async findAll(
+    userId: number,
+    filters?: {
+      status?: BookingStatus;
+      startDate?: Date;
+      endDate?: Date;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    // Auto-complete past bookings before returning results
+    await this.autoCompletePastBookings();
+
+    const where: {
+      userId: number;
+      status?: BookingStatus;
+      bookedAt?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    } = { userId };
+
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.bookedAt = {};
+      if (filters.startDate) {
+        where.bookedAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        where.bookedAt.lte = filters.endDate;
+      }
+    }
+
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
+
     return this.databaseService.classBooking.findMany({
-      where: { userId },
+      where,
       include: {
         class: {
           include: {
@@ -26,6 +65,8 @@ export class ClassBookingsService extends BookingsService {
         },
       },
       orderBy: { bookedAt: 'desc' },
+      skip,
+      take: limit,
     });
   }
 
