@@ -93,7 +93,12 @@ export class ServiceBookingsService extends BookingsService {
     const limit = filters?.limit || 10;
     const skip = (page - 1) * limit;
 
-    return this.databaseService.serviceBooking.findMany({
+    // Get total count for pagination metadata
+    const total = await this.databaseService.serviceBooking.count({
+      where,
+    });
+
+    const bookings = await this.databaseService.serviceBooking.findMany({
       where,
       include: {
         service: {
@@ -101,12 +106,22 @@ export class ServiceBookingsService extends BookingsService {
             gym: true,
           },
         },
-        user: currentUser.role !== 'CUSTOMER', // Include user info for admins/gym owners
+        user: currentUser.role !== 'CUSTOMER',
       },
       orderBy: { bookedAt: 'desc' },
       skip,
       take: limit,
     });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: bookings,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findOne(id: number, userId: number) {

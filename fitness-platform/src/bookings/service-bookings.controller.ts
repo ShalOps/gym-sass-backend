@@ -37,7 +37,10 @@ export class ServiceBookingsController {
   @ApiOperation({
     summary: "Get user's service bookings with optional filters",
   })
-  @ApiResponse({ status: 200, description: 'List of service bookings.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of service bookings with metadata.',
+  })
   @ApiBearerAuth('JWT-auth')
   findAll(
     @Request() req: RequestWithUser,
