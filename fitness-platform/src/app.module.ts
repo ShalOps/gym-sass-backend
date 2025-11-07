@@ -11,6 +11,7 @@ import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { MulterModule } from '@nestjs/platform-express';
 
 @Module({
@@ -25,6 +26,7 @@ import { MulterModule } from '@nestjs/platform-express';
     GymClassesModule,
     ServiceOptionAssignmentModule,
     UploadsModule,
+    BookingsModule,
     MulterModule.register({ dest: './uploads' }),
   ],
   controllers: [AppController],
