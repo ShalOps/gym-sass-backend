@@ -181,6 +181,65 @@ export class ClassBookingsService extends BookingsService {
       throw new NotFoundException('Gym class not found');
     }
 
+    // Check if user already has an active booking for this class
+    const existingBooking = await this.databaseService.classBooking.findFirst({
+      where: {
+        userId,
+        classId,
+        status: {
+          not: BookingStatus.CANCELLED,
+        },
+      },
+    });
+
+    if (existingBooking) {
+      throw new BadRequestException(
+        'You already have an active booking for this class',
+      );
+    }
+
+    // Check for time conflicts if startTime and endTime are provided
+    if (startTime && endTime) {
+      const conflictingBooking =
+        await this.databaseService.classBooking.findFirst({
+          where: {
+            userId,
+            status: {
+              not: BookingStatus.CANCELLED,
+            },
+            OR: [
+              {
+                AND: [
+                  { startTime: { lte: startTime } },
+                  { endTime: { gt: startTime } },
+                ],
+              },
+              {
+                AND: [
+                  { startTime: { lt: endTime } },
+                  { endTime: { gte: endTime } },
+                ],
+              },
+              {
+                AND: [
+                  { startTime: { gte: startTime } },
+                  { endTime: { lte: endTime } },
+                ],
+              },
+            ],
+          },
+          include: {
+            class: true,
+          },
+        });
+
+      if (conflictingBooking) {
+        throw new BadRequestException(
+          `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
+        );
+      }
+    }
+
     // Check capacity: count current confirmed bookings for this class at this time
     // For simplicity, assume no time overlap check yet, just total capacity
     const confirmedBookings = await this.databaseService.classBooking.count({
