@@ -176,4 +176,26 @@ export class ServiceBookingsController {
   ) {
     return this.serviceBookingsService.cancel(id, req.user.userId);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('GYMOWNER', 'ADMIN', 'TRAINER')
+  @Post(':id/mark-no-show')
+  @ApiOperation({ summary: 'Mark a service booking as no-show' })
+  @ApiResponse({ status: 200, description: 'Booking marked as no-show.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request - booking not confirmed.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions.',
+  })
+  @ApiResponse({ status: 404, description: 'Booking not found.' })
+  @ApiBearerAuth('JWT-auth')
+  markNoShow(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.serviceBookingsService.markNoShow(id, req.user.userId);
+  }
 }

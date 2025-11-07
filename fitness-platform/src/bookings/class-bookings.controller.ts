@@ -23,9 +23,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  @ApiOperation({ summary: "Get user's class bookings with optional filters" })
-  @ApiResponse({ status: 200, description: 'List of class bookings.' })
-  @ApiBearerAuth('JWT-auth')
 } from '@nestjs/swagger';
 
 @ApiTags('class-bookings')
@@ -35,6 +32,9 @@ export class ClassBookingsController {
   constructor(private readonly classBookingsService: ClassBookingsService) {}
 
   @Get()
+  @ApiOperation({ summary: "Get user's class bookings with optional filters" })
+  @ApiResponse({ status: 200, description: 'List of class bookings.' })
+  @ApiBearerAuth('JWT-auth')
   findAll(
     @Request() req: RequestWithUser,
     @Query('status') status?: string,
@@ -171,5 +171,27 @@ export class ClassBookingsController {
     @Request() req: RequestWithUser,
   ) {
     return this.classBookingsService.cancel(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('GYMOWNER', 'ADMIN', 'TRAINER')
+  @Post(':id/mark-no-show')
+  @ApiOperation({ summary: 'Mark a class booking as no-show' })
+  @ApiResponse({ status: 200, description: 'Booking marked as no-show.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request - booking not confirmed.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions.',
+  })
+  @ApiResponse({ status: 404, description: 'Booking not found.' })
+  @ApiBearerAuth('JWT-auth')
+  markNoShow(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.classBookingsService.markNoShow(id, req.user.userId);
   }
 }
