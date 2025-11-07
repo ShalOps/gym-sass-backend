@@ -19,7 +19,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     switch (exception.code) {
       case 'P2002':
         status = HttpStatus.CONFLICT;
-        message = `A record with this ${exception.meta?.target} already exists`;
+        message = `A record with this ${String(exception.meta?.target)} already exists`;
         break;
       case 'P2003':
         status = HttpStatus.BAD_REQUEST;

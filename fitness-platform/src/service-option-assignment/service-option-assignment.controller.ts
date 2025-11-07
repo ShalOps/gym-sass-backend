@@ -22,6 +22,7 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @ApiTags('service-option-assignment')
 @Controller('service-option-assignment')
@@ -43,7 +44,7 @@ export class ServiceOptionAssignmentController {
   @ApiBearerAuth('JWT-auth')
   create(
     @Body() createServiceOptionAssignmentDto: CreateServiceOptionAssignmentDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.serviceOptionAssignmentService.create(
       createServiceOptionAssignmentDto,
@@ -83,7 +84,7 @@ export class ServiceOptionAssignmentController {
   update(
     @Param('id') id: string,
     @Body() updateServiceOptionAssignmentDto: UpdateServiceOptionAssignmentDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.serviceOptionAssignmentService.update(
       +id,
@@ -100,7 +101,7 @@ export class ServiceOptionAssignmentController {
   @ApiResponse({ status: 404, description: 'Assignment not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  remove(@Param('id') id: string, @Req() req: any) {
+  remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.serviceOptionAssignmentService.remove(+id, req.user.userId);
   }
 }

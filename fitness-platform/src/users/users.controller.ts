@@ -3,7 +3,6 @@ import {
   Get,
   Body,
   Patch,
-  Param,
   Delete,
   Query,
   BadRequestException,
@@ -27,6 +26,7 @@ import { UpdateUsersDto } from './dto/update-users.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @ApiTags('users')
 @Controller('users')
@@ -151,7 +151,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User updated' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth('JWT-auth')
-  update(@Body() updateUsersDto: UpdateUsersDto, @Req() req: any) {
+  update(@Body() updateUsersDto: UpdateUsersDto, @Req() req: RequestWithUser) {
     return this.usersService.update(updateUsersDto, req.user.userId);
   }
 
@@ -163,7 +163,7 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Req() req: any) {
+  async remove(@Req() req: RequestWithUser) {
     await this.usersService.remove(req.user.userId);
   }
 }

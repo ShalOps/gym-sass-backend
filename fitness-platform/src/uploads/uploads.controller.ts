@@ -205,7 +205,7 @@ export class UploadsController {
     let orders: number[] | undefined;
     if (body.orders) {
       try {
-        orders = JSON.parse(body.orders);
+        orders = JSON.parse(body.orders) as number[];
         if (!Array.isArray(orders) || orders.length !== files.length) {
           throw new BadRequestException(
             'Orders must be an array matching the number of files',
@@ -328,7 +328,7 @@ export class UploadsController {
     let orders: number[] | undefined;
     if (body.orders) {
       try {
-        orders = JSON.parse(body.orders);
+        orders = JSON.parse(body.orders) as number[];
         if (!Array.isArray(orders) || orders.length !== files.length) {
           throw new BadRequestException(
             'Orders must be an array matching the number of files',

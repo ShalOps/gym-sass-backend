@@ -4,7 +4,6 @@ import {
   IsString,
   IsEnum,
   IsOptional,
-  IsIn,
   MinLength,
 } from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';

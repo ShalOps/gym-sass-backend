@@ -24,6 +24,7 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @ApiTags('service-option')
 @Controller('service-option')
@@ -46,7 +47,7 @@ export class ServiceOptionController {
   @ApiBearerAuth('JWT-auth')
   create(
     @Body() createServiceOptionDto: CreateServiceOptionDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.serviceOptionService.create(
       createServiceOptionDto,
@@ -87,7 +88,7 @@ export class ServiceOptionController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateServiceOptionDto: UpdateServiceOptionDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.serviceOptionService.update(
       id,
@@ -107,7 +108,10 @@ export class ServiceOptionController {
   @ApiResponse({ status: 404, description: 'Service option not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
     await this.serviceOptionService.remove(id, req.user.userId);
   }
 }

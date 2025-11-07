@@ -23,6 +23,7 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @ApiTags('gym-classes')
 @Controller('gym-classes')
@@ -37,7 +38,10 @@ export class GymClassesController {
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 404, description: 'Gym or trainer not found.' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createGymClassesDto: CreateGymClassesDto, @Req() req: any) {
+  create(
+    @Body() createGymClassesDto: CreateGymClassesDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.gymClassesService.create(createGymClassesDto, req.user.userId);
   }
 
@@ -70,7 +74,7 @@ export class GymClassesController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateGymClassesDto: UpdateGymClassesDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.gymClassesService.update(
       id,
@@ -87,7 +91,10 @@ export class GymClassesController {
   @ApiResponse({ status: 404, description: 'Gym class not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
     await this.gymClassesService.remove(id, req.user.userId);
   }
 }

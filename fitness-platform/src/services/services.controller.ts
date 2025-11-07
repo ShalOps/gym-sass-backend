@@ -23,6 +23,7 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @ApiTags('services')
 @Controller('services')
@@ -40,7 +41,10 @@ export class ServicesController {
     description: 'Service with this name already exists in the gym.',
   })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createServiceDto: CreateServiceDto, @Req() req: any) {
+  create(
+    @Body() createServiceDto: CreateServiceDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.servicesService.create(createServiceDto, req.user.userId);
   }
 
@@ -75,7 +79,7 @@ export class ServicesController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateServiceDto: UpdateServiceDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.servicesService.update(id, updateServiceDto, req.user.userId);
   }
@@ -88,7 +92,10 @@ export class ServicesController {
   @ApiResponse({ status: 404, description: 'Service not found.' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
     await this.servicesService.remove(id, req.user.userId);
   }
 }

@@ -20,6 +20,7 @@ import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
+import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import {
   ApiTags,
   ApiOperation,
@@ -63,7 +64,7 @@ export class GymsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 409, description: 'Conflict' })
   @ApiBearerAuth('JWT-auth')
-  create(@Body() createGymsDto: CreateGymsDto, @Req() req: any) {
+  create(@Body() createGymsDto: CreateGymsDto, @Req() req: RequestWithUser) {
     return this.gymsService.create(createGymsDto, req.user.userId);
   }
 
@@ -158,7 +159,7 @@ export class GymsController {
   update(
     @Param('id') id: string,
     @Body() updateGymsDto: UpdateGymsDto,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
     return this.gymsService.update(+id, updateGymsDto, req.user.userId);
   }
@@ -174,7 +175,7 @@ export class GymsController {
   @ApiResponse({ status: 404, description: 'Gym not found' })
   @ApiBearerAuth('JWT-auth')
   @HttpCode(204)
-  async remove(@Param('id') id: string, @Req() req: any) {
+  async remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     await this.gymsService.remove(+id, req.user.userId);
   }
 }

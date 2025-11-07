@@ -19,11 +19,11 @@ export class DatabaseService
     try {
       await this.$connect();
       this.logger.log('Successfully connected to the database.');
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         'Database connection failed during module initialization.',
-        error.message,
-        error.stack,
+        (error as Error).message,
+        (error as Error).stack,
       );
 
       throw error;
