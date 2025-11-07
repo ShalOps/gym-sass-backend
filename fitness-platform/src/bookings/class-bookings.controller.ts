@@ -173,7 +173,7 @@ export class ClassBookingsController {
     return this.classBookingsService.cancel(id, req.user.userId);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles('GYMOWNER', 'ADMIN', 'TRAINER')
   @Post(':id/mark-no-show')
   @ApiOperation({ summary: 'Mark a class booking as no-show' })
