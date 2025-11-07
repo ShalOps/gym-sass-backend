@@ -16,7 +16,19 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BookingStatus } from '@prisma/client';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  @ApiOperation({ summary: "Get user's class bookings with optional filters" })
+  @ApiResponse({ status: 200, description: 'List of class bookings.' })
+  @ApiBearerAuth('JWT-auth')
+} from '@nestjs/swagger';
 
+@ApiTags('class-bookings')
 @Controller('bookings/classes')
 @UseGuards(JwtAuthGuard)
 export class ClassBookingsController {
@@ -66,6 +78,14 @@ export class ClassBookingsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a specific class booking by ID' })
+  @ApiResponse({ status: 200, description: 'Class booking details.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions.',
+  })
+  @ApiResponse({ status: 404, description: 'Booking not found.' })
+  @ApiBearerAuth('JWT-auth')
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: RequestWithUser,
@@ -74,6 +94,17 @@ export class ClassBookingsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new class booking' })
+  @ApiResponse({
+    status: 201,
+    description: 'Class booking created successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or business rule violation.',
+  })
+  @ApiResponse({ status: 404, description: 'Class not found.' })
+  @ApiBearerAuth('JWT-auth')
   create(
     @Body() createClassBookingDto: CreateClassBookingDto,
     @Request() req: RequestWithUser,
@@ -92,6 +123,21 @@ export class ClassBookingsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a class booking' })
+  @ApiResponse({
+    status: 200,
+    description: 'Class booking updated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data or business rule violation.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions.',
+  })
+  @ApiResponse({ status: 404, description: 'Booking not found.' })
+  @ApiBearerAuth('JWT-auth')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateBookingDto: UpdateBookingDto,
@@ -105,6 +151,21 @@ export class ClassBookingsController {
   }
 
   @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a class booking' })
+  @ApiResponse({
+    status: 200,
+    description: 'Class booking cancelled successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot cancel - booking already completed or cancelled.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions.',
+  })
+  @ApiResponse({ status: 404, description: 'Booking not found.' })
+  @ApiBearerAuth('JWT-auth')
   cancel(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: RequestWithUser,
