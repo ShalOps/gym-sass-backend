@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { Role, Gender, Goal } from '@prisma/client';
+import { Role, Goal } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -64,7 +64,25 @@ export class AuthService {
         goal: goal,
       },
     });
-    return { message: 'User registered successfully' };
+
+    return {
+      user: {
+        userId: registeredUser.userId,
+        email: registeredUser.email,
+        phoneNo: registeredUser.phoneNo,
+        firstName: registeredUser.firstName,
+        lastName: registeredUser.lastName,
+        userName: registeredUser.userName,
+        birthDate: registeredUser.birthDate,
+        location: registeredUser.location,
+        bio: registeredUser.bio,
+        profilePic: registeredUser.profilePic,
+        role: registeredUser.role,
+        gender: registeredUser.gender,
+        goal: registeredUser.goal,
+      },
+      message: 'Registration successful',
+    };
   }
 
   async login(dto: LoginDto) {
