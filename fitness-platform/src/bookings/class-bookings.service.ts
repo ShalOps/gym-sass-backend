@@ -164,6 +164,70 @@ export class ClassBookingsService extends BookingsService {
     });
   }
 
+  async markNoShow(id: number, currentUserId: number) {
+    const booking = await this.databaseService.classBooking.findUnique({
+      where: { classBookingId: id },
+      include: {
+        class: {
+          include: {
+            gym: true,
+            trainer: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Class booking not found');
+    }
+
+    // Check if current user has permission (admin, gym owner, or trainer)
+    const currentUser = await this.databaseService.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (!currentUser) {
+      throw new ForbiddenException('User not found');
+    }
+
+    // Allow admin to mark any booking as no-show
+    if (currentUser.role !== 'ADMIN') {
+      // For non-admin, check if they own the gym or are a trainer
+      const isOwner = await this.checkOwnership(
+        booking.class.gymId,
+        currentUserId,
+      );
+      if (!isOwner) {
+        throw new ForbiddenException(
+          'You do not have permission to mark this booking as no-show',
+        );
+      }
+    }
+
+    // Business logic: can only mark confirmed bookings as no-show
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(
+        'Can only mark confirmed bookings as no-show',
+      );
+    }
+
+    return this.databaseService.classBooking.update({
+      where: { classBookingId: id },
+      data: { status: BookingStatus.NO_SHOW },
+      include: {
+        class: {
+          include: {
+            gym: true,
+            trainer: true,
+          },
+        },
+        user: true,
+      },
+    });
+  }
+
   async create(
     userId: number,
     classId: number,

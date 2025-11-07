@@ -160,6 +160,68 @@ export class ServiceBookingsService extends BookingsService {
     });
   }
 
+  async markNoShow(id: number, currentUserId: number) {
+    const booking = await this.databaseService.serviceBooking.findUnique({
+      where: { serviceBookingId: id },
+      include: {
+        service: {
+          include: {
+            gym: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Service booking not found');
+    }
+
+    // Check if current user has permission (admin, gym owner, or trainer)
+    const currentUser = await this.databaseService.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (!currentUser) {
+      throw new ForbiddenException('User not found');
+    }
+
+    // Allow admin to mark any booking as no-show
+    if (currentUser.role !== 'ADMIN') {
+      // For non-admin, check if they own the gym or are a trainer
+      const isOwner = await this.checkOwnership(
+        booking.service.gymId,
+        currentUserId,
+      );
+      if (!isOwner) {
+        throw new ForbiddenException(
+          'You do not have permission to mark this booking as no-show',
+        );
+      }
+    }
+
+    // Business logic: can only mark confirmed bookings as no-show
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException(
+        'Can only mark confirmed bookings as no-show',
+      );
+    }
+
+    return this.databaseService.serviceBooking.update({
+      where: { serviceBookingId: id },
+      data: { status: BookingStatus.NO_SHOW },
+      include: {
+        service: {
+          include: {
+            gym: true,
+          },
+        },
+        user: true,
+      },
+    });
+  }
+
   // Additional method for creating a service booking
   async create(
     userId: number,
