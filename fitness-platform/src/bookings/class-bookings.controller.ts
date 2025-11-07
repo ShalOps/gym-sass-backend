@@ -8,11 +8,13 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { ClassBookingsService } from './class-bookings.service';
 import { CreateClassBookingDto } from './dto/create-class-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BookingStatus } from '@prisma/client';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 
 @Controller('bookings/classes')
@@ -21,8 +23,46 @@ export class ClassBookingsController {
   constructor(private readonly classBookingsService: ClassBookingsService) {}
 
   @Get()
-  findAll(@Request() req: RequestWithUser) {
-    return this.classBookingsService.findAll(req.user.userId);
+  findAll(
+    @Request() req: RequestWithUser,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const filters: {
+      status?: BookingStatus;
+      startDate?: Date;
+      endDate?: Date;
+      page?: number;
+      limit?: number;
+    } = {};
+
+    if (
+      status &&
+      Object.values(BookingStatus).includes(status as BookingStatus)
+    ) {
+      filters.status = status as BookingStatus;
+    }
+
+    if (startDate) {
+      filters.startDate = new Date(startDate);
+    }
+
+    if (endDate) {
+      filters.endDate = new Date(endDate);
+    }
+
+    if (page) {
+      filters.page = parseInt(page, 10);
+    }
+
+    if (limit) {
+      filters.limit = parseInt(limit, 10);
+    }
+
+    return this.classBookingsService.findAll(req.user.userId, filters);
   }
 
   @Get(':id')
