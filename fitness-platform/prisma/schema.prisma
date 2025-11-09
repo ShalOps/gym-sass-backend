@@ -156,3 +156,17 @@ model GymReviewResponse {
   owner      User      @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
   ownerId    Int
 }
+
+model GymClassReview {
+  id        Int       @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  class     GymClasses @relation(fields: [classId], references: [classId], onDelete: Cascade)
+  classId   Int
+  user      User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  response  GymClassReviewResponse?
+}

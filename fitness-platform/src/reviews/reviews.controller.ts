@@ -6,7 +6,7 @@ import { CreateReviewDto } from "./dto/create-review.dto";
 import { GetUser } from "src/common/decorators/get-user.decorator";
 import { RolesGuard } from "src/auth/guards/roles.guard";
 import { Role } from "generated/prisma";
-import { Roles } from "src/common/decorators/roles.decorator";
+import { Roles } from "src/auth/roles.decorator";
 import { UpdateReviewDto } from "./dto/update-review.dto";
 import { CreateResponseDto } from "./dto/create-response.dto";
 

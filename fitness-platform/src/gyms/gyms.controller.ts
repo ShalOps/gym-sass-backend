@@ -19,7 +19,7 @@ import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
+import { Roles } from 'src/auth/roles.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('gyms')
