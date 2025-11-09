@@ -177,6 +177,6 @@ model GymClassReviewResponse {
   createdAt   DateTime       @default(now())
   review      GymClassReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   reviewId    Int @unique   
-  owner       User           @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
-  ownerId     Int
+  trainer       User   @relation(fields: [trainerId], references: [userId], onDelete: Restrict)
+  trainerId     Int
 }
