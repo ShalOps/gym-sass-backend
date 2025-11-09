@@ -170,3 +170,13 @@ model GymClassReview {
 
   response  GymClassReviewResponse?
 }
+
+model GymClassReviewResponse {
+  responseId  Int            @id @default(autoincrement())
+  message     String
+  createdAt   DateTime       @default(now())
+  review      GymClassReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewId    Int @unique   
+  owner       User           @relation(fields: [ownerId], references: [userId], onDelete: Cascade)
+  ownerId     Int
+}
