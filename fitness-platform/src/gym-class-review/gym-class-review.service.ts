@@ -8,7 +8,7 @@ import { CreateGymClassReviewResponseDto } from "./dto/create-gym-class-review-r
 export class GymClassReviewsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async createReview(userId: number, dto: CreateGymClassReviewDto) {
+  async createClassReview(userId: number, dto: CreateGymClassReviewDto) {
     const gymClass = await this.databaseService.gymClasses.findUnique({
       where: { classId: dto.classId },
       include: { gym: true },
@@ -32,7 +32,7 @@ export class GymClassReviewsService {
     });
   }
 
-  async updateReview(userId: number, reviewId: number, dto: UpdateGymClassReviewDto) {
+  async updateClassReview(userId: number, reviewId: number, dto: UpdateGymClassReviewDto) {
     const review = await this.databaseService.gymClassReview.findUnique({
       where: { id: reviewId },
     });
@@ -47,7 +47,7 @@ export class GymClassReviewsService {
     });
   }
 
-  async deleteReview(userId: number, reviewId: number, isAdmin = false) {
+  async deleteClassReview(userId: number, reviewId: number, isAdmin = false) {
     const review = await this.databaseService.gymClassReview.findUnique({
       where: { id: reviewId },
       include: { gymClass: true },
@@ -63,33 +63,49 @@ export class GymClassReviewsService {
     });
   }
 
-  async addResponse(trainerId: number, reviewId: number, dto: CreateGymClassReviewResponseDto) {
+  async addResponse(userId: number, reviewId: number, dto: CreateGymClassReviewResponseDto) {
     const review = await this.databaseService.gymClassReview.findUnique({
-      where: { id: reviewId },
-      include: { gymClass: { include: { gym: true } } },
+        where: { id: reviewId },
+        include: { gymClass: { include: { gym: true } } },
     });
 
     if (!review) throw new NotFoundException('Review not found');
-    if (review.gymClass.gym.gymtrainerId !== trainerId)
-      throw new ForbiddenException('You can only respond to reviews for your own gym classes');
+
+    const gymOwnerId = review.gymClass.gym.gymOwnerId;
+    const gymTrainerId = review.gymClass.gym.gymTrainerId;
+
+    if (userId !== gymOwnerId && userId !== gymTrainerId) {
+        throw new ForbiddenException('You can only respond to reviews for your own gym classes');
+    }
+
+    const isOwner = userId === gymOwnerId;
+    const isTrainer = userId === gymTrainerId;
 
     return this.databaseService.gymClassReviewResponse.create({
-      data: {
+        data: {
         message: dto.message,
         reviewId,
-        trainerId,
-      },
+        ownerId: isOwner ? userId : null,
+        trainerId: isTrainer ? userId : null,
+        },
     });
-  }
+    }
+
 
   async getClassReviews(classId: number) {
     return this.databaseService.gymClassReview.findMany({
-      where: { classId },
-      include: {
+        where: { classId },
+        include: {
         user: { select: { userName: true, profilePic: true } },
-        response: { include: { owner: { select: { userName: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+        response: {
+            include: {
+            owner: { select: { userName: true } },
+            trainer: { select: { userName: true } },
+            },
+        },
+        },
+        orderBy: { createdAt: 'desc' },
+        });
+    }
+
 }
