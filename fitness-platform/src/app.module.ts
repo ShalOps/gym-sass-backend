@@ -10,9 +10,10 @@ import { ServicesModule } from './services/services.module';
 import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
+import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ConfigModule.forRoot(), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule],
+  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ConfigModule.forRoot(), ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, AdminAnalyticsModule],
   controllers: [AppController],
   providers: [AppService],
 })
