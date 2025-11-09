@@ -3,6 +3,7 @@ import { DatabaseService } from "src/database/database.service";
 import { CreateGymClassReviewDto } from "./dto/create-gym-class-review.dto";
 import { UpdateGymClassReviewDto } from "./dto/update-gym-class-review.dto";
 import { CreateGymClassReviewResponseDto } from "./dto/create-gym-class-review-response.dto";
+import { UpdateGymClassReviewResponseDto } from "./dto/update-gym-class-review-response.dto";
 
 @Injectable()
 export class GymClassReviewsService {
@@ -90,6 +91,50 @@ export class GymClassReviewsService {
         },
     });
     }
+
+    async updateResponse(userId: number, responseId: number, dto: UpdateGymClassReviewResponseDto) {
+        const response = await this.databaseService.gymClassReviewResponse.findUnique({
+        where: { id: responseId },
+        include: {
+            review: { include: { gymClass: { include: { gym: true } } } },
+        },
+        });
+
+        if (!response) throw new NotFoundException('Response not found');
+
+        const gymOwnerId = response.review.gymClass.gym.gymOwnerId;
+        const gymTrainerId = response.review.gymClass.gym.gymTrainerId;
+
+        if (userId !== gymOwnerId && userId !== gymTrainerId)
+        throw new ForbiddenException('You can only update your own response');
+
+        return this.databaseService.gymClassReviewResponse.update({
+        where: { id: responseId },
+        data: { message: dto.message },
+        });
+  }
+
+
+  async deleteResponse(userId: number, responseId: number, isAdmin = false) {
+    const response = await this.databaseService.gymClassReviewResponse.findUnique({
+      where: { id: responseId },
+      include: {
+        review: { include: { gymClass: { include: { gym: true } } } },
+      },
+    });
+
+    if (!response) throw new NotFoundException('Response not found');
+
+    const gymOwnerId = response.review.gymClass.gym.gymOwnerId;
+    const gymTrainerId = response.review.gymClass.gym.gymTrainerId;
+
+    if (!isAdmin && userId !== gymOwnerId && userId !== gymTrainerId)
+      throw new ForbiddenException('You can only delete your own response');
+
+    return this.databaseService.gymClassReviewResponse.delete({
+      where: { id: responseId },
+    });
+  }
 
 
   async getClassReviews(classId: number) {

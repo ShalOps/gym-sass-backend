@@ -28,6 +28,7 @@ import { Role } from 'generated/prisma';
 import { Roles } from 'src/auth/roles.decorator';
 import { UpdateGymClassReviewDto } from './dto/update-gym-class-review.dto';
 import { CreateGymClassReviewResponseDto } from './dto/create-gym-class-review-response.dto';
+import { UpdateGymClassReviewResponseDto } from './dto/update-gym-class-review-response.dto';
 
 @ApiTags('Gym Class Reviews')
 @ApiBearerAuth()
@@ -134,6 +135,45 @@ export class GymClassReviewsController {
     description: 'ID of the gym class',
     type: Number,
   })
+
+  
+  @Patch(':responseId')
+  @ApiOperation({ summary: 'Update an existing class review response (Trainer only)' })
+  @ApiBody({ type: UpdateGymClassReviewResponseDto })
+  @ApiOkResponse({ description: 'Response successfully updated.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. You can only update your own response.',
+  })
+  @ApiNotFoundResponse({ description: 'Response not found.' })
+  updateResponse(
+    @Param('responseId', ParseIntPipe) responseId: number,
+    @GetUser() user: any,
+    @Body() dto: UpdateGymClassReviewResponseDto,
+  ) {
+    return this.gymClassReviewsService.updateResponse(
+      user.userId,
+      responseId,
+      dto,
+    );
+  }
+
+  @Delete(':responseId')
+  @ApiOperation({ summary: 'Delete a class review response (Trainer only)' })
+  @ApiOkResponse({ description: 'Response successfully deleted.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. You can only delete your own response.',
+  })
+  @ApiNotFoundResponse({ description: 'Response not found.' })
+  deleteResponse(
+    @Param('responseId', ParseIntPipe) responseId: number,
+    @GetUser() user: any,
+  ) {
+    return this.gymClassReviewsService.deleteResponse(
+      user.userId,
+      responseId,
+    );
+  }
+
   @ApiOkResponse({ description: 'List of gym class reviews.' })
   getClassReviews(@Param('classId', ParseIntPipe) classId: number) {
     return this.gymClassReviewsService.getClassReviews(classId);
