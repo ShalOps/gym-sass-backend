@@ -21,6 +21,7 @@ async function bootstrap() {
     .addTag('service-option-assignment', 'Service option assignment management endpoints')
     .addTag('gym-classes', 'Gym classes management endpoints')
     .addTag('reviews', 'Gym Reviews management endpoints')
+    .addTag('gym-class-reviews', 'Gym Class Reviews management endpoints')
 
     .addBearerAuth(
       {

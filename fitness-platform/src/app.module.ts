@@ -9,10 +9,11 @@ import { ServicesModule } from './services/services.module';
 import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
-import { ReviewsModule } from './reviews/reviews.module';
+import { ReviewsModule } from './gym-reviews/gym-reviews.module';
+import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, ReviewsModule],
+  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, ReviewsModule,GymClassReviewModule],
   controllers: [AppController],
   providers: [AppService],
 })

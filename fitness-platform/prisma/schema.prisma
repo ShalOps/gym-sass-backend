@@ -11,24 +11,27 @@ datasource db {
 }
 
 model User {
-  userId     Int          @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  userName   String        @unique
-  password   String
-  birthDate  DateTime 
-  gender     Gender
-  email      String?         @unique
-  phoneNo    String?        @unique
-  profilePic String?
-  bio        String?
-  location   String
-  goal       Goal?
-  role       Role            @default(CUSTOMER)
-  gyms       Gym[]
-  gymclasses GymClasses[]
-  reviews         GymReview[]
-  reviewResponses GymReviewResponse[]
+  userId                Int                      @id @default(autoincrement())
+  firstName             String
+  lastName              String
+  userName              String                   @unique
+  password              String
+  birthDate             DateTime
+  gender                Gender
+  email                 String?                  @unique
+  phoneNo               String?                  @unique
+  profilePic            String?
+  bio                   String?
+  location              String
+  goal                  Goal?
+  role                  Role                     @default(CUSTOMER)
+  gyms                  Gym[]
+  gymclasses            GymClasses[]
+  reviews               GymReview[]
+  reviewResponses       GymReviewResponse[]
+  classReviews          GymClassReview[]
+  ownerClassResponses   GymClassReviewResponse[] @relation("OwnerResponses")
+  trainerClassResponses GymClassReviewResponse[] @relation("TrainerResponses")
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
@@ -120,6 +123,8 @@ model GymClasses {
   gymId         Int
   trainer       User   @relation(fields: [trainerId], references: [userId], onDelete: Restrict)
   trainerId     Int
+
+  reviews GymClassReview[]
 }
 
 enum Category {
@@ -158,27 +163,29 @@ model GymReviewResponse {
 }
 
 model GymClassReview {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   rating    Int
   comment   String?
   class     GymClasses @relation(fields: [classId], references: [classId], onDelete: Cascade)
   classId   Int
-  user      User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [userId], onDelete: Cascade)
   userId    Int
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
-  response  GymClassReviewResponse?
+  response GymClassReviewResponse?
+
+  @@unique([classId, userId])
 }
 
 model GymClassReviewResponse {
-  responseId  Int            @id @default(autoincrement())
-  message     String
-  createdAt   DateTime       @default(now())
-  review      GymClassReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  reviewId    Int @unique   
-  trainer       User?   @relation(fields: [trainerId], references: [userId], onDelete: Restrict)
-  trainerId     Int?
+  responseId Int            @id @default(autoincrement())
+  message    String
+  createdAt  DateTime       @default(now())
+  review     GymClassReview @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  reviewId   Int            @unique
+  trainer    User?          @relation("TrainerResponses", fields: [trainerId], references: [userId], onDelete: SetNull)
+  trainerId  Int?
   owner      User?          @relation("OwnerResponses", fields: [ownerId], references: [userId])
   ownerId    Int?
 }

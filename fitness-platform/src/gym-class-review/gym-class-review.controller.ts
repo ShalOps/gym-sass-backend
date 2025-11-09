@@ -39,7 +39,8 @@ export class GymClassReviewsController {
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER)
   @ApiOperation({ summary: 'Create a new class review (Customer only)' })
   @ApiBody({ type: CreateGymClassReviewDto })
   @ApiOkResponse({ description: 'Class review successfully created.' })
@@ -119,11 +120,11 @@ export class GymClassReviewsController {
     description: 'Forbidden. Can only respond to reviews for own class.',
   })
   addResponse(
-    @GetUser('userId') ownerId: number,
+    @GetUser('userId') userId: number,
     @Param('id', ParseIntPipe) reviewId: number,
     @Body() dto: CreateGymClassReviewResponseDto,
   ) {
-    return this.gymClassReviewsService.addResponse(ownerId, reviewId, dto);
+    return this.gymClassReviewsService.addResponse(userId, reviewId, dto);
   }
 
   @Get('class/:classId')
@@ -136,8 +137,14 @@ export class GymClassReviewsController {
     type: Number,
   })
 
-  
-  @Patch(':responseId')
+  @ApiOkResponse({ description: 'List of gym class reviews.' })
+  getClassReviews(@Param('classId', ParseIntPipe) classId: number) {
+    return this.gymClassReviewsService.getClassReviews(classId);
+  }
+
+  @Patch('responses/:responseId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER, Role.GYMOWNER)
   @ApiOperation({ summary: 'Update an existing class review response (Trainer only)' })
   @ApiBody({ type: UpdateGymClassReviewResponseDto })
   @ApiOkResponse({ description: 'Response successfully updated.' })
@@ -157,7 +164,9 @@ export class GymClassReviewsController {
     );
   }
 
-  @Delete(':responseId')
+  @Delete('responses/:responseId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER, Role.GYMOWNER, Role.ADMIN)
   @ApiOperation({ summary: 'Delete a class review response (Trainer only)' })
   @ApiOkResponse({ description: 'Response successfully deleted.' })
   @ApiForbiddenResponse({
@@ -168,14 +177,12 @@ export class GymClassReviewsController {
     @Param('responseId', ParseIntPipe) responseId: number,
     @GetUser() user: any,
   ) {
+    const isAdmin = user.role === Role.ADMIN;
     return this.gymClassReviewsService.deleteResponse(
       user.userId,
       responseId,
+      isAdmin
     );
   }
 
-  @ApiOkResponse({ description: 'List of gym class reviews.' })
-  getClassReviews(@Param('classId', ParseIntPipe) classId: number) {
-    return this.gymClassReviewsService.getClassReviews(classId);
-  }
 }
