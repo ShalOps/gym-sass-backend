@@ -43,10 +43,11 @@ export abstract class BookingsService {
     throw new Error('cancel must be implemented in subclass');
   }
 
-  // Helper method to check if user is admin or owner
+  // Helper method to check if user is admin, owner, or assigned trainer
   protected async checkOwnership(
     gymId: number,
     userId: number,
+    trainerId?: number,
   ): Promise<boolean> {
     const user = await this.databaseService.user.findUnique({
       where: { userId },
@@ -60,7 +61,13 @@ export abstract class BookingsService {
       select: { gymOwnerId: true },
     });
 
-    return gym?.gymOwnerId === userId;
+    // Check gym ownership
+    if (gym?.gymOwnerId === userId) return true;
+
+    // Check trainer relationship (for class bookings)
+    if (trainerId && trainerId === userId) return true;
+
+    return false;
   }
 
   // Helper method to auto-complete past bookings

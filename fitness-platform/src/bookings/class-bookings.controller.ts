@@ -177,7 +177,7 @@ export class ClassBookingsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('GYMOWNER', 'ADMIN', 'TRAINER')
+  @Roles('GYMOWNER', 'ADMIN')
   @Post(':id/mark-no-show')
   @ApiOperation({ summary: 'Mark a class booking as no-show' })
   @ApiResponse({ status: 200, description: 'Booking marked as no-show.' })
