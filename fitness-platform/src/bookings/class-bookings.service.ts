@@ -296,12 +296,14 @@ export class ClassBookingsService extends BookingsService {
 
     // Allow admin to mark any booking as no-show
     if (currentUser.role !== 'ADMIN') {
-      // For non-admin, check if they own the gym or are a trainer
-      const isOwner = await this.checkOwnership(
+      // For non-admin, check if they own the gym or are the trainer for this class
+      const isGymOwner = await this.checkOwnership(
         booking.class.gymId,
         currentUserId,
       );
-      if (!isOwner) {
+      const isClassTrainer = booking.class.trainerId === currentUserId;
+
+      if (!isGymOwner && !isClassTrainer) {
         throw new ForbiddenException(
           'You do not have permission to mark this booking as no-show',
         );
