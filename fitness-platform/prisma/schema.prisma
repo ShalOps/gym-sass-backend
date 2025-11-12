@@ -14,25 +14,25 @@ datasource db {
 
 
 model User {
-  userId     Int          @id @default(autoincrement())
+  userId     Int            @id @default(autoincrement())
   firstName  String
   lastName   String
-  userName   String        @unique
+  userName   String         @unique
   password   String
   birthDate  DateTime 
   gender     Gender
-  email      String?         @unique
+  email      String?        @unique
   phoneNo    String?        @unique
   profilePic String?
   bio        String?
   location   String
   goal       Goal?
-  role       Role            @default(CUSTOMER)
+  role       Role           @default(CUSTOMER)
   gyms       Gym[]
   gymclasses GymClasses[]
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  lastLogin  DateTime?    @updatedAt       
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  lastLogin  DateTime?             
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
@@ -79,12 +79,14 @@ model Gym {
 }
 
 model Service {
-  serviceId           Int                       @id @default(autoincrement())
+  serviceId           Int                        @id @default(autoincrement())
   name                String                    
   price               Float
-  duration            String                    // days or monthly/yearly
+  duration            String                     // days or monthly/yearly
   category            Category
   target              String
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
   optionAssignments   ServiceOptionAssignment[]  
   gym                 Gym                        @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   gymId               Int
@@ -121,6 +123,8 @@ model GymClasses {
   classSchedule     String
   capacity          Int
   duration          String
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
   gym               Gym         @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
   gymId             Int
   trainer           User        @relation(fields: [trainerId], references: [userId], onDelete: Restrict)

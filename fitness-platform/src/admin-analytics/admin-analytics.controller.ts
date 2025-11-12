@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards} from '@nestjs/common';
+import { Controller, Get, UseGuards, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { AdminAnalyticsQueryDto } from './dto/admin-analytics-query.dto';
 
 @Controller('admin-analytics')
 export class AdminAnalyticsController {
@@ -11,7 +12,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get total number of users' })
+  @ApiOperation({ summary: 'Retrieve the total count of all users' })
   @Get('totalusers')
   @ApiBearerAuth('JWT-auth')
   totalUsers() {
@@ -20,7 +21,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of users grouped by role'})
+  @ApiOperation({ summary: 'Retrieve user counts grouped by role'})
   @Get('users-by-role')
   @ApiBearerAuth('JWT-auth')
   usersByRole() {
@@ -29,7 +30,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of users grouped by gender'})
+  @ApiOperation({ summary: 'Retrieve user counts grouped by gender'})
   @Get('users-by-gender')
   @ApiBearerAuth('JWT-auth')
   usersByGender() {
@@ -38,7 +39,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of users grouped by goal'})  
+  @ApiOperation({ summary: 'Retrieve user counts grouped by fitness goal'})  
   @Get('users-by-goal')
   @ApiBearerAuth('JWT-auth')
   usersByGoal() {
@@ -47,7 +48,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of new users signed up grouped by day'})  
+  @ApiOperation({ summary: 'Retrieve daily new user sign-up counts over the last 30 days'})  
   @Get('new-users-daily')
   @ApiBearerAuth('JWT-auth')
   newUsersDaily(){
@@ -56,16 +57,16 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of new users signed up grouped by week'})  
+  @ApiOperation({ summary: 'Retrieve weekly new user sign-up counts over the last 90 days'})  
   @Get('new-users-weekly')
   @ApiBearerAuth('JWT-auth')
   newUsersWeekly(){
-    return this.adminAnalyticsService.newUsersDaily();
+    return this.adminAnalyticsService.newUsersWeekly();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Get number of new users signed up grouped by month'})  
+  @ApiOperation({ summary: 'Retrieve monthly new user sign-up counts over the last year'})  
   @Get('new-users-month')
   @ApiBearerAuth('JWT-auth')
   newUsersPerMonth(){
@@ -74,7 +75,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of active users'})  
+  @ApiOperation({ summary: 'Retrieve the count of active users (users who logged in within the last 30 days)'})  
   @Get('active-users')
   @ApiBearerAuth('JWT-auth')
   activeUsers(){
@@ -84,7 +85,7 @@ export class AdminAnalyticsController {
   
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of users age distribution'})  
+  @ApiOperation({ summary: 'Retrieve user counts grouped by age distribution ranges'})  
   @Get('age-distribution')
   @ApiBearerAuth('JWT-auth')
   ageDistribution(){
@@ -93,7 +94,7 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of gyms by verification status'})  
+  @ApiOperation({ summary: 'Retrieve gym counts by verification status (total, verified, unverified)'})  
   @Get('gym-verified')
   @ApiBearerAuth('JWT-auth')
   gymsByVerification(){
@@ -102,56 +103,47 @@ export class AdminAnalyticsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of gyms by number of services'})  
+  @ApiOperation({ summary: 'Retrieve top gyms by number of services offered (with optional limit and date range filter)'})  
   @Get('gym-by-services')
   @ApiBearerAuth('JWT-auth')
-  gymsByServices(){
-    return this.adminAnalyticsService.gymsByServices();
+  gymsByServices(@Query() query: AdminAnalyticsQueryDto){
+    return this.adminAnalyticsService.gymsByServices(query.limit, query.from, query.to);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of gyms by number of classes'})  
+  @ApiOperation({ summary: 'Retrieve top gyms by number of classes offered (with optional limit and date range filter)'})  
   @Get('gym-by-classes')
   @ApiBearerAuth('JWT-auth')
-  gymsByClasses(){
-    return this.adminAnalyticsService.gymsByClasses();
+  gymsByClasses(@Query() query: AdminAnalyticsQueryDto){
+    return this.adminAnalyticsService.gymsByClasses(query.limit, query.from, query.to);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of class schedules by popularity'})  
+  @ApiOperation({ summary: 'Retrieve top class schedules by number of classes (sorted by popularity, with optional limit and date range filter)'})  
   @Get('class-schedules')
   @ApiBearerAuth('JWT-auth')
-  popularClassSchedules(){
-    return this.adminAnalyticsService.popularClassSchedules();
+  popularClassSchedules(@Query() query:AdminAnalyticsQueryDto){
+    return this.adminAnalyticsService.popularClassSchedules(query.limit, query.from, query.to);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of trainers by number of classes'})  
+  @ApiOperation({ summary: 'Retrieve top trainers by number of classes taught (with optional limit and date range filter)'})  
   @Get('trainer-classes')
   @ApiBearerAuth('JWT-auth')
-  topTrainersByClasses(){
-    return this.adminAnalyticsService.topTrainersByClasses();
+  topTrainersByClasses(@Query() query: AdminAnalyticsQueryDto){
+    return this.adminAnalyticsService.topTrainersByClasses(query.limit, query.from, query.to);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'List of class pricings'})  
+  @ApiOperation({ summary: 'Retrieve per-gym insights of average class price (with optional limit and date range filter)'})  
   @Get('class-pricings')
   @ApiBearerAuth('JWT-auth')
-  gymClassPricingInsights(){
-    return this.adminAnalyticsService.gymClassPricingInsights();
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Total classes per gym'})  
-  @Get('total-classes-per-gym')
-  @ApiBearerAuth('JWT-auth')
-  totalClassesPerGym(){
-    return this.adminAnalyticsService.totalClassesPerGym();
+  gymClassPricingInsights(@Query() query: AdminAnalyticsQueryDto){
+    return this.adminAnalyticsService.gymClassPricingInsights(query.limit, query.from, query.to);
   }
 
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import { StringFormatParams } from 'zod/v4/core';
 
 
 @Injectable()
@@ -8,7 +9,7 @@ export class AdminAnalyticsService {
 
   async totalUsers() {
      const numberOfUsers = await this.databaseService.user.count();
-     return `Total number of users ${numberOfUsers}`;
+     return { count: numberOfUsers};
   }
 
   async usersByRole(){
@@ -32,53 +33,77 @@ export class AdminAnalyticsService {
   }
   
   async usersByGoal(){
-    const usersByGender = await this.databaseService.user.groupBy({
+    const usersByGoal = await this.databaseService.user.groupBy({
       by: ['goal'], 
       _count: {
         userId: true,
       },
     })
-    return usersByGender;
+    return usersByGoal;
   }
 
   async newUsersDaily(){
-      const newUsersDaily = await this.databaseService.user.groupBy({
-        by: ['createdAt'],
-        _count: { _all: true },
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-          },
-        },
-        orderBy: { createdAt: 'asc' },
-      })
+    type DailyCount = {
+        day: Date;
+        count: bigint;
+    };
+    try {
+    const result = await this.databaseService.$queryRaw<DailyCount[]>`
+      SELECT 
+        DATE_TRUNC('day', "createdAt") AS day,
+        COUNT(*) AS count
+      FROM "User"
+      WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+      GROUP BY day
+      ORDER BY day ASC
+    `;
 
-      return newUsersDaily;
+    return result.map(row => ({
+      period: row.day.toISOString().slice(0, 10),
+      count: Number(row.count),
+    }));
+  } catch (error) {
+    console.error('Error in newUsersDaily: ', error);
+    throw error;
+  }
   }
 
   async newUsersWeekly(){
-    const newUsersWeekly = await this.databaseService.$queryRaw`
+    type WeeklyCount = {
+        week: Date;
+        count: bigint;
+    };
+    try {
+    const result = await this.databaseService.$queryRaw<WeeklyCount[]>`
       SELECT 
-        DATE_TRUNC('week', "createdAt") AS "creationWeek",
-        COUNT(userId) AS "count"
+        DATE_TRUNC('week', "createdAt") AS "week",
+        COUNT(*) AS "count"
       FROM "User"
       WHERE "createdAt" >= NOW() - INTERVAL '90 days'
-      GROUP BY "creationWeek"
-      ORDER BY "creationWeek" ASC`
+      GROUP BY "week"
+      ORDER BY "week" ASC`
 
-      return newUsersWeekly
+      return result.map(row => ({
+          period: row.week.toISOString().slice(0, 10), 
+          count: Number(row.count),
+      }));
+    } catch (error) {
+      console.error('Error in newUsersWeekly: ', error);
+      throw error;
+    }
   }
 
 
   async newUsersPerMonth() {
     type MonthlyCountRow = {
-      creationMonth: Date;
+      month: Date;
       count: bigint;
     };
 
+    try {
     const result = await this.databaseService.$queryRaw<MonthlyCountRow[]>`
       SELECT 
-        DATE_TRUNC('month', "createdAt")::date AS "creationMonth",
+        DATE_TRUNC('month', "createdAt")::date AS "month",
         COUNT(*) AS "count"
       FROM "User"
       WHERE "createdAt" >= NOW() - INTERVAL '365 days'
@@ -87,9 +112,13 @@ export class AdminAnalyticsService {
     `;  
 
     return result.map((row) => ({
-      creationMonth: row.creationMonth.toISOString().slice(0, 7),
+      period: row.month.toISOString().slice(0, 7),
       count: Number(row.count),
     }));
+    } catch (error){
+      console.error('Error in newUsersPerMonth: ', error);
+      throw error;
+    }
   }
 
   async activeUsers(){
@@ -100,16 +129,21 @@ export class AdminAnalyticsService {
         },
       },
     });
-    return `Number of active user is: ${activeUsers}`;
+    return { count: activeUsers };
   }
 
   async ageDistribution() {
-    const result = await this.databaseService.$queryRaw<
-      Array<{ age_group: string; count: bigint }>
-    >`
+    
+    type ageCountRow = {
+      age_group: string;
+      count: bigint;
+    };
+
+    try {
+    const result = await this.databaseService.$queryRaw<ageCountRow[]>`
       SELECT
         CASE
-          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) < 18      THEN 'Under 18'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) < 18     THEN 'Under 18'
           WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) <= 24    THEN '18-24'
           WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) <= 34    THEN '25-34'
           WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) <= 44    THEN '35-44'
@@ -120,17 +154,21 @@ export class AdminAnalyticsService {
         COUNT(*) AS count
       FROM "User"
       WHERE "birthDate" IS NOT NULL
-      GROUP BY 1               -- 1 = the CASE expression (the first selected column)
-      ORDER BY 1;              -- keep the same order
+      GROUP BY 1             
+      ORDER BY 1
     `;
 
-    return result.map(r => ({
-      ageGroup: r.age_group,
-      count: Number(r.count),
+    return result.map((row) => ({
+      ageGroup: row.age_group,
+      count: Number(row.count),
     }));
+  } catch (error) {
+    console.error('Error in ageDistribution: ', error)
+    throw error;
+  }
   }
 
-    async gymsByVerificationStatus() {
+  async gymsByVerificationStatus() {
     const [totalGyms, verifiedCount] = await Promise.all([
       this.databaseService.gym.count(),
 
@@ -148,8 +186,32 @@ export class AdminAnalyticsService {
     };
   }
 
-    async gymsByServices(limit: number = 10) {
+  private buildDateFilter(from?: string, to?: string){
+    const where: any = {};
+
+    if(from) {
+      where.gte = new Date(from);
+    }
+
+    if(to) {
+      where.lte = new Date(to);
+    }
+
+    return Object.keys(where).length > 0? where : undefined;
+  }
+
+  async gymsByServices(limit: number = 10, from?: string, to?: string) {
+    
+    const dateFilter = this.buildDateFilter(from, to);
+    const serviceFilter = dateFilter ? { createdAt: dateFilter } : {};
+
     const gyms = await this.databaseService.gym.findMany({
+      where: 
+        {
+          services: {
+            some: serviceFilter,
+          },
+        },
       select: {
         gymId: true,
         gymName: true,
@@ -170,12 +232,21 @@ export class AdminAnalyticsService {
     return gyms.map(gym => ({
       gymId: gym.gymId,
       gymName: gym.gymName,
-      serviceCount: gym._count.services,
+      count: gym._count.services,
     }));
   }
 
-    async gymsByClasses(limit: number = 10) {
+  async gymsByClasses(limit: number = 10, from?: string, to?: string) {
+
+    const dateFilter = this.buildDateFilter(from, to);
+    const classFilter = dateFilter ? { createdAt: dateFilter } : {};
+    
     const gyms = await this.databaseService.gym.findMany({
+      where: {
+          gymClasses: {
+            some: classFilter,
+          },
+        },
       select: {
         gymId: true,
         gymName: true,
@@ -196,16 +267,21 @@ export class AdminAnalyticsService {
     return gyms.map(gym => ({
       gymId: gym.gymId,
       gymName: gym.gymName,
-      classCount: gym._count.gymClasses,
+      count: gym._count.gymClasses,
     }));
   }
 
-  async popularClassSchedules(limit: number = 10) {
+  async popularClassSchedules(limit: number = 10, from?: string, to?: string) {
+    
+    const dateFilter = this.buildDateFilter(from, to);
+    const classFilter = dateFilter ? { createdAt: dateFilter } : {};
+
     const schedules = await this.databaseService.gymClasses.groupBy({
       by: ['classSchedule'],
       _count: {
         classId: true,
       },
+      where: classFilter,
       orderBy: {
         _count: {
           classId: 'desc',
@@ -216,16 +292,20 @@ export class AdminAnalyticsService {
 
     return schedules.map(item => ({
       schedule: item.classSchedule,
-      classCount: item._count.classId,
+      count: item._count.classId,
     }));
   }
 
-  async topTrainersByClasses(limit: number = 10) {
+  async topTrainersByClasses(limit: number = 10, from?: string, to?: string) {
+
+    const dateFilter = this.buildDateFilter(from, to);
+    const trainerFilter = dateFilter ? { createdAt: dateFilter } : {};
+
     const trainers = await this.databaseService.user.findMany({
       where: {
         role: 'TRAINER',
         gymclasses: {
-          some: {}, 
+          some: trainerFilter, 
         },
       },
       select: {
@@ -251,12 +331,21 @@ export class AdminAnalyticsService {
       trainerId: trainer.userId,
       name: `${trainer.firstName} ${trainer.lastName}`,
       userName: trainer.userName,
-      classCount: trainer._count.gymclasses,
+      count: trainer._count.gymclasses,
     }));
   }
 
-  async gymClassPricingInsights(limit: number = 20) {
+  async gymClassPricingInsights(limit: number = 20, from?: string, to?: string) {
+
+    const dateFilter = this.buildDateFilter(from, to);
+    const classFilter = dateFilter ? { createdAt: dateFilter } : {};
+
     const gyms = await this.databaseService.gym.findMany({
+      where: {
+        gymClasses: {
+          some: classFilter,
+        }
+      },
       select: {
         gymId: true,
         gymName: true,
@@ -296,39 +385,6 @@ export class AdminAnalyticsService {
       })
       .filter(g => g.totalClasses > 0); 
   }
-
-    async totalClassesPerGym(limit: number = 20) {
-    const gyms = await this.databaseService.gym.findMany({
-      select: {
-        gymId: true,
-        gymName: true,
-        _count: {
-          select: {
-            gymClasses: true,
-          },
-        },
-      },
-      where: {
-        gymClasses: {
-          some: {}, // Only gyms with at least one class
-        },
-      },
-      orderBy: {
-        gymClasses: {
-          _count: 'desc',
-        },
-      },
-      take: limit,
-    });
-
-    return gyms.map(gym => ({
-      gymId: gym.gymId,
-      gymName: gym.gymName,
-      totalClasses: gym._count.gymClasses,
-    }));
-  }
-
-
 
 
 }
