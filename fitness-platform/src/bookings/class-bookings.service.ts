@@ -49,6 +49,12 @@ export class ClassBookingsService extends BookingsService {
           in: number[];
         };
       };
+      OR?: Array<{
+        userId?: number;
+        class?: {
+          trainerId: number;
+        };
+      }>;
     } = {};
 
     // Role-based filtering
@@ -69,8 +75,14 @@ export class ClassBookingsService extends BookingsService {
       }
 
       where.class = { gymId: { in: gymIds } };
+    } else if (currentUser.role === 'TRAINER') {
+      // Trainers can see their own bookings OR bookings for classes they teach
+      where.OR = [
+        { userId }, // Their own bookings
+        { class: { trainerId: userId } }, // Bookings for classes they teach
+      ];
     } else {
-      // Regular users (CUSTOMER, TRAINER) can only see their own bookings
+      // Regular users (CUSTOMER) can only see their own bookings
       where.userId = userId;
     }
 
@@ -143,13 +155,31 @@ export class ClassBookingsService extends BookingsService {
       throw new NotFoundException('Class booking not found');
     }
 
-    // Check if user owns the booking or is admin/gym owner
+    // Check if user owns the booking or has permission to view it
     if (booking.userId !== userId) {
+      const currentUser = await this.databaseService.user.findUnique({
+        where: { userId },
+        select: { role: true },
+      });
+
+      if (!currentUser) {
+        throw new ForbiddenException('User not found');
+      }
+
+      // Allow admin or gym owner to view any booking
       const isOwner = await this.checkOwnership(booking.class.gymId, userId);
       if (!isOwner) {
-        throw new ForbiddenException(
-          'You do not have permission to view this booking',
-        );
+        // For trainers, check if they teach this class
+        if (
+          currentUser.role === 'TRAINER' &&
+          booking.class.trainerId === userId
+        ) {
+          // Trainer can view bookings for their classes
+        } else {
+          throw new ForbiddenException(
+            'You do not have permission to view this booking',
+          );
+        }
       }
     }
 
