@@ -76,12 +76,22 @@ export class GymClassesService {
   }
 
   async findAll() {
-    return this.databaseservice.gymClasses.findMany({
+    const classes = await this.databaseservice.gymClasses.findMany({
       include: {
         gym: true,
         trainer: true,
+        coverPhoto: {
+          select: {
+            thumbnailUrl: true,
+          },
+        },
       },
     });
+
+    return classes.map((gymClass) => ({
+      ...gymClass,
+      coverPhotoUrl: gymClass.coverPhoto?.thumbnailUrl || null,
+    }));
   }
 
   async findOne(id: number) {
@@ -89,21 +99,25 @@ export class GymClassesService {
       where: {
         classId: id,
       },
+      include: {
+        gym: true,
+        trainer: true,
+        coverPhoto: {
+          select: {
+            thumbnailUrl: true,
+          },
+        },
+      },
     });
 
     if (!gymClass) {
       throw new NotFoundException(`Gym class with ID ${id} not found`);
     }
 
-    return this.databaseservice.gymClasses.findUnique({
-      where: {
-        classId: id,
-      },
-      include: {
-        gym: true,
-        trainer: true,
-      },
-    });
+    return {
+      ...gymClass,
+      coverPhotoUrl: gymClass.coverPhoto?.thumbnailUrl || null,
+    };
   }
 
   async update(

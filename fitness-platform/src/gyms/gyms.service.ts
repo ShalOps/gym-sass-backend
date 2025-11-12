@@ -73,11 +73,24 @@ export class GymsService {
         where,
         skip,
         take: limit,
+        include: {
+          coverPhoto: {
+            select: {
+              thumbnailUrl: true,
+            },
+          },
+        },
       }),
       this.databaseservice.gym.count({ where }),
     ]);
+
+    const transformedData = data.map((gym) => ({
+      ...gym,
+      coverPhotoUrl: gym.coverPhoto?.thumbnailUrl || null,
+    }));
+
     return {
-      data,
+      data: transformedData,
       total,
       page,
       limit,
@@ -90,8 +103,12 @@ export class GymsService {
       where: {
         gymId: id,
       },
-      select: {
-        gymId: true,
+      include: {
+        coverPhoto: {
+          select: {
+            thumbnailUrl: true,
+          },
+        },
       },
     });
 
@@ -99,11 +116,10 @@ export class GymsService {
       throw new NotFoundException(`Gym with ID ${id} not found`);
     }
 
-    return this.databaseservice.gym.findUnique({
-      where: {
-        gymId: id,
-      },
-    });
+    return {
+      ...gym,
+      coverPhotoUrl: gym.coverPhoto?.thumbnailUrl || null,
+    };
   }
 
   async update(

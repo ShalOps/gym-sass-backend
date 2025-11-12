@@ -36,8 +36,14 @@ export class UsersService {
       }),
       this.databaseservice.user.count({ where }),
     ]);
+
+    const transformedData = data.map((user) => ({
+      ...user,
+      profilePicUrl: user.profilePic || null,
+    }));
+
     return {
-      data,
+      data: transformedData,
       total,
       page,
       limit,
@@ -59,11 +65,16 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} id not found`);
     }
 
-    return this.databaseservice.user.findUnique({
+    const fullUser = await this.databaseservice.user.findUnique({
       where: {
         userId: id,
       },
     });
+
+    return {
+      ...fullUser,
+      profilePicUrl: fullUser?.profilePic || null,
+    };
   }
 
   async update(updateUsersDto: UpdateUsersDto, currentUserId: number) {
