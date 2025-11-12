@@ -13,6 +13,7 @@ import { ServiceOptionAssignmentModule } from './service-option-assignment/servi
 import { UploadsModule } from './uploads/uploads.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { MulterModule } from '@nestjs/platform-express';
+import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { MulterModule } from '@nestjs/platform-express';
     ServiceOptionAssignmentModule,
     UploadsModule,
     BookingsModule,
-    MulterModule.register({ dest: './uploads' }),
+    MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
   ],
   controllers: [AppController],
   providers: [AppService],

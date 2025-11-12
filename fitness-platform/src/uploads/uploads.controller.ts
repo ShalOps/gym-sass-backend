@@ -27,6 +27,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
+import { UPLOADS_DIR_ABSOLUTE } from '../config/paths.config';
 
 type UploadedFile = {
   mimetype: string;
@@ -38,8 +39,6 @@ interface User {
   userId: number;
   role: string;
 }
-
-const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
 
 @ApiTags('uploads')
 @Controller('uploads')
@@ -79,7 +78,7 @@ export class UploadsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: UPLOADS_DIR,
+        destination: UPLOADS_DIR_ABSOLUTE,
         filename: (req, file: UploadedFile, cb) => {
           const uniqueName = `${Date.now()}-${Math.round(
             Math.random() * 1e9,
@@ -169,7 +168,7 @@ export class UploadsController {
   @UseInterceptors(
     FilesInterceptor('photos', 10, {
       storage: diskStorage({
-        destination: UPLOADS_DIR,
+        destination: UPLOADS_DIR_ABSOLUTE,
         filename: (req, file: UploadedFile, cb) => {
           const uniqueName = `${Date.now()}-${Math.round(
             Math.random() * 1e9,
@@ -293,7 +292,7 @@ export class UploadsController {
   @UseInterceptors(
     FilesInterceptor('photos', 10, {
       storage: diskStorage({
-        destination: UPLOADS_DIR,
+        destination: UPLOADS_DIR_ABSOLUTE,
         filename: (req, file: UploadedFile, cb) => {
           const uniqueName = `${Date.now()}-${Math.round(
             Math.random() * 1e9,

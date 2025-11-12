@@ -9,6 +9,12 @@ import { unlink } from 'fs/promises';
 import { mkdir } from 'fs/promises';
 import sharp from 'sharp';
 import { Photo } from '@prisma/client';
+import {
+  UPLOADS_DIR_ABSOLUTE,
+  THUMBNAIL_DIR_ABSOLUTE,
+  UPLOADS_WEB_PREFIX,
+  THUMBNAIL_WEB_PREFIX,
+} from '../config/paths.config';
 
 @Injectable()
 export class UploadsService {
@@ -16,20 +22,23 @@ export class UploadsService {
 
   private async generateThumbnails(photos: Photo[]): Promise<void> {
     const thumbnailPromises = photos.map(async (photo) => {
-      const originalPath = `.${photo.url}`;
+      // Convert web path to absolute filesystem path
+      const originalPath = photo.url.replace(
+        UPLOADS_WEB_PREFIX,
+        UPLOADS_DIR_ABSOLUTE + '/',
+      );
       const filename = photo.url.split('/').pop();
-      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
-      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
+      const thumbnailPath = `${THUMBNAIL_DIR_ABSOLUTE}/${filename}`;
 
       try {
         await sharp(originalPath)
           .resize(300, 300, { fit: 'cover' })
           .jpeg({ quality: 80 })
-          .toFile(`.${thumbnailPath}`);
+          .toFile(thumbnailPath);
 
         await this.db.photo.update({
           where: { id: photo.id },
-          data: { thumbnailUrl: thumbnailPath },
+          data: { thumbnailUrl: `${THUMBNAIL_WEB_PREFIX}${filename}` },
         });
       } catch (error) {
         console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
@@ -95,14 +104,24 @@ export class UploadsService {
     thumbnailUrl?: string | null;
   }): Promise<void> {
     try {
-      await unlink(`.${photo.url}`);
+      // Convert web path to absolute filesystem path
+      const filePath = photo.url.replace(
+        UPLOADS_WEB_PREFIX,
+        UPLOADS_DIR_ABSOLUTE + '/',
+      );
+      await unlink(filePath);
     } catch (error) {
       console.warn(`Failed to delete file: ${photo.url}`, error);
     }
 
     if (photo.thumbnailUrl) {
       try {
-        await unlink(`.${photo.thumbnailUrl}`);
+        // Convert thumbnail web path to absolute filesystem path
+        const thumbnailPath = photo.thumbnailUrl.replace(
+          THUMBNAIL_WEB_PREFIX,
+          THUMBNAIL_DIR_ABSOLUTE + '/',
+        );
+        await unlink(thumbnailPath);
       } catch (error) {
         console.warn(
           `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
@@ -184,7 +203,12 @@ export class UploadsService {
     // Clean up old profile picture file (after successful DB update)
     if (oldProfilePic && oldProfilePic !== filePath) {
       try {
-        await unlink(`.${oldProfilePic}`);
+        // Convert web path to absolute filesystem path
+        const oldFilePath = oldProfilePic.replace(
+          UPLOADS_WEB_PREFIX,
+          UPLOADS_DIR_ABSOLUTE + '/',
+        );
+        await unlink(oldFilePath);
       } catch (error) {
         // Log error but don't fail the operation
         console.warn(
@@ -252,7 +276,7 @@ export class UploadsService {
     }
 
     // Ensure thumbnails directory exists
-    await mkdir(process.env.THUMBNAIL_DIR || './uploads/thumbnails', {
+    await mkdir(THUMBNAIL_DIR_ABSOLUTE, {
       recursive: true,
     });
 
@@ -337,7 +361,7 @@ export class UploadsService {
     }
 
     // Ensure thumbnails directory exists
-    await mkdir(process.env.THUMBNAIL_DIR || './uploads/thumbnails', {
+    await mkdir(THUMBNAIL_DIR_ABSOLUTE, {
       recursive: true,
     });
 

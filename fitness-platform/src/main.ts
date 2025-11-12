@@ -3,16 +3,13 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
-import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
-
-const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
+import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
 
 async function bootstrap() {
   // Ensure uploads directory exists
-  const fullUploadsPath = join(process.cwd(), UPLOADS_DIR);
-  await mkdir(fullUploadsPath, { recursive: true });
+  await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
@@ -23,7 +20,7 @@ async function bootstrap() {
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Serve static files from uploads directory
-  app.useStaticAssets(join(__dirname, '..', UPLOADS_DIR), {
+  app.useStaticAssets(UPLOADS_DIR_ABSOLUTE, {
     prefix: '/uploads/',
   });
 
