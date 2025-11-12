@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -29,6 +30,7 @@ import { Roles } from 'src/auth/roles.decorator';
 import { UpdateGymClassReviewDto } from './dto/update-gym-class-review.dto';
 import { CreateGymClassReviewResponseDto } from './dto/create-gym-class-review-response.dto';
 import { UpdateGymClassReviewResponseDto } from './dto/update-gym-class-review-response.dto';
+import { PaginationDto } from './dto/pagination.dto';
 
 @ApiTags('Gym Class Reviews')
 @ApiBearerAuth()
@@ -136,10 +138,16 @@ export class GymClassReviewsController {
     description: 'ID of the gym class',
     type: Number,
   })
-
-  @ApiOkResponse({ description: 'List of gym class reviews.' })
-  getClassReviews(@Param('classId', ParseIntPipe) classId: number) {
-    return this.gymClassReviewsService.getClassReviews(classId);
+  @ApiOkResponse({ description: 'Paginated list of gym class reviews.' })
+  getClassReviews(
+    @Param('classId', ParseIntPipe) classId: number,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.gymClassReviewsService.getClassReviews(
+      classId,
+      paginationDto.page,
+      paginationDto.limit,
+    );
   }
 
   @Patch('responses/:responseId')
