@@ -122,15 +122,32 @@ export class ReviewsService {
     }
 
 
-  async getGymReviews(gymId: number) {
-    return this.databaseservice.gymReview.findMany({
-      where: { gymId },
-      include: {
-        user: { select: { userName: true, profilePic: true } },
-        response: { include: { owner: { select: { userName: true } } } },
+  async getGymReviews(gymId: number, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+      this.databaseservice.gymReview.findMany({
+        where: { gymId },
+        include: {
+          user: { select: { userName: true, profilePic: true } },
+          response: { include: { owner: { select: { userName: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.databaseservice.gymReview.count({ where: { gymId } }),
+    ]);
+
+    return {
+      data: reviews,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
 }
