@@ -205,6 +205,23 @@ export class ClassBookingsService extends BookingsService {
       );
     }
 
+    // Check capacity if status is being changed to CONFIRMED
+    if (
+      updateData.status === BookingStatus.CONFIRMED &&
+      booking.status !== BookingStatus.CONFIRMED
+    ) {
+      const confirmedBookings = await this.databaseService.classBooking.count({
+        where: {
+          classId: booking.classId,
+          status: BookingStatus.CONFIRMED,
+        },
+      });
+
+      if (confirmedBookings >= booking.class.capacity) {
+        throw new BadRequestException('Class is at full capacity');
+      }
+    }
+
     // Update the booking
     return this.databaseService.classBooking.update({
       where: { classBookingId: id },
