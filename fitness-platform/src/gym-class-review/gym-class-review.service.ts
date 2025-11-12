@@ -23,6 +23,11 @@ export class GymClassReviewsService {
 
     if (existing) throw new ForbiddenException('You have already reviewed this class');
 
+    // if both comment and  rating are not provided
+    if (!dto.comment && !dto.rating) {
+      throw new ForbiddenException('At least one of rating or comment must be provided');
+    }
+
     return this.databaseService.gymClassReview.create({
       data: {
         rating: dto.rating,
@@ -39,9 +44,13 @@ export class GymClassReviewsService {
     });
 
     if (!review) throw new NotFoundException('Review not found');
-    if (review.userId !== userId)
+    if (review.userId !== userId){
       throw new ForbiddenException('You can only update your own review');
+    }
 
+    if (dto.rating === undefined && dto.comment === undefined) {
+      throw new ForbiddenException('At least one field (rating or comment) must be provided for update');
+    }
     return this.databaseService.gymClassReview.update({
       where: { id: reviewId },
       data: dto,
@@ -79,6 +88,18 @@ export class GymClassReviewsService {
         throw new ForbiddenException('You can only respond to reviews for your own gym classes');
     }
 
+    if( dto.message === undefined || dto.message === null || dto.message.trim() === '') {
+      throw new ForbiddenException('Response message cannot be empty');
+    }
+
+    const existingResponse = await this.databaseService.gymClassReviewResponse.findFirst({
+        where: { reviewId },
+    });
+    
+    if (existingResponse) {
+        throw new ForbiddenException('Response to this review already exists');
+    }
+
     const isOwner = userId === gymOwnerId;
     const isTrainer = userId === gymTrainerId;
 
@@ -105,8 +126,16 @@ export class GymClassReviewsService {
     const gymOwnerId = response.review.class.gym.gymOwnerId; 
     const gymTrainerId = response.review.class.trainerId; 
 
-    if (userId !== gymOwnerId && userId !== gymTrainerId)
+    if (response.ownerId !== gymOwnerId && response.ownerId !== gymTrainerId){
+      throw new ForbiddenException('Only a gym owner or trainer can create a response');
+    }
+
+    if (userId !== response.ownerId){
       throw new ForbiddenException('You can only update your own response');
+    }
+    if( dto.message === undefined || dto.message === null || dto.message.trim() === '') {
+      throw new ForbiddenException('Response message cannot be empty');
+    }
 
     return this.databaseService.gymClassReviewResponse.update({
       where: { responseId: responseId },
@@ -128,8 +157,12 @@ export class GymClassReviewsService {
     const gymOwnerId = response.review.class.gym.gymOwnerId;
     const gymTrainerId = response.review.class.trainerId;
 
-    if (!isAdmin && userId !== gymOwnerId && userId !== gymTrainerId)
+    if (response.ownerId !== gymOwnerId && response.ownerId !== gymTrainerId)
+    throw new ForbiddenException('Only a gym owner or trainer can create a response');
+
+    if (!isAdmin && userId !== response.ownerId)
       throw new ForbiddenException('You can only delete your own response');
+
 
     return this.databaseService.gymClassReviewResponse.delete({
       where: { responseId: responseId },

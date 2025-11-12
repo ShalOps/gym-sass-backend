@@ -70,11 +70,11 @@ export class GymClassReviewsController {
     description: 'Forbidden. Can only update own class review.',
   })
   update(
-    @GetUser('userId') userId: number,
+    @GetUser() user,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateGymClassReviewDto,
   ) {
-    return this.gymClassReviewsService.updateClassReview(userId, id, dto);
+    return this.gymClassReviewsService.updateClassReview(user.userId, id, dto);
   }
 
   @Delete(':id')
@@ -120,11 +120,11 @@ export class GymClassReviewsController {
     description: 'Forbidden. Can only respond to reviews for own class.',
   })
   addResponse(
-    @GetUser('userId') userId: number,
+    @GetUser() user,
     @Param('id', ParseIntPipe) reviewId: number,
     @Body() dto: CreateGymClassReviewResponseDto,
   ) {
-    return this.gymClassReviewsService.addResponse(userId, reviewId, dto);
+    return this.gymClassReviewsService.addResponse(user.userId, reviewId, dto);
   }
 
   @Get('class/:classId')

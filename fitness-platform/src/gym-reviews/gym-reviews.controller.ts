@@ -41,11 +41,11 @@ export class ReviewsController {
     @ApiNotFoundResponse({ description: 'Review not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only update own review.' })
     update(
-        @GetUser('userId') userId: number,
+        @GetUser() user,
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateReviewDto,
     ) {
-        return this.reviewsService.updateReview(userId, id, dto);
+        return this.reviewsService.updateReview(user.userId, id, dto);
     }
 
 
@@ -73,11 +73,42 @@ export class ReviewsController {
     @ApiNotFoundResponse({ description: 'Review not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only respond to reviews for own gym.' })
     addResponse(
-        @GetUser('userId') ownerId: number,
+        @GetUser() user,
         @Param('id', ParseIntPipe) reviewId: number, 
         @Body() dto: CreateResponseDto,
     ) {
-        return this.reviewsService.addResponse(ownerId, reviewId, dto);
+        return this.reviewsService.addResponse(user.userId, reviewId, dto);
+    }
+
+    @Delete(':id/response')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.GYMOWNER)
+    @ApiOperation({ summary: 'Delete a response to a review (Gym Owner only)' })
+    @ApiParam({ name: 'id', description: 'ID of the review to delete response from', type: Number })
+    @ApiOkResponse({ description: 'Response successfully deleted.' })
+    @ApiNotFoundResponse({ description: 'Response not found.' })
+    @ApiForbiddenResponse({ description: 'Forbidden. Can only delete responses for own gym.' })
+    deleteResponse(
+        @GetUser() user,
+        @Param('id', ParseIntPipe) responseId: number,
+    ) {
+        return this.reviewsService.deleteResponse(user.userId, responseId);
+    }
+    @Patch(':id/response')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.GYMOWNER)
+    @ApiOperation({ summary: 'Update a response to a review (Gym Owner only)' })
+    @ApiParam({ name: 'id', description: 'ID of the review to update response for', type: Number })
+    @ApiBody({ type: CreateResponseDto })
+    @ApiOkResponse({ description: 'Response successfully updated.' })
+    @ApiNotFoundResponse({ description: 'Response not found.' })
+    @ApiForbiddenResponse({ description: 'Forbidden. Can only update responses for own gym.' })
+    updateResponse(
+        @GetUser() user,
+        @Param('id', ParseIntPipe) responseId: number,
+        @Body() dto: CreateResponseDto,
+    ) {
+        return this.reviewsService.updateResponse(user.userId, responseId, dto);
     }
 
     @Get('gym/:gymId')
