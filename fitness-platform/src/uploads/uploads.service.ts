@@ -8,10 +8,148 @@ import { DatabaseService } from '../database/database.service';
 import { unlink } from 'fs/promises';
 import { mkdir } from 'fs/promises';
 import sharp from 'sharp';
+import { Photo } from '@prisma/client';
 
 @Injectable()
 export class UploadsService {
   constructor(private readonly db: DatabaseService) {}
+
+  private async generateThumbnails(photos: Photo[]): Promise<void> {
+    const thumbnailPromises = photos.map(async (photo) => {
+      const originalPath = `.${photo.url}`;
+      const filename = photo.url.split('/').pop();
+      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
+      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
+
+      try {
+        await sharp(originalPath)
+          .resize(300, 300, { fit: 'cover' })
+          .jpeg({ quality: 80 })
+          .toFile(`.${thumbnailPath}`);
+
+        await this.db.photo.update({
+          where: { id: photo.id },
+          data: { thumbnailUrl: thumbnailPath },
+        });
+      } catch (error) {
+        console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
+        // Continue without thumbnail
+      }
+    });
+
+    await Promise.all(thumbnailPromises);
+  }
+
+  private async createPhotos(
+    entityType: 'GYM' | 'CLASS',
+    entityId: number,
+    filePaths: string[],
+    coverIndex?: number,
+    orders?: number[],
+  ): Promise<Photo[]> {
+    return this.db.$transaction(async (tx) => {
+      // Reset existing cover if setting a new one
+      if (coverIndex !== undefined) {
+        await tx.photo.updateMany({
+          where: { entityType, entityId },
+          data: { isCover: false },
+        });
+      }
+
+      const createdPhotos: Photo[] = [];
+      for (let i = 0; i < filePaths.length; i++) {
+        const photo = await tx.photo.create({
+          data: {
+            url: filePaths[i],
+            entityType,
+            entityId,
+            isCover: coverIndex !== undefined && i === coverIndex,
+            order: orders ? orders[i] : i + 1,
+          },
+        });
+        createdPhotos.push(photo);
+      }
+
+      // Update entity coverPhotoId if coverIndex provided
+      if (coverIndex !== undefined && createdPhotos[coverIndex]) {
+        const updateData = { coverPhotoId: createdPhotos[coverIndex].id };
+        if (entityType === 'GYM') {
+          await tx.gym.update({
+            where: { gymId: entityId },
+            data: updateData,
+          });
+        } else {
+          await tx.gymClasses.update({
+            where: { classId: entityId },
+            data: updateData,
+          });
+        }
+      }
+
+      return createdPhotos;
+    });
+  }
+
+  private async deletePhotoFiles(photo: {
+    url: string;
+    thumbnailUrl?: string | null;
+  }): Promise<void> {
+    try {
+      await unlink(`.${photo.url}`);
+    } catch (error) {
+      console.warn(`Failed to delete file: ${photo.url}`, error);
+    }
+
+    if (photo.thumbnailUrl) {
+      try {
+        await unlink(`.${photo.thumbnailUrl}`);
+      } catch (error) {
+        console.warn(
+          `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
+          error,
+        );
+      }
+    }
+  }
+
+  private async checkPhotoPermissions(
+    entityType: 'GYM' | 'CLASS',
+    entityId: number,
+    currentUserId: number,
+    action: string,
+  ): Promise<void> {
+    const user = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (user?.role === 'ADMIN') return; // Admin bypass
+
+    if (entityType === 'GYM') {
+      const gym = await this.db.gym.findUnique({
+        where: { gymId: entityId },
+        select: { gymOwnerId: true },
+      });
+      if (gym?.gymOwnerId !== currentUserId) {
+        throw new ForbiddenException(
+          `Only the gym owner or admin can ${action}`,
+        );
+      }
+    } else {
+      const gymClass = await this.db.gymClasses.findUnique({
+        where: { classId: entityId },
+        select: { trainerId: true, gym: { select: { gymOwnerId: true } } },
+      });
+      if (
+        gymClass?.gym.gymOwnerId !== currentUserId &&
+        gymClass?.trainerId !== currentUserId
+      ) {
+        throw new ForbiddenException(
+          `Only the gym owner, trainer, or admin can ${action}`,
+        );
+      }
+    }
+  }
 
   async updateUserProfilePic(
     userId: number,
@@ -59,7 +197,7 @@ export class UploadsService {
     currentUserId: number,
     orders?: number[],
   ) {
-    // Check if gym exists and user has permission (owner or admin)
+    // Check if gym exists
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -69,16 +207,13 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException(
-        'Only the gym owner or admin can upload photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'GYM',
+      gymId,
+      currentUserId,
+      'upload photos',
+    );
 
     // Check current photo count
     const currentCount = await this.db.photo.count({
@@ -97,65 +232,16 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos = await this.db.$transaction(async (tx) => {
-      // Reset existing cover if setting a new one
-      if (coverIndex !== undefined) {
-        await tx.photo.updateMany({
-          where: { entityType: 'GYM', entityId: gymId },
-          data: { isCover: false },
-        });
-      }
-
-      const createdPhotos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
-      for (let i = 0; i < filePaths.length; i++) {
-        const photo = await tx.photo.create({
-          data: {
-            url: filePaths[i],
-            entityType: 'GYM',
-            entityId: gymId,
-            isCover: coverIndex !== undefined && i === coverIndex,
-            order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
-          },
-        });
-        createdPhotos.push(photo);
-      }
-
-      // Update gym coverPhotoId if coverIndex provided
-      if (coverIndex !== undefined && createdPhotos[coverIndex]) {
-        await tx.gym.update({
-          where: { gymId },
-          data: { coverPhotoId: createdPhotos[coverIndex].id },
-        });
-      }
-
-      return createdPhotos;
-    });
+    const photos = await this.createPhotos(
+      'GYM',
+      +gymId,
+      filePaths,
+      coverIndex,
+      orders,
+    );
 
     // Generate thumbnails in parallel
-    const thumbnailPromises = photos.map(async (photo) => {
-      const originalPath = `.${photo.url}`;
-      const filename = photo.url.split('/').pop();
-      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
-      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
-
-      try {
-        await sharp(originalPath)
-          .resize(300, 300, { fit: 'cover' })
-          .jpeg({ quality: 80 })
-          .toFile(`.${thumbnailPath}`);
-
-        await this.db.photo.update({
-          where: { id: photo.id },
-          data: { thumbnailUrl: thumbnailPath },
-        });
-      } catch (error) {
-        console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
-        // Continue without thumbnail
-      }
-    });
-
-    // Wait for all thumbnails to complete
-    await Promise.all(thumbnailPromises);
+    await this.generateThumbnails(photos);
 
     return {
       message: 'Photos uploaded successfully',
@@ -191,7 +277,7 @@ export class UploadsService {
     currentUserId: number,
     orders?: number[],
   ) {
-    // Check if class exists and user has permission (gym owner, trainer, or admin)
+    // Check if class exists
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -206,20 +292,13 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (
-      currentUser?.role !== 'ADMIN' &&
-      gymClass.gym.gymOwnerId !== currentUserId &&
-      gymClass.trainerId !== currentUserId
-    ) {
-      throw new ForbiddenException(
-        'Only the gym owner, trainer, or admin can upload photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'CLASS',
+      classId,
+      currentUserId,
+      'upload photos',
+    );
 
     // Check current photo count
     const currentCount = await this.db.photo.count({
@@ -238,65 +317,16 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos = await this.db.$transaction(async (tx) => {
-      // Reset existing cover if setting a new one
-      if (coverIndex !== undefined) {
-        await tx.photo.updateMany({
-          where: { entityType: 'CLASS', entityId: classId },
-          data: { isCover: false },
-        });
-      }
-
-      const createdPhotos: Awaited<ReturnType<typeof tx.photo.create>>[] = [];
-      for (let i = 0; i < filePaths.length; i++) {
-        const photo = await tx.photo.create({
-          data: {
-            url: filePaths[i],
-            entityType: 'CLASS',
-            entityId: classId,
-            isCover: coverIndex !== undefined && i === coverIndex,
-            order: orders ? orders[i] : i + 1, // Default to sequential order starting from 1
-          },
-        });
-        createdPhotos.push(photo);
-      }
-
-      // Update class coverPhotoId if coverIndex provided
-      if (coverIndex !== undefined && createdPhotos[coverIndex]) {
-        await tx.gymClasses.update({
-          where: { classId },
-          data: { coverPhotoId: createdPhotos[coverIndex].id },
-        });
-      }
-
-      return createdPhotos;
-    });
+    const photos = await this.createPhotos(
+      'CLASS',
+      +classId,
+      filePaths,
+      coverIndex,
+      orders,
+    );
 
     // Generate thumbnails in parallel
-    const thumbnailPromises = photos.map(async (photo) => {
-      const originalPath = `.${photo.url}`;
-      const filename = photo.url.split('/').pop();
-      const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
-      const thumbnailPath = `/${thumbnailDir.replace('./', '')}/${filename}`;
-
-      try {
-        await sharp(originalPath)
-          .resize(300, 300, { fit: 'cover' })
-          .jpeg({ quality: 80 })
-          .toFile(`.${thumbnailPath}`);
-
-        await this.db.photo.update({
-          where: { id: photo.id },
-          data: { thumbnailUrl: thumbnailPath },
-        });
-      } catch (error) {
-        console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
-        // Continue without thumbnail
-      }
-    });
-
-    // Wait for all thumbnails to complete
-    await Promise.all(thumbnailPromises);
+    await this.generateThumbnails(photos);
 
     return {
       message: 'Photos uploaded successfully',
@@ -326,7 +356,7 @@ export class UploadsService {
   }
 
   async deleteGymPhoto(gymId: number, photoId: number, currentUserId: number) {
-    // Check if gym exists and user has permission (owner or admin)
+    // Check if gym exists
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -336,16 +366,13 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException(
-        'Only the gym owner or admin can delete photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'GYM',
+      gymId,
+      currentUserId,
+      'delete photos',
+    );
 
     // Find the photo
     const photo = await this.db.photo.findUnique({
@@ -374,22 +401,7 @@ export class UploadsService {
     });
 
     // Delete the files from disk
-    try {
-      await unlink(`.${photo.url}`);
-    } catch (error) {
-      console.warn(`Failed to delete file: ${photo.url}`, error);
-    }
-
-    if (photo.thumbnailUrl) {
-      try {
-        await unlink(`.${photo.thumbnailUrl}`);
-      } catch (error) {
-        console.warn(
-          `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
-          error,
-        );
-      }
-    }
+    await this.deletePhotoFiles(photo);
 
     return { message: 'Photo deleted successfully' };
   }
@@ -399,7 +411,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission (gym owner, trainer, or admin)
+    // Check if class exists
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -414,20 +426,13 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (
-      currentUser?.role !== 'ADMIN' &&
-      gymClass.gym.gymOwnerId !== currentUserId &&
-      gymClass.trainerId !== currentUserId
-    ) {
-      throw new ForbiddenException(
-        'Only the gym owner, trainer, or admin can delete photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'CLASS',
+      classId,
+      currentUserId,
+      'delete photos',
+    );
 
     // Find the photo
     const photo = await this.db.photo.findUnique({
@@ -456,22 +461,7 @@ export class UploadsService {
     });
 
     // Delete the files from disk
-    try {
-      await unlink(`.${photo.url}`);
-    } catch (error) {
-      console.warn(`Failed to delete file: ${photo.url}`, error);
-    }
-
-    if (photo.thumbnailUrl) {
-      try {
-        await unlink(`.${photo.thumbnailUrl}`);
-      } catch (error) {
-        console.warn(
-          `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
-          error,
-        );
-      }
-    }
+    await this.deletePhotoFiles(photo);
 
     return { message: 'Photo deleted successfully' };
   }
@@ -481,7 +471,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if gym exists and user has permission (owner or admin)
+    // Check if gym exists
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -491,16 +481,13 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException(
-        'Only the gym owner or admin can update cover photo',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'GYM',
+      gymId,
+      currentUserId,
+      'update cover photo',
+    );
 
     // Check if photo exists and belongs to this gym
     const photo = await this.db.photo.findUnique({
@@ -537,7 +524,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission (gym owner, trainer, or admin)
+    // Check if class exists
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -552,20 +539,13 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (
-      currentUser?.role !== 'ADMIN' &&
-      gymClass.gym.gymOwnerId !== currentUserId &&
-      gymClass.trainerId !== currentUserId
-    ) {
-      throw new ForbiddenException(
-        'Only the gym owner, trainer, or admin can update cover photo',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'CLASS',
+      classId,
+      currentUserId,
+      'update cover photo',
+    );
 
     // Check if photo exists and belongs to this class
     const photo = await this.db.photo.findUnique({
@@ -602,7 +582,7 @@ export class UploadsService {
     photoOrders: { photoId: number; order: number }[],
     currentUserId: number,
   ) {
-    // Check if gym exists and user has permission (owner or admin)
+    // Check if gym exists
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -612,16 +592,13 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException(
-        'Only the gym owner or admin can reorder photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'GYM',
+      gymId,
+      currentUserId,
+      'reorder photos',
+    );
 
     // Update orders in a transaction
     await this.db.$transaction(async (tx) => {
@@ -653,7 +630,7 @@ export class UploadsService {
     photoOrders: { photoId: number; order: number }[],
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission (gym owner, trainer, or admin)
+    // Check if class exists
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -668,20 +645,13 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
-    const currentUser = await this.db.user.findUnique({
-      where: { userId: currentUserId },
-      select: { role: true },
-    });
-
-    if (
-      currentUser?.role !== 'ADMIN' &&
-      gymClass.gym.gymOwnerId !== currentUserId &&
-      gymClass.trainerId !== currentUserId
-    ) {
-      throw new ForbiddenException(
-        'Only the gym owner, trainer, or admin can reorder photos',
-      );
-    }
+    // Check user permissions
+    await this.checkPhotoPermissions(
+      'CLASS',
+      classId,
+      currentUserId,
+      'reorder photos',
+    );
 
     // Update orders in a transaction
     await this.db.$transaction(async (tx) => {
