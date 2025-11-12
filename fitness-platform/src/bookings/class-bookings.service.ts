@@ -300,6 +300,10 @@ export class ClassBookingsService extends BookingsService {
       throw new NotFoundException('Gym class not found');
     }
 
+    if (startTime && endTime && startTime >= endTime) {
+      throw new BadRequestException('Start time must be before end time');
+    }
+
     // Check if user already has an active booking for this class
     const existingBooking = await this.databaseService.classBooking.findFirst({
       where: {

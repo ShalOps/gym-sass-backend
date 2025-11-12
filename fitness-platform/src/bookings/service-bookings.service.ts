@@ -295,6 +295,10 @@ export class ServiceBookingsService extends BookingsService {
       throw new NotFoundException('Service not found');
     }
 
+    if (startTime && endTime && startTime >= endTime) {
+      throw new BadRequestException('Start time must be before end time');
+    }
+
     // Check for time conflicts if startTime and endTime are provided
     if (startTime && endTime) {
       const conflictingBooking =
