@@ -95,7 +95,7 @@ export class GymClassReviewsService {
     const existingResponse = await this.databaseService.gymClassReviewResponse.findFirst({
         where: { reviewId },
     });
-    
+
     if (existingResponse) {
         throw new ForbiddenException('Response to this review already exists');
     }
@@ -169,21 +169,38 @@ export class GymClassReviewsService {
     });
   }
 
+  async getClassReviews(classId: number, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
 
-  async getClassReviews(classId: number) {
-    return this.databaseService.gymClassReview.findMany({
+    const [reviews, total] = await Promise.all([
+      this.databaseService.gymClassReview.findMany({
         where: { classId },
         include: {
-        user: { select: { userName: true, profilePic: true } },
-        response: {
+          user: { select: { userName: true, profilePic: true } },
+          response: {
             include: {
-            owner: { select: { userName: true } },
-            trainer: { select: { userName: true } },
+              owner: { select: { userName: true } },
+              trainer: { select: { userName: true } },
             },
-        },
+          },
         },
         orderBy: { createdAt: 'desc' },
-        });
-    }
+        skip,
+        take: limit,
+      }),
+      this.databaseService.gymClassReview.count({ where: { classId } }),
+    ]);
+
+    return {
+      data: reviews,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
 
 }
