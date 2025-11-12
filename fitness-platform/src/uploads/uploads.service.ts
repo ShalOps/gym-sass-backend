@@ -59,7 +59,7 @@ export class UploadsService {
     currentUserId: number,
     orders?: number[],
   ) {
-    // Check if gym exists and user is the owner
+    // Check if gym exists and user has permission (owner or admin)
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -69,8 +69,15 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    if (gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException('Only the gym owner can upload photos');
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException(
+        'Only the gym owner or admin can upload photos',
+      );
     }
 
     // Check current photo count
@@ -184,7 +191,7 @@ export class UploadsService {
     currentUserId: number,
     orders?: number[],
   ) {
-    // Check if class exists and user has permission (gym owner or trainer)
+    // Check if class exists and user has permission (gym owner, trainer, or admin)
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -199,12 +206,18 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
     if (
+      currentUser?.role !== 'ADMIN' &&
       gymClass.gym.gymOwnerId !== currentUserId &&
       gymClass.trainerId !== currentUserId
     ) {
       throw new ForbiddenException(
-        'Only the gym owner or trainer can upload photos',
+        'Only the gym owner, trainer, or admin can upload photos',
       );
     }
 
@@ -313,7 +326,7 @@ export class UploadsService {
   }
 
   async deleteGymPhoto(gymId: number, photoId: number, currentUserId: number) {
-    // Check if gym exists and user is the owner
+    // Check if gym exists and user has permission (owner or admin)
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -323,8 +336,15 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    if (gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException('Only the gym owner can delete photos');
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException(
+        'Only the gym owner or admin can delete photos',
+      );
     }
 
     // Find the photo
@@ -379,7 +399,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission
+    // Check if class exists and user has permission (gym owner, trainer, or admin)
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -394,12 +414,18 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
     if (
+      currentUser?.role !== 'ADMIN' &&
       gymClass.gym.gymOwnerId !== currentUserId &&
       gymClass.trainerId !== currentUserId
     ) {
       throw new ForbiddenException(
-        'Only the gym owner or trainer can delete photos',
+        'Only the gym owner, trainer, or admin can delete photos',
       );
     }
 
@@ -455,7 +481,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if gym exists and user is the owner
+    // Check if gym exists and user has permission (owner or admin)
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -465,8 +491,15 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    if (gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException('Only the gym owner can update cover photo');
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException(
+        'Only the gym owner or admin can update cover photo',
+      );
     }
 
     // Check if photo exists and belongs to this gym
@@ -504,7 +537,7 @@ export class UploadsService {
     photoId: number,
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission
+    // Check if class exists and user has permission (gym owner, trainer, or admin)
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -519,12 +552,18 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
     if (
+      currentUser?.role !== 'ADMIN' &&
       gymClass.gym.gymOwnerId !== currentUserId &&
       gymClass.trainerId !== currentUserId
     ) {
       throw new ForbiddenException(
-        'Only the gym owner or trainer can update cover photo',
+        'Only the gym owner, trainer, or admin can update cover photo',
       );
     }
 
@@ -563,7 +602,7 @@ export class UploadsService {
     photoOrders: { photoId: number; order: number }[],
     currentUserId: number,
   ) {
-    // Check if gym exists and user is the owner
+    // Check if gym exists and user has permission (owner or admin)
     const gym = await this.db.gym.findUnique({
       where: { gymId },
       select: { gymOwnerId: true },
@@ -573,8 +612,15 @@ export class UploadsService {
       throw new NotFoundException('Gym not found');
     }
 
-    if (gym.gymOwnerId !== currentUserId) {
-      throw new ForbiddenException('Only the gym owner can reorder photos');
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
+    if (currentUser?.role !== 'ADMIN' && gym.gymOwnerId !== currentUserId) {
+      throw new ForbiddenException(
+        'Only the gym owner or admin can reorder photos',
+      );
     }
 
     // Update orders in a transaction
@@ -607,7 +653,7 @@ export class UploadsService {
     photoOrders: { photoId: number; order: number }[],
     currentUserId: number,
   ) {
-    // Check if class exists and user has permission
+    // Check if class exists and user has permission (gym owner, trainer, or admin)
     const gymClass = await this.db.gymClasses.findUnique({
       where: { classId },
       select: {
@@ -622,12 +668,18 @@ export class UploadsService {
       throw new NotFoundException('Class not found');
     }
 
+    const currentUser = await this.db.user.findUnique({
+      where: { userId: currentUserId },
+      select: { role: true },
+    });
+
     if (
+      currentUser?.role !== 'ADMIN' &&
       gymClass.gym.gymOwnerId !== currentUserId &&
       gymClass.trainerId !== currentUserId
     ) {
       throw new ForbiddenException(
-        'Only the gym owner or trainer can reorder photos',
+        'Only the gym owner, trainer, or admin can reorder photos',
       );
     }
 
