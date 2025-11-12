@@ -9,6 +9,7 @@ import { Role } from "generated/prisma";
 import { Roles } from "src/auth/roles.decorator";
 import { UpdateReviewDto } from "./dto/update-gym-review.dto";
 import { CreateResponseDto } from "./dto/create-response.dto";
+import { UpdateResponseReviewDto } from "./dto/update-response-review.dto";
 
 @ApiTags('Reviews') 
 @ApiBearerAuth()
@@ -99,14 +100,14 @@ export class ReviewsController {
     @Roles(Role.GYMOWNER)
     @ApiOperation({ summary: 'Update a response to a review (Gym Owner only)' })
     @ApiParam({ name: 'id', description: 'ID of the review to update response for', type: Number })
-    @ApiBody({ type: CreateResponseDto })
+    @ApiBody({ type: UpdateResponseReviewDto })
     @ApiOkResponse({ description: 'Response successfully updated.' })
     @ApiNotFoundResponse({ description: 'Response not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only update responses for own gym.' })
     updateResponse(
         @GetUser() user,
         @Param('id', ParseIntPipe) responseId: number,
-        @Body() dto: CreateResponseDto,
+        @Body() dto: UpdateResponseReviewDto,
     ) {
         return this.reviewsService.updateResponse(user.userId, responseId, dto);
     }

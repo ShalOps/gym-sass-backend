@@ -3,6 +3,7 @@ import { DatabaseService } from "src/database/database.service";
 import { CreateReviewDto } from "./dto/create-gym-review.dto";
 import { UpdateReviewDto } from "./dto/update-gym-review.dto";
 import { CreateResponseDto } from "./dto/create-response.dto";
+import { UpdateResponseReviewDto } from "./dto/update-response-review.dto";
 
 @Injectable()
 export class ReviewsService {
@@ -87,7 +88,7 @@ export class ReviewsService {
     });
   }
 
-  async updateResponse(ownerId: number, responseId: number, dto: CreateResponseDto) {
+  async updateResponse(ownerId: number, responseId: number, dto: UpdateResponseReviewDto) {
     const response = await this.databaseservice.gymReviewResponse.findUnique({
       where: { responseId: responseId },
       include: { review: { include: { gym: true } } },
