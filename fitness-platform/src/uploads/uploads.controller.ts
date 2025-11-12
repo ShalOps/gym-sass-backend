@@ -43,11 +43,11 @@ const UPLOADS_DIR = process.env.UPLOADS_DIR || './uploads';
 
 @ApiTags('uploads')
 @Controller('uploads')
-@UseGuards(JwtAuthGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('profile/:userId')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Upload or update user profile picture' })
   @ApiParam({ name: 'userId', description: 'ID of the user' })
   @ApiConsumes('multipart/form-data')
@@ -127,6 +127,7 @@ export class UploadsController {
   }
 
   @Post('gym/:id/photos')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Upload photos for a gym' })
   @ApiParam({ name: 'id', description: 'ID of the gym' })
   @ApiConsumes('multipart/form-data')
@@ -250,6 +251,7 @@ export class UploadsController {
   }
 
   @Post('class/:id/photos')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Upload photos for a gym class' })
   @ApiParam({ name: 'id', description: 'ID of the class' })
   @ApiConsumes('multipart/form-data')
@@ -373,6 +375,7 @@ export class UploadsController {
   }
 
   @Delete('gym/:id/photos/:photoId')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete a photo for a gym' })
   @ApiParam({ name: 'id', description: 'ID of the gym' })
   @ApiParam({ name: 'photoId', description: 'ID of the photo' })
@@ -402,6 +405,7 @@ export class UploadsController {
   }
 
   @Delete('class/:id/photos/:photoId')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete a photo for a gym class' })
   @ApiParam({ name: 'id', description: 'ID of the class' })
   @ApiParam({ name: 'photoId', description: 'ID of the photo' })
@@ -431,6 +435,7 @@ export class UploadsController {
   }
 
   @Put('gym/:id/cover/:photoId')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update cover photo for a gym' })
   @ApiParam({ name: 'id', description: 'ID of the gym' })
   @ApiParam({ name: 'photoId', description: 'ID of the photo to set as cover' })
@@ -460,6 +465,7 @@ export class UploadsController {
   }
 
   @Put('class/:id/cover/:photoId')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update cover photo for a gym class' })
   @ApiParam({ name: 'id', description: 'ID of the class' })
   @ApiParam({ name: 'photoId', description: 'ID of the photo to set as cover' })
@@ -489,6 +495,7 @@ export class UploadsController {
   }
 
   @Put('gym/:id/photos/order')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update photo order for a gym' })
   @ApiParam({ name: 'id', description: 'ID of the gym' })
   @ApiBody({
@@ -532,6 +539,7 @@ export class UploadsController {
   }
 
   @Put('class/:id/photos/order')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update photo order for a gym class' })
   @ApiParam({ name: 'id', description: 'ID of the class' })
   @ApiBody({
