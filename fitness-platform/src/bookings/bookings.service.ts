@@ -69,35 +69,4 @@ export abstract class BookingsService {
 
     return false;
   }
-
-  // Helper method to auto-complete past bookings
-  protected async autoCompletePastBookings(): Promise<void> {
-    const now = new Date();
-
-    // Auto-complete class bookings
-    await this.databaseService.classBooking.updateMany({
-      where: {
-        status: BookingStatus.CONFIRMED,
-        endTime: {
-          lt: now,
-        },
-      },
-      data: {
-        status: BookingStatus.COMPLETED,
-      },
-    });
-
-    // Auto-complete service bookings
-    await this.databaseService.serviceBooking.updateMany({
-      where: {
-        status: BookingStatus.CONFIRMED,
-        endTime: {
-          lt: now,
-        },
-      },
-      data: {
-        status: BookingStatus.COMPLETED,
-      },
-    });
-  }
 }

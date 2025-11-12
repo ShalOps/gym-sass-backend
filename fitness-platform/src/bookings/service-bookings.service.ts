@@ -24,9 +24,6 @@ export class ServiceBookingsService extends BookingsService {
       limit?: number;
     },
   ) {
-    // Auto-complete past bookings before returning results
-    await this.autoCompletePastBookings();
-
     // Get current user's role to determine what they can see
     const currentUser = await this.databaseService.user.findUnique({
       where: { userId },

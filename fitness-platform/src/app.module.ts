@@ -13,7 +13,9 @@ import { ServiceOptionAssignmentModule } from './service-option-assignment/servi
 import { UploadsModule } from './uploads/uploads.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { MulterModule } from '@nestjs/platform-express';
+import { ScheduleModule } from '@nestjs/schedule';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
+import { TasksService } from './tasks/tasks.service';
 
 @Module({
   imports: [
@@ -29,8 +31,9 @@ import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
     UploadsModule,
     BookingsModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TasksService],
 })
 export class AppModule {}
