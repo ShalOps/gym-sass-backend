@@ -1,4 +1,3 @@
-// /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   ForbiddenException,
@@ -125,8 +124,8 @@ export class UploadsService {
       return createdPhotos;
     });
 
-    // Generate thumbnails
-    for (const photo of photos) {
+    // Generate thumbnails in parallel
+    const thumbnailPromises = photos.map(async (photo) => {
       const originalPath = `.${photo.url}`;
       const filename = photo.url.split('/').pop();
       const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
@@ -146,7 +145,10 @@ export class UploadsService {
         console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
         // Continue without thumbnail
       }
-    }
+    });
+
+    // Wait for all thumbnails to complete
+    await Promise.all(thumbnailPromises);
 
     return {
       message: 'Photos uploaded successfully',
@@ -257,8 +259,8 @@ export class UploadsService {
       return createdPhotos;
     });
 
-    // Generate thumbnails
-    for (const photo of photos) {
+    // Generate thumbnails in parallel
+    const thumbnailPromises = photos.map(async (photo) => {
       const originalPath = `.${photo.url}`;
       const filename = photo.url.split('/').pop();
       const thumbnailDir = process.env.THUMBNAIL_DIR || './uploads/thumbnails';
@@ -278,7 +280,10 @@ export class UploadsService {
         console.warn(`Failed to generate thumbnail for ${photo.url}:`, error);
         // Continue without thumbnail
       }
-    }
+    });
+
+    // Wait for all thumbnails to complete
+    await Promise.all(thumbnailPromises);
 
     return {
       message: 'Photos uploaded successfully',
