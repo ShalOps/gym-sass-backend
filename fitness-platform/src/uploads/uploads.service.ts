@@ -163,11 +163,36 @@ export class UploadsService {
       );
     }
 
+    // Get current user to store old profile picture path
+    const user = await this.db.user.findUnique({
+      where: { userId },
+      select: { profilePic: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const oldProfilePic = user.profilePic;
+
     // Update the user's profilePic in DB
     await this.db.user.update({
       where: { userId },
       data: { profilePic: filePath },
     });
+
+    // Clean up old profile picture file (after successful DB update)
+    if (oldProfilePic && oldProfilePic !== filePath) {
+      try {
+        await unlink(`.${oldProfilePic}`);
+      } catch (error) {
+        // Log error but don't fail the operation
+        console.warn(
+          `Failed to delete old profile picture: ${oldProfilePic}`,
+          error,
+        );
+      }
+    }
 
     return {
       message: 'Profile picture updated successfully',
