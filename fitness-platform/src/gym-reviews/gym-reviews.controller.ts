@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { ReviewsService } from "./gym-reviews.service";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
@@ -10,6 +10,7 @@ import { Roles } from "src/auth/roles.decorator";
 import { UpdateReviewDto } from "./dto/update-gym-review.dto";
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { UpdateResponseReviewDto } from "./dto/update-response-review.dto";
+import { PaginationDto } from "./dto/pagination.dto";
 
 @ApiTags('Reviews') 
 @ApiBearerAuth()
@@ -115,8 +116,11 @@ export class ReviewsController {
     @Get('gym/:gymId')
     @ApiOperation({ summary: 'Get all reviews for a specific gym (Public/Guest access)' })
     @ApiParam({ name: 'gymId', description: 'ID of the gym', type: Number })
-    @ApiOkResponse({ description: 'List of gym reviews.' })
-    getGymReviews(@Param('gymId', ParseIntPipe) gymId: number) { 
-        return this.reviewsService.getGymReviews(gymId);
+    @ApiOkResponse({ description: 'Paginated list of gym reviews.' })
+    getGymReviews(
+    @Param('gymId', ParseIntPipe) gymId: number,
+    @Query() paginationDto: PaginationDto,
+    ) {
+    return this.reviewsService.getGymReviews(gymId, paginationDto.page, paginationDto.limit);
     }
 }
