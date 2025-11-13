@@ -53,7 +53,7 @@ export class GymClassReviewsController {
     @Body() dto: CreateGymClassReviewDto,
     @GetUser() user: any,
   ) {
-    return this.gymClassReviewsService.createClassReview(user.userId, dto);
+    return this.gymClassReviewsService.createClassReview(user.userId, dto,user.role);
   }
 
   @Patch(':id')
@@ -72,11 +72,11 @@ export class GymClassReviewsController {
     description: 'Forbidden. Can only update own class review.',
   })
   update(
-    @GetUser() user,
+    @GetUser() user:any,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateGymClassReviewDto,
   ) {
-    return this.gymClassReviewsService.updateClassReview(user.userId, id, dto);
+    return this.gymClassReviewsService.updateClassReview(user.userId, id, dto,user.role);
   }
 
   @Delete(':id')
@@ -95,7 +95,7 @@ export class GymClassReviewsController {
   @ApiForbiddenResponse({
     description: 'Forbidden. Can only delete own review unless Admin.',
   })
-  delete(@GetUser() user, @Param('id', ParseIntPipe) id: number) {
+  delete(@GetUser() user: any, @Param('id', ParseIntPipe) id: number) {
     const isAdmin = user.role === Role.ADMIN;
     return this.gymClassReviewsService.deleteClassReview(
       user.userId,
@@ -122,11 +122,11 @@ export class GymClassReviewsController {
     description: 'Forbidden. Can only respond to reviews for own class.',
   })
   addResponse(
-    @GetUser() user,
+    @GetUser() user:any,
     @Param('id', ParseIntPipe) reviewId: number,
     @Body() dto: CreateGymClassReviewResponseDto,
   ) {
-    return this.gymClassReviewsService.addResponse(user.userId, reviewId, dto);
+    return this.gymClassReviewsService.createResponse(user.userId, reviewId, dto);
   }
 
   @Get('class/:classId')
@@ -161,8 +161,8 @@ export class GymClassReviewsController {
   })
   @ApiNotFoundResponse({ description: 'Response not found.' })
   updateResponse(
-    @Param('responseId', ParseIntPipe) responseId: number,
     @GetUser() user: any,
+    @Param('responseId', ParseIntPipe) responseId: number,
     @Body() dto: UpdateGymClassReviewResponseDto,
   ) {
     return this.gymClassReviewsService.updateResponse(

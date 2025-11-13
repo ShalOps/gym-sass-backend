@@ -7,22 +7,18 @@ import { UpdateResponseReviewDto } from "./dto/update-response-review.dto";
 
 @Injectable()
 export class ReviewsService {
-  constructor(private databaseservice: DatabaseService) {}
+  constructor(private databaseService: DatabaseService) {}
 
   async createReview(userId: number, dto: CreateReviewDto) {
-    const gym = await this.databaseservice.gym.findUnique({ where: { gymId: dto.gymId } });
+    const gym = await this.databaseService.gym.findUnique({ where: { gymId: dto.gymId } });
     if (!gym) throw new NotFoundException('Gym not found');
 
-    const existing = await this.databaseservice.gymReview.findUnique({
+    const existing = await this.databaseService.gymReview.findUnique({
       where: { gymId_userId: { gymId: dto.gymId, userId } },
     });
     if (existing) throw new ForbiddenException('You already reviewed this gym');
 
-     if (!dto.comment && !dto.rating) {
-      throw new ForbiddenException('At least one of rating or comment must be provided');
-    }
-
-    return this.databaseservice.gymReview.create({
+    return this.databaseService.gymReview.create({
       data: { ...dto, userId },
     });
   }
@@ -30,7 +26,7 @@ export class ReviewsService {
   
   async updateReview(userId: number, reviewId: number, dto: UpdateReviewDto) {
 
-    const review = await this.databaseservice.gymReview.findUnique({ where: { id: reviewId } });
+    const review = await this.databaseService.gymReview.findUnique({ where: { id: reviewId } });
 
     if (!review) throw new NotFoundException('Review not found');
     if (review.userId !== userId) throw new ForbiddenException('You can edit only your own review');
@@ -39,7 +35,7 @@ export class ReviewsService {
       throw new ForbiddenException('At least one of rating or comment must be provided for update');
     }
 
-    return this.databaseservice.gymReview.update({
+    return this.databaseService.gymReview.update({
       where: { id: reviewId },
       data: dto,
     });
@@ -47,86 +43,101 @@ export class ReviewsService {
 
    async deleteReview(userId: number, reviewId: number, isAdmin = false) {
 
-    const review = await this.databaseservice.gymReview.findUnique({ where: { id: reviewId } });
+    const review = await this.databaseService.gymReview.findUnique({ where: { id: reviewId } });
     if (!review) throw new NotFoundException('Review not found');
 
     if (!isAdmin && review.userId !== userId)
       throw new ForbiddenException('You can delete only your own review');
 
-    return this.databaseservice.gymReview.delete({ where: { id: reviewId } });
+    return this.databaseService.gymReview.delete({ where: { id: reviewId } });
   }
 
 
-  async addResponse(ownerId: number, reviewId: number, dto: CreateResponseDto) {
-    const review = await this.databaseservice.gymReview.findUnique({
+  async createResponse(userId: number, reviewId: number, dto: CreateResponseDto) {
+    const review = await this.databaseService.gymReview.findUnique({
       where: { id: reviewId },
       include: { gym: true },
     });
     if (!review) throw new NotFoundException('Review not found');
+    const gymOwnerId = review.gym.gymOwnerId;
+    
+    if ( userId!== gymOwnerId) {
+      throw new ForbiddenException('only the gym owner can create a response');
+    }
 
-    const existingResponse = await this.databaseservice.gymReviewResponse.findFirst({
+    const existingResponse = await this.databaseService.gymReviewResponse.findFirst({
       where: { reviewId },
     }); 
     if (existingResponse) {
       throw new ForbiddenException('Response to this review already exists');
     }
 
-    if (review.gym.gymOwnerId !== ownerId) {
-      throw new ForbiddenException('You can only respond to reviews for your own gym');
-    }
-
-    if (!dto.message || dto.message.trim().length === 0) {
+    if (!dto.message || !dto.message.trim()) {
       throw new ForbiddenException('Response message cannot be empty');
     }
 
-    return this.databaseservice.gymReviewResponse.create({
+    return this.databaseService.gymReviewResponse.create({
       data: {
         message: dto.message,
         reviewId,
-        ownerId,
+        ownerId: userId,
       },
     });
   }
 
-  async updateResponse(ownerId: number, responseId: number, dto: UpdateResponseReviewDto) {
-    const response = await this.databaseservice.gymReviewResponse.findUnique({
+  async updateResponse(userId: number, responseId: number, dto: UpdateResponseReviewDto) {
+    const response = await this.databaseService.gymReviewResponse.findUnique({
       where: { responseId: responseId },
       include: { review: { include: { gym: true } } },
     });
 
     if (!response) throw new NotFoundException('Response not found');
-    if (response.ownerId !== ownerId) {
+    const gymOwnerId = response.review.gym.gymOwnerId;
+
+    if (userId !== gymOwnerId){
+    throw new ForbiddenException('Only a gym owner can create a response');
+  }
+
+    if (userId !== response.ownerId){
       throw new ForbiddenException('You can only update your own response');
     }
-    if (!dto.message || dto.message.trim().length === 0) {
+
+    if (!dto.message || !dto.message.trim()) {
       throw new ForbiddenException('Response message cannot be empty');
     }
 
-    return this.databaseservice.gymReviewResponse.update({
+    return this.databaseService.gymReviewResponse.update({
       where: { responseId: responseId },
       data: { message: dto.message },
     });
   }
-  async deleteResponse(ownerId: number, responseId: number) {
-    const response = await this.databaseservice.gymReviewResponse.findUnique({
+  async deleteResponse(userId: number, responseId: number, isAdmin = false) {
+    const response = await this.databaseService.gymReviewResponse.findUnique({
       where: { responseId: responseId },
       include: { review: { include: { gym: true } } },
       });
       if (!response) throw new NotFoundException('Response not found');
 
-      if (response.ownerId !== ownerId) {
-        throw new ForbiddenException('You can only delete your own response');
+      const gymOwnerId = response.review.gym.gymOwnerId;
+
+      if (!isAdmin && userId !== response.ownerId && userId !== gymOwnerId){
+        throw new ForbiddenException('Only the gym owner or admin can manage responses');
       }
 
-      return this.databaseservice.gymReviewResponse.delete({ where: { responseId: responseId } });
-    }
+        return this.databaseService.gymReviewResponse.delete({ where: { responseId: responseId } });
+      }
 
 
   async getGymReviews(gymId: number, page = 1, limit = 10) {
+    const MAX_LIMIT = 50;
+    const DEFAULT_LIMIT = 10;
+    limit = Math.min(limit || DEFAULT_LIMIT, MAX_LIMIT);
+    page = Math.max(1, page);
+
     const skip = (page - 1) * limit;
 
     const [reviews, total] = await Promise.all([
-      this.databaseservice.gymReview.findMany({
+      this.databaseService.gymReview.findMany({
         where: { gymId },
         include: {
           user: { select: { userName: true, profilePic: true } },
@@ -136,7 +147,7 @@ export class ReviewsService {
         skip,
         take: limit,
       }),
-      this.databaseservice.gymReview.count({ where: { gymId } }),
+      this.databaseService.gymReview.count({ where: { gymId } }),
     ]);
 
     return {

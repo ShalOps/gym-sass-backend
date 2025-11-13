@@ -43,7 +43,7 @@ export class ReviewsController {
     @ApiNotFoundResponse({ description: 'Review not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only update own review.' })
     update(
-        @GetUser() user,
+        @GetUser() user:any,
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateReviewDto,
     ) {
@@ -59,7 +59,10 @@ export class ReviewsController {
     @ApiOkResponse({ description: 'Review successfully deleted.' })
     @ApiNotFoundResponse({ description: 'Review not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only delete own review unless Admin.' })
-    delete(@GetUser() user, @Param('id', ParseIntPipe) id: number) {
+    delete(
+        @GetUser() user: any,
+        @Param('id', 
+        ParseIntPipe) id: number) {
         const isAdmin = user.role === Role.ADMIN;
         return this.reviewsService.deleteReview(user.userId, id, isAdmin);
     }
@@ -75,26 +78,27 @@ export class ReviewsController {
     @ApiNotFoundResponse({ description: 'Review not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only respond to reviews for own gym.' })
     addResponse(
-        @GetUser() user,
+        @GetUser() user: any,
         @Param('id', ParseIntPipe) reviewId: number, 
         @Body() dto: CreateResponseDto,
     ) {
-        return this.reviewsService.addResponse(user.userId, reviewId, dto);
+        return this.reviewsService.createResponse(user.userId, reviewId, dto);
     }
 
     @Delete(':id/response')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.GYMOWNER)
+    @Roles(Role.GYMOWNER,Role.ADMIN)
     @ApiOperation({ summary: 'Delete a response to a review (Gym Owner only)' })
     @ApiParam({ name: 'id', description: 'ID of the review to delete response from', type: Number })
     @ApiOkResponse({ description: 'Response successfully deleted.' })
     @ApiNotFoundResponse({ description: 'Response not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only delete responses for own gym.' })
     deleteResponse(
-        @GetUser() user,
+        @GetUser() user: any,
         @Param('id', ParseIntPipe) responseId: number,
     ) {
-        return this.reviewsService.deleteResponse(user.userId, responseId);
+        const isAdmin = user.role === Role.ADMIN;
+        return this.reviewsService.deleteResponse(user.userId, responseId, isAdmin);
     }
     @Patch(':id/response')
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -106,7 +110,7 @@ export class ReviewsController {
     @ApiNotFoundResponse({ description: 'Response not found.' })
     @ApiForbiddenResponse({ description: 'Forbidden. Can only update responses for own gym.' })
     updateResponse(
-        @GetUser() user,
+        @GetUser() user: any,
         @Param('id', ParseIntPipe) responseId: number,
         @Body() dto: UpdateResponseReviewDto,
     ) {

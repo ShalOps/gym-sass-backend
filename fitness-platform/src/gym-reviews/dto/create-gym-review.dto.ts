@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, ValidateIf } from "class-validator";
 
 export class CreateReviewDto {
     @IsInt()
@@ -13,6 +13,10 @@ export class CreateReviewDto {
 
     @IsInt()
     gymId: number;
+
+    @ValidateIf(o => !o.comment && !o.rating)
+    @IsNotEmpty({ message: 'At least one of rating or comment must be provided' })
+    dummy?: any;
 
 
 }

@@ -4,18 +4,23 @@ import { CreateGymClassReviewDto } from "./dto/create-gym-class-review.dto";
 import { UpdateGymClassReviewDto } from "./dto/update-gym-class-review.dto";
 import { CreateGymClassReviewResponseDto } from "./dto/create-gym-class-review-response.dto";
 import { UpdateGymClassReviewResponseDto } from "./dto/update-gym-class-review-response.dto";
+import { Role } from "@prisma/client/wasm";
 
 @Injectable()
 export class GymClassReviewsService {
   constructor(private databaseService: DatabaseService) {}
 
-  async createClassReview(userId: number, dto: CreateGymClassReviewDto) {
+  async createClassReview(userId: number, dto: CreateGymClassReviewDto, userRole: Role) {
     const gymClass = await this.databaseService.gymClasses.findUnique({
       where: { classId: dto.classId },
       include: { gym: true },
     });
 
     if (!gymClass) throw new NotFoundException('Gym class not found');
+
+    if (userRole !== Role.CUSTOMER) {
+      throw new ForbiddenException('Only customers can give class reviews');
+    }
 
     const existing = await this.databaseService.gymClassReview.findFirst({
       where: { classId: dto.classId, userId },
@@ -38,10 +43,13 @@ export class GymClassReviewsService {
     });
   }
 
-  async updateClassReview(userId: number, reviewId: number, dto: UpdateGymClassReviewDto) {
+  async updateClassReview(userId: number, reviewId: number, dto: UpdateGymClassReviewDto,userRole:Role) {
     const review = await this.databaseService.gymClassReview.findUnique({
       where: { id: reviewId },
     });
+    if(userRole !== Role.CUSTOMER){
+      throw new ForbiddenException('Only customers can update class reviews');
+    }
 
     if (!review) throw new NotFoundException('Review not found');
     if (review.userId !== userId){
@@ -73,7 +81,7 @@ export class GymClassReviewsService {
     });
   }
 
-  async addResponse(userId: number, reviewId: number, dto: CreateGymClassReviewResponseDto) {
+  async createResponse(userId: number, reviewId: number, dto: CreateGymClassReviewResponseDto) {
     const review = await this.databaseService.gymClassReview.findUnique({
         where: { id: reviewId },
         include: { class: { include: { gym: true } } },
@@ -85,10 +93,10 @@ export class GymClassReviewsService {
     const gymTrainerId = review.class.trainerId;
 
     if (userId !== gymOwnerId && userId !== gymTrainerId) {
-        throw new ForbiddenException('You can only respond to reviews for your own gym classes');
+        throw new ForbiddenException('Only the gym owner or the class trainer can respond to this review');
     }
 
-    if( dto.message === undefined || dto.message === null || dto.message.trim() === '') {
+    if( !dto.message || !dto.message.trim()) {
       throw new ForbiddenException('Response message cannot be empty');
     }
 
@@ -115,7 +123,7 @@ export class GymClassReviewsService {
 
   async updateResponse(userId: number, responseId: number, dto: UpdateGymClassReviewResponseDto) {
     const response = await this.databaseService.gymClassReviewResponse.findUnique({
-      where: { responseId: responseId },
+      where: { responseId },
       include: {
         review: { include: { class: { include: { gym: true } } } }, 
       },
@@ -126,14 +134,18 @@ export class GymClassReviewsService {
     const gymOwnerId = response.review.class.gym.gymOwnerId; 
     const gymTrainerId = response.review.class.trainerId; 
 
-    if (response.ownerId !== gymOwnerId && response.ownerId !== gymTrainerId){
+    if (userId !== gymOwnerId && userId!== gymTrainerId){
       throw new ForbiddenException('Only a gym owner or trainer can create a response');
     }
 
     if (userId !== response.ownerId){
       throw new ForbiddenException('You can only update your own response');
     }
-    if( dto.message === undefined || dto.message === null || dto.message.trim() === '') {
+    if (dto.message === undefined) {
+    throw new ForbiddenException('At least one updatable field must be provided (message)');
+    }
+
+    if (dto.message === null || !dto.message.trim()) {
       throw new ForbiddenException('Response message cannot be empty');
     }
 
@@ -155,10 +167,10 @@ export class GymClassReviewsService {
     if (!response) throw new NotFoundException('Response not found');
 
     const gymOwnerId = response.review.class.gym.gymOwnerId;
-    const gymTrainerId = response.review.class.trainerId;
+    const gymTrainerId = response.trainerId?? response.review.class.trainerId;
 
-    if (response.ownerId !== gymOwnerId && response.ownerId !== gymTrainerId)
-    throw new ForbiddenException('Only a gym owner or trainer can create a response');
+    if (userId !== gymOwnerId && userId !== gymTrainerId)
+    throw new ForbiddenException('Only the gym owner or the class trainer can delete responses for this class');
 
     if (!isAdmin && userId !== response.ownerId)
       throw new ForbiddenException('You can only delete your own response');
@@ -170,20 +182,17 @@ export class GymClassReviewsService {
   }
 
   async getClassReviews(classId: number, page = 1, limit = 10) {
+    const MAX_LIMIT = 50;
+    const DEFAULT_LIMIT = 10;
+    limit = Math.min(limit || DEFAULT_LIMIT, MAX_LIMIT);
+    page = Math.max(1, page);
+
     const skip = (page - 1) * limit;
 
     const [reviews, total] = await Promise.all([
       this.databaseService.gymClassReview.findMany({
         where: { classId },
-        include: {
-          user: { select: { userName: true, profilePic: true } },
-          response: {
-            include: {
-              owner: { select: { userName: true } },
-              trainer: { select: { userName: true } },
-            },
-          },
-        },
+        include: { },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -201,6 +210,5 @@ export class GymClassReviewsService {
       },
     };
   }
-
 
 }
