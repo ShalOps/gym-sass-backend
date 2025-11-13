@@ -84,6 +84,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid password credentials');
     }
 
+    await this.db.user.update({
+        where: {
+           userId: user!.userId 
+          },
+        data: { 
+          lastLogin: new Date() 
+        },
+    });
+
     const payload = { 
       sub: user!.userId, 
       role: user!.role 

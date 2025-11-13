@@ -11,9 +11,14 @@ import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
 import { ReviewsModule } from './gym-reviews/gym-reviews.module';
 import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
+import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 
+import { ConfigModule } from '@nestjs/config';
 @Module({
-  imports: [DatabaseModule, AuthModule, UsersModule, GymsModule, ServicesModule, ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, ReviewsModule,GymClassReviewModule],
+  imports: [DatabaseModule, AuthModule, UsersModule, 
+    GymsModule, ConfigModule.forRoot(), ServicesModule, 
+    ServiceOptionModule, GymClassesModule, ServiceOptionAssignmentModule, 
+    AdminAnalyticsModule,ReviewsModule, GymClassReviewModule],
   controllers: [AppController],
   providers: [AppService],
 })
