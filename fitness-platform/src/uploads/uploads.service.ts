@@ -103,20 +103,16 @@ export class UploadsService {
     url: string;
     thumbnailUrl?: string | null;
   }): Promise<void> {
-    try {
-      // Convert web path to absolute filesystem path
-      const filePath = photo.url.replace(
-        UPLOADS_WEB_PREFIX,
-        UPLOADS_DIR_ABSOLUTE + '/',
-      );
-      await unlink(filePath);
-    } catch (error) {
-      console.warn(`Failed to delete file: ${photo.url}`, error);
-    }
+    // Delete main file first
+    const filePath = photo.url.replace(
+      UPLOADS_WEB_PREFIX,
+      UPLOADS_DIR_ABSOLUTE + '/',
+    );
+    await unlink(filePath);
 
+    // Delete thumbnail if it exists
     if (photo.thumbnailUrl) {
       try {
-        // Convert thumbnail web path to absolute filesystem path
         const thumbnailPath = photo.thumbnailUrl.replace(
           THUMBNAIL_WEB_PREFIX,
           THUMBNAIL_DIR_ABSOLUTE + '/',
@@ -127,6 +123,7 @@ export class UploadsService {
           `Failed to delete thumbnail: ${photo.thumbnailUrl}`,
           error,
         );
+        // Continue - thumbnail deletion is not critical
       }
     }
   }
@@ -444,13 +441,10 @@ export class UploadsService {
       data: { coverPhotoId: null },
     });
 
-    // Delete the photo record
+    await this.deletePhotoFiles(photo);
     await this.db.photo.delete({
       where: { id: photoId },
     });
-
-    // Delete the files from disk
-    await this.deletePhotoFiles(photo);
 
     return { message: 'Photo deleted successfully' };
   }
@@ -504,13 +498,13 @@ export class UploadsService {
       data: { coverPhotoId: null },
     });
 
-    // Delete the photo record
+    // Delete the files from disk first (critical operation)
+    await this.deletePhotoFiles(photo);
+
+    // Only delete the DB record if file deletion succeeded
     await this.db.photo.delete({
       where: { id: photoId },
     });
-
-    // Delete the files from disk
-    await this.deletePhotoFiles(photo);
 
     return { message: 'Photo deleted successfully' };
   }
