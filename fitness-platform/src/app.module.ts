@@ -20,7 +20,6 @@ import { ReviewsModule } from './gym-reviews/gym-reviews.module';
 import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
 import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 
-import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
     DatabaseModule,
