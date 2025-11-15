@@ -137,6 +137,7 @@ model GymClasses {
   coverPhotoId  Int?   @unique
 
   classBookings ClassBooking[]
+  reviews       GymClassReview[]
 }
 
 model Photo {
@@ -150,7 +151,6 @@ model Photo {
   order        Int?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-  reviews GymClassReview[]
 
   gymCover   Gym?        @relation("gymCover")
   classCover GymClasses? @relation("classCover")
