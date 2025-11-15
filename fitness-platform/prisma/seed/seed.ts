@@ -7,6 +7,10 @@ async function main() {
   // Wrapped the entire seeding logic inside a transaction for atomicity.
   await prisma.$transaction(async (tx) => {
     // Delete in reverse dependency order
+    await tx.gymClassReviewResponse.deleteMany({});
+    await tx.gymClassReview.deleteMany({});
+    await tx.gymReviewResponse.deleteMany({});
+    await tx.gymReview.deleteMany({});
     await tx.serviceBooking.deleteMany({});
     await tx.classBooking.deleteMany({});
     await tx.serviceOptionAssignment.deleteMany({});
@@ -18,7 +22,6 @@ async function main() {
     await tx.user.deleteMany({});
 
     // Reset sequences to restart IDs from 1
-    await tx.$executeRaw`ALTER SEQUENCE "Gym_gymId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "User_userId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "Gym_gymId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "Service_serviceId_seq" RESTART WITH 1;`;
@@ -28,6 +31,10 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "Photo_id_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "ClassBooking_classBookingId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "ServiceBooking_serviceBookingId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymReview_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymReviewResponse_responseId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymClassReview_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymClassReviewResponse_responseId_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -236,6 +243,58 @@ async function main() {
             paymentStatus: 'PENDING',
           },
         });
+      }
+    }
+
+    // Seed gym reviews
+    for (const gym of gyms) {
+      const numReviews = Math.min(5, customers.length);
+      for (let r = 0; r < numReviews; r++) {
+        const customer = customers[(gym.gymId + r) % customers.length];
+        const review = await tx.gymReview.create({
+          data: {
+            rating: (r % 5) + 1,
+            comment: r % 2 === 0 ? `Great gym experience!` : null,
+            gymId: gym.gymId,
+            userId: customer.userId,
+          },
+        });
+        // Add response for some reviews
+        if (r % 3 === 0) {
+          await tx.gymReviewResponse.create({
+            data: {
+              message: `Thank you for your feedback!`,
+              reviewId: review.id,
+              ownerId: gym.gymOwnerId,
+            },
+          });
+        }
+      }
+    }
+
+    // Seed class reviews
+    for (const gymClass of gymClasses) {
+      const numReviews = Math.min(3, customers.length);
+      for (let r = 0; r < numReviews; r++) {
+        const customer = customers[(gymClass.classId + r) % customers.length];
+        const review = await tx.gymClassReview.create({
+          data: {
+            rating: (r % 5) + 1,
+            comment: r % 2 === 0 ? `Excellent class!` : null,
+            classId: gymClass.classId,
+            userId: customer.userId,
+          },
+        });
+        // Add response for some reviews
+        if (r % 2 === 0) {
+          await tx.gymClassReviewResponse.create({
+            data: {
+              message: `We're glad you enjoyed it!`,
+              reviewId: review.id,
+              trainerId: gymClass.trainerId,
+            },
+          });
+        }
       }
     }
   }); // end transaction
