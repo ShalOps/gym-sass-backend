@@ -12,7 +12,11 @@ import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MulterModule } from '@nestjs/platform-express';
+import { ReviewsModule } from './gym-reviews/gym-reviews.module';
+import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
+import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 
+import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
     DatabaseModule,
@@ -25,9 +29,14 @@ import { MulterModule } from '@nestjs/platform-express';
     GymClassesModule,
     ServiceOptionAssignmentModule,
     UploadsModule,
+    AdminAnalyticsModule,
+    ReviewsModule,
+    GymClassReviewModule,
     MulterModule.register({ dest: './uploads' }),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+
+
