@@ -3,11 +3,26 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { mkdir } from 'fs/promises';
+import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  // Ensure uploads directory exists
+  await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  );
+
   app.useGlobalFilters(new PrismaExceptionFilter());
+
+  // Serve static files from uploads directory
+  app.useStaticAssets(UPLOADS_DIR_ABSOLUTE, {
+    prefix: '/uploads/',
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Gym Platform API')
@@ -18,8 +33,11 @@ async function bootstrap() {
     .addTag('gyms', 'Gym management endpoints')
     .addTag('services', 'Services management endpoints')
     .addTag('service-option', 'Service option management endpoints')
-    .addTag('service-option-assignment', 'Service option assignment management endpoints')
-    .addTag('gym-classes', 'Gym classes management endpoints')
+    .addTag(
+      'service-option-assignment',
+      'Service option assignment management endpoints',
+    )
+    .addTag('gym-classes', 'Gym classes management endpoint')
     .addTag('reviews', 'Gym Reviews management endpoints')
     .addTag('gym-class-reviews', 'Gym Class Reviews management endpoints')
 

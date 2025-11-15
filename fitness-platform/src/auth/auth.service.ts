@@ -1,11 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { Role, Gender, Goal } from '@prisma/client';
+import { Role, Goal } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { JwtService } from '@nestjs/jwt'; 
-
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
@@ -15,17 +20,20 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-
-    if(!dto.password.length || dto.password.length <8){
-      throw new BadRequestException('Password must be at least 8 characters long');
+    if (!dto.password.length || dto.password.length < 8) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters long',
+      );
     }
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const gender = dto.gender as Gender;
+    const gender = dto.gender;
     const goal = dto.goal as Goal;
 
-    let role: Role = dto.role || Role.CUSTOMER;
+    const role: Role = dto.role || Role.CUSTOMER;
     // check if the email and the phone number is unique
-    const queryClauses: ({ phoneNo: string } | { email: string })[] = [{ phoneNo: dto.phoneNo }];
+    const queryClauses: ({ phoneNo: string } | { email: string })[] = [
+      { phoneNo: dto.phoneNo },
+    ];
 
     if (dto.email) {
       queryClauses.push({ email: dto.email });
@@ -34,7 +42,6 @@ export class AuthService {
     const existingUser = await this.db.user.findFirst({
       where: { OR: queryClauses },
     });
-
 
     if (existingUser) {
       throw new ConflictException('Email or phone number already in use');
@@ -57,14 +64,32 @@ export class AuthService {
         goal: goal,
       },
     });
-    return { message: 'User registered successfully' };
+
+    return {
+      user: {
+        userId: registeredUser.userId,
+        email: registeredUser.email,
+        phoneNo: registeredUser.phoneNo,
+        firstName: registeredUser.firstName,
+        lastName: registeredUser.lastName,
+        userName: registeredUser.userName,
+        birthDate: registeredUser.birthDate,
+        location: registeredUser.location,
+        bio: registeredUser.bio,
+        profilePic: registeredUser.profilePic,
+        role: registeredUser.role,
+        gender: registeredUser.gender,
+        goal: registeredUser.goal,
+      },
+      message: 'Registration successful',
+    };
   }
 
   async login(dto: LoginDto) {
-    if(!dto.email && !dto.phoneNo){
+    if (!dto.email && !dto.phoneNo) {
       throw new BadRequestException('Enter email or phone number to login');
     }
-    if(!dto.password){
+    if (!dto.password) {
       throw new BadRequestException('Password is required');
     }
 
@@ -72,10 +97,9 @@ export class AuthService {
       ? await this.db.user.findUnique({ where: { email: dto.email } })
       : await this.db.user.findUnique({ where: { phoneNo: dto.phoneNo! } });
 
-    if(dto.email && !user){
+    if (dto.email && !user) {
       throw new NotFoundException('Invalid email credentials');
-    }
-    else if(dto.phoneNo && !user){
+    } else if (dto.phoneNo && !user) {
       throw new NotFoundException('Invalid phone number credentials');
     }
 

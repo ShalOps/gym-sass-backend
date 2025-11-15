@@ -1,4 +1,10 @@
-import { IsString, IsEmail, IsOptional, IsDateString, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsDateString,
+  IsEnum,
+} from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -53,7 +59,7 @@ export class CreateUsersDto {
     example: 'johndoe@example.com',
     format: 'email',
   })
-  @IsOptional() 
+  @IsOptional()
   @IsEmail()
   email: string;
 
