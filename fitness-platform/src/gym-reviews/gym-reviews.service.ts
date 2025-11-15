@@ -102,6 +102,10 @@ export class ReviewsService {
       throw new ForbiddenException('You can only update your own response');
     }
 
+    if (dto.message === undefined) {
+      throw new ForbiddenException('At least one updatable field must be provided (message)');
+    }
+
     if (!dto.message || !dto.message.trim()) {
       throw new ForbiddenException('Response message cannot be empty');
     }

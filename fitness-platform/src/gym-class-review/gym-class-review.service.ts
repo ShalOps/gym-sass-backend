@@ -138,7 +138,7 @@ export class GymClassReviewsService {
       throw new ForbiddenException('Only a gym owner or trainer can create a response');
     }
 
-    if (userId !== response.ownerId){
+    if (userId !== response.ownerId && userId !== response.trainerId){
       throw new ForbiddenException('You can only update your own response');
     }
     if (dto.message === undefined) {
@@ -172,7 +172,7 @@ export class GymClassReviewsService {
     if (userId !== gymOwnerId && userId !== gymTrainerId)
     throw new ForbiddenException('Only the gym owner or the class trainer can delete responses for this class');
 
-    if (!isAdmin && userId !== response.ownerId)
+    if (!isAdmin && userId !== response.ownerId && userId !== response.trainerId)
       throw new ForbiddenException('You can only delete your own response');
 
 
