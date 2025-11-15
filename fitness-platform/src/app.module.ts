@@ -16,7 +16,11 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
 import { TasksService } from './tasks/tasks.service';
+import { ReviewsModule } from './gym-reviews/gym-reviews.module';
+import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
+import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 
+import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
     DatabaseModule,
@@ -30,6 +34,9 @@ import { TasksService } from './tasks/tasks.service';
     ServiceOptionAssignmentModule,
     UploadsModule,
     BookingsModule,
+    AdminAnalyticsModule,
+    ReviewsModule, 
+    GymClassReviewModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
   ],
@@ -37,3 +44,5 @@ import { TasksService } from './tasks/tasks.service';
   providers: [AppService, TasksService],
 })
 export class AppModule {}
+
+

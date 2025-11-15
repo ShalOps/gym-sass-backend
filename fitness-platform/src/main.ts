@@ -38,6 +38,8 @@ async function bootstrap() {
       'Service option assignment management endpoints',
     )
     .addTag('gym-classes', 'Gym classes management endpoint')
+    .addTag('reviews', 'Gym Reviews management endpoints')
+    .addTag('gym-class-reviews', 'Gym Class Reviews management endpoints')
 
     .addBearerAuth(
       {
