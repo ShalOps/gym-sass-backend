@@ -34,7 +34,7 @@ import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
     UploadsModule,
     BookingsModule,
     AdminAnalyticsModule,
-    ReviewsModule, 
+    ReviewsModule,
     GymClassReviewModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
@@ -43,5 +43,3 @@ import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
   providers: [AppService, TasksService],
 })
 export class AppModule {}
-
-

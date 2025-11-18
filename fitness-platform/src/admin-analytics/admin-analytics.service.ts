@@ -2,53 +2,52 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { StringFormatParams } from 'zod/v4/core';
 
-
 @Injectable()
 export class AdminAnalyticsService {
-  constructor(private readonly databaseService: DatabaseService){}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async totalUsers() {
-     const numberOfUsers = await this.databaseService.user.count();
-     return { count: numberOfUsers};
+    const numberOfUsers = await this.databaseService.user.count();
+    return { count: numberOfUsers };
   }
 
-  async usersByRole(){
+  async usersByRole() {
     const usersByRole = await this.databaseService.user.groupBy({
-      by: ['role'], 
+      by: ['role'],
       _count: {
         userId: true,
       },
-    })
+    });
     return usersByRole;
   }
 
-  async usersByGender(){
+  async usersByGender() {
     const usersByGender = await this.databaseService.user.groupBy({
-      by: ['gender'], 
+      by: ['gender'],
       _count: {
         userId: true,
       },
-    })
+    });
     return usersByGender;
   }
-  
-  async usersByGoal(){
+
+  async usersByGoal() {
     const usersByGoal = await this.databaseService.user.groupBy({
-      by: ['goal'], 
+      by: ['goal'],
       _count: {
         userId: true,
       },
-    })
+    });
     return usersByGoal;
   }
 
-  async newUsersDaily(){
+  async newUsersDaily() {
     type DailyCount = {
-        day: Date;
-        count: bigint;
+      day: Date;
+      count: bigint;
     };
     try {
-    const result = await this.databaseService.$queryRaw<DailyCount[]>`
+      const result = await this.databaseService.$queryRaw<DailyCount[]>`
       SELECT 
         DATE_TRUNC('day', "createdAt") AS day,
         COUNT(*) AS count
@@ -58,41 +57,40 @@ export class AdminAnalyticsService {
       ORDER BY day ASC
     `;
 
-    return result.map(row => ({
-      period: row.day.toISOString().slice(0, 10),
-      count: Number(row.count),
-    }));
-  } catch (error) {
-    console.error('Error in newUsersDaily: ', error);
-    throw error;
-  }
+      return result.map((row) => ({
+        period: row.day.toISOString().slice(0, 10),
+        count: Number(row.count),
+      }));
+    } catch (error) {
+      console.error('Error in newUsersDaily: ', error);
+      throw error;
+    }
   }
 
-  async newUsersWeekly(){
+  async newUsersWeekly() {
     type WeeklyCount = {
-        week: Date;
-        count: bigint;
+      week: Date;
+      count: bigint;
     };
     try {
-    const result = await this.databaseService.$queryRaw<WeeklyCount[]>`
+      const result = await this.databaseService.$queryRaw<WeeklyCount[]>`
       SELECT 
         DATE_TRUNC('week', "createdAt") AS "week",
         COUNT(*) AS "count"
       FROM "User"
       WHERE "createdAt" >= NOW() - INTERVAL '90 days'
       GROUP BY "week"
-      ORDER BY "week" ASC`
+      ORDER BY "week" ASC`;
 
-      return result.map(row => ({
-          period: row.week.toISOString().slice(0, 10), 
-          count: Number(row.count),
+      return result.map((row) => ({
+        period: row.week.toISOString().slice(0, 10),
+        count: Number(row.count),
       }));
     } catch (error) {
       console.error('Error in newUsersWeekly: ', error);
       throw error;
     }
   }
-
 
   async newUsersPerMonth() {
     type MonthlyCountRow = {
@@ -101,7 +99,7 @@ export class AdminAnalyticsService {
     };
 
     try {
-    const result = await this.databaseService.$queryRaw<MonthlyCountRow[]>`
+      const result = await this.databaseService.$queryRaw<MonthlyCountRow[]>`
       SELECT 
         DATE_TRUNC('month', "createdAt")::date AS "month",
         COUNT(*) AS "count"
@@ -109,19 +107,19 @@ export class AdminAnalyticsService {
       WHERE "createdAt" >= NOW() - INTERVAL '365 days'
       GROUP BY DATE_TRUNC('month', "createdAt")::date
       ORDER BY DATE_TRUNC('month', "createdAt")::date ASC
-    `;  
+    `;
 
-    return result.map((row) => ({
-      period: row.month.toISOString().slice(0, 7),
-      count: Number(row.count),
-    }));
-    } catch (error){
+      return result.map((row) => ({
+        period: row.month.toISOString().slice(0, 7),
+        count: Number(row.count),
+      }));
+    } catch (error) {
       console.error('Error in newUsersPerMonth: ', error);
       throw error;
     }
   }
 
-  async activeUsers(){
+  async activeUsers() {
     const activeUsers = await this.databaseService.user.count({
       where: {
         lastLogin: {
@@ -133,14 +131,13 @@ export class AdminAnalyticsService {
   }
 
   async ageDistribution() {
-    
     type ageCountRow = {
       age_group: string;
       count: bigint;
     };
 
     try {
-    const result = await this.databaseService.$queryRaw<ageCountRow[]>`
+      const result = await this.databaseService.$queryRaw<ageCountRow[]>`
       SELECT
         CASE
           WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, "birthDate")) < 18     THEN 'Under 18'
@@ -158,14 +155,14 @@ export class AdminAnalyticsService {
       ORDER BY 1
     `;
 
-    return result.map((row) => ({
-      ageGroup: row.age_group,
-      count: Number(row.count),
-    }));
-  } catch (error) {
-    console.error('Error in ageDistribution: ', error)
-    throw error;
-  }
+      return result.map((row) => ({
+        ageGroup: row.age_group,
+        count: Number(row.count),
+      }));
+    } catch (error) {
+      console.error('Error in ageDistribution: ', error);
+      throw error;
+    }
   }
 
   async gymsByVerificationStatus() {
@@ -186,32 +183,33 @@ export class AdminAnalyticsService {
     };
   }
 
-  private buildDateFilter(from?: string, to?: string){
-    const where: any = {};
+  private buildDateFilter(
+    from?: string,
+    to?: string,
+  ): { gte?: Date; lte?: Date } | undefined {
+    const where: { gte?: Date; lte?: Date } = {};
 
-    if(from) {
+    if (from) {
       where.gte = new Date(from);
     }
 
-    if(to) {
+    if (to) {
       where.lte = new Date(to);
     }
 
-    return Object.keys(where).length > 0? where : undefined;
+    return Object.keys(where).length > 0 ? where : undefined;
   }
 
   async gymsByServices(limit: number = 10, from?: string, to?: string) {
-    
     const dateFilter = this.buildDateFilter(from, to);
     const serviceFilter = dateFilter ? { createdAt: dateFilter } : {};
 
     const gyms = await this.databaseService.gym.findMany({
-      where: 
-        {
-          services: {
-            some: serviceFilter,
-          },
+      where: {
+        services: {
+          some: serviceFilter,
         },
+      },
       select: {
         gymId: true,
         gymName: true,
@@ -229,7 +227,7 @@ export class AdminAnalyticsService {
       take: limit,
     });
 
-    return gyms.map(gym => ({
+    return gyms.map((gym) => ({
       gymId: gym.gymId,
       gymName: gym.gymName,
       count: gym._count.services,
@@ -237,16 +235,15 @@ export class AdminAnalyticsService {
   }
 
   async gymsByClasses(limit: number = 10, from?: string, to?: string) {
-
     const dateFilter = this.buildDateFilter(from, to);
     const classFilter = dateFilter ? { createdAt: dateFilter } : {};
-    
+
     const gyms = await this.databaseService.gym.findMany({
       where: {
-          gymClasses: {
-            some: classFilter,
-          },
+        gymClasses: {
+          some: classFilter,
         },
+      },
       select: {
         gymId: true,
         gymName: true,
@@ -264,7 +261,7 @@ export class AdminAnalyticsService {
       take: limit,
     });
 
-    return gyms.map(gym => ({
+    return gyms.map((gym) => ({
       gymId: gym.gymId,
       gymName: gym.gymName,
       count: gym._count.gymClasses,
@@ -272,7 +269,6 @@ export class AdminAnalyticsService {
   }
 
   async popularClassSchedules(limit: number = 10, from?: string, to?: string) {
-    
     const dateFilter = this.buildDateFilter(from, to);
     const classFilter = dateFilter ? { createdAt: dateFilter } : {};
 
@@ -290,14 +286,13 @@ export class AdminAnalyticsService {
       take: limit,
     });
 
-    return schedules.map(item => ({
+    return schedules.map((item) => ({
       schedule: item.classSchedule,
       count: item._count.classId,
     }));
   }
 
   async topTrainersByClasses(limit: number = 10, from?: string, to?: string) {
-
     const dateFilter = this.buildDateFilter(from, to);
     const trainerFilter = dateFilter ? { createdAt: dateFilter } : {};
 
@@ -305,7 +300,7 @@ export class AdminAnalyticsService {
       where: {
         role: 'TRAINER',
         gymclasses: {
-          some: trainerFilter, 
+          some: trainerFilter,
         },
       },
       select: {
@@ -327,7 +322,7 @@ export class AdminAnalyticsService {
       take: limit,
     });
 
-    return trainers.map(trainer => ({
+    return trainers.map((trainer) => ({
       trainerId: trainer.userId,
       name: `${trainer.firstName} ${trainer.lastName}`,
       userName: trainer.userName,
@@ -335,8 +330,11 @@ export class AdminAnalyticsService {
     }));
   }
 
-  async gymClassPricingInsights(limit: number = 20, from?: string, to?: string) {
-
+  async gymClassPricingInsights(
+    limit: number = 20,
+    from?: string,
+    to?: string,
+  ) {
     const dateFilter = this.buildDateFilter(from, to);
     const classFilter = dateFilter ? { createdAt: dateFilter } : {};
 
@@ -344,7 +342,7 @@ export class AdminAnalyticsService {
       where: {
         gymClasses: {
           some: classFilter,
-        }
+        },
       },
       select: {
         gymId: true,
@@ -364,15 +362,15 @@ export class AdminAnalyticsService {
     });
 
     return gyms
-      .map(gym => {
-        const classes = gym.gymClasses;
+      .map((gym) => {
+        const classes = gym.gymClasses as { price: number }[];
         const totalClasses = classes.length;
         const avgPrice =
           totalClasses > 0
             ? Number(
                 (
                   classes.reduce((sum, c) => sum + c.price, 0) / totalClasses
-                ).toFixed(2)
+                ).toFixed(2),
               )
             : 0;
 
@@ -383,8 +381,6 @@ export class AdminAnalyticsService {
           averagePrice: avgPrice,
         };
       })
-      .filter(g => g.totalClasses > 0); 
+      .filter((g) => g.totalClasses > 0);
   }
-
-
 }
