@@ -238,7 +238,15 @@ export class AdminAnalyticsService {
     const dateFilter = this.buildDateFilter(from, to);
     const classFilter = dateFilter ? { createdAt: dateFilter } : {};
 
-    const gyms = await this.databaseService.gym.findMany({
+    type GymWithClassCount = {
+      gymId: number;
+      gymName: string;
+      _count: {
+        gymClasses: number;
+      };
+    };
+
+    const gyms: GymWithClassCount[] = await this.databaseService.gym.findMany({
       where: {
         gymClasses: {
           some: classFilter,
@@ -288,7 +296,7 @@ export class AdminAnalyticsService {
 
     return schedules.map((item) => ({
       schedule: item.classSchedule,
-      count: item._count.classId,
+      count: Number(item._count.classId),
     }));
   }
 
@@ -296,31 +304,42 @@ export class AdminAnalyticsService {
     const dateFilter = this.buildDateFilter(from, to);
     const trainerFilter = dateFilter ? { createdAt: dateFilter } : {};
 
-    const trainers = await this.databaseService.user.findMany({
-      where: {
-        role: 'TRAINER',
-        gymclasses: {
-          some: trainerFilter,
-        },
-      },
-      select: {
-        userId: true,
-        firstName: true,
-        lastName: true,
-        userName: true,
-        _count: {
-          select: {
-            gymclasses: true,
+    type TrainerWithClassCount = {
+      userId: number;
+      firstName: string;
+      lastName: string;
+      userName: string;
+      _count: {
+        gymclasses: number;
+      };
+    };
+
+    const trainers: TrainerWithClassCount[] =
+      await this.databaseService.user.findMany({
+        where: {
+          role: 'TRAINER',
+          gymclasses: {
+            some: trainerFilter,
           },
         },
-      },
-      orderBy: {
-        gymclasses: {
-          _count: 'desc',
+        select: {
+          userId: true,
+          firstName: true,
+          lastName: true,
+          userName: true,
+          _count: {
+            select: {
+              gymclasses: true,
+            },
+          },
         },
-      },
-      take: limit,
-    });
+        orderBy: {
+          gymclasses: {
+            _count: 'desc',
+          },
+        },
+        take: limit,
+      });
 
     return trainers.map((trainer) => ({
       trainerId: trainer.userId,
