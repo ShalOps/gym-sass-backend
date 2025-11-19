@@ -1,0 +1,19 @@
+import { Controller, Get, Param, Query, UsePipes, ValidationPipe } from "@nestjs/common";
+import { GymAnalyticsService } from "./gym-analytics.service";
+import { DateRangeDto } from "./dto/date-range.dto";
+
+@Controller('analytics')
+@UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+export class GymAnalyticsController {
+  constructor(private gymAnalyticsService: GymAnalyticsService) {}
+
+
+  @Get('gyms/:gymId/bookings/total')
+  async totalBookingsForGym(
+    @Param('gymId') gymId: string,
+    @Query() dateRange: DateRangeDto,
+  ) {
+    return this.gymAnalyticsService.totalBookingsForGym(gymId, dateRange.startDate, dateRange.endDate);
+  }
+
+}
