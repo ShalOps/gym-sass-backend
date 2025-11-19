@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, UsePipes, ValidationPipe } from "@nestjs/common";
 import { GymAnalyticsService } from "./gym-analytics.service";
 import { DateRangeDto } from "./dto/date-range.dto";
+import { BookingStatsQueryDto } from "./dto/booking-stats.dto";
 
 @Controller('analytics')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -13,7 +14,17 @@ export class GymAnalyticsController {
     @Param('gymId') gymId: string,
     @Query() dateRange: DateRangeDto,
   ) {
-    return this.gymAnalyticsService.totalBookingsForGym(gymId, dateRange.startDate, dateRange.endDate);
+    return this.gymAnalyticsService.totalBookingsForGym(
+        gymId,
+        dateRange.startDate,
+        dateRange.endDate
+    );
   }
+   @Get('bookings/stats')
+    async bookingCounts(@Query() q: BookingStatsQueryDto) {
+        return this.gymAnalyticsService.bookingCounts(q);
+    }
+
+    
 
 }
