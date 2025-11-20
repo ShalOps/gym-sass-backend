@@ -43,10 +43,10 @@ export class CreateClassBookingDto {
   notes?: string;
 
   @ApiPropertyOptional({
-    description: 'Payment intent ID if already created',
-    example: 'pi_1GqICZ2eZvKYlo2ChXrlK9Qb',
+    description: 'Return URL for payment redirection',
+    example: 'https://gymsass.com/bookings/success',
   })
   @IsOptional()
   @IsString()
-  paymentIntentId?: string;
+  returnUrl?: string;
 }
