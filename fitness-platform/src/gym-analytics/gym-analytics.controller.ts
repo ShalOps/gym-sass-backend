@@ -18,7 +18,7 @@ export class GymAnalyticsController {
   }
   @Get('users/activity')
     getUserActivity(@Query() query: DateRangeDto) {
-      return this.gymAnalyticsService.getUserActivity(query);
+      return this.gymAnalyticsService.getUserActivity();
   }
 
   @Get('revenue')
