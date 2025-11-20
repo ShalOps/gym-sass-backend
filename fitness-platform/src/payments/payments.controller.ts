@@ -26,6 +26,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { Request } from 'express';
 import { ChapaWebhookDto } from './dto/webhook.dto';
 import { Throttle } from '@nestjs/throttler';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
+import { RecordManualPaymentDto } from './dto/manual-payment.dto';
 
 interface User {
   userId: number;
@@ -127,5 +129,27 @@ export class PaymentController {
   async getTransaction(@Param('txRef') txRef: string, @Req() req: Request) {
     const user = req.user as User;
     return await this.paymentService.getTransactionByTxRef(txRef, user);
+  }
+
+  @Post('refund')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Refund a payment (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Payment refunded successfully' })
+  async refund(@Body() dto: RefundPaymentDto, @Req() req: Request) {
+    const user = req.user as User;
+    return this.paymentService.refundPayment(user, dto);
+  }
+
+  @Post('record-manual')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Record a manual cash payment (Staff only)' })
+  @ApiResponse({ status: 201, description: 'Manual payment recorded' })
+  async recordManual(@Body() dto: RecordManualPaymentDto, @Req() req: Request) {
+    const user = req.user as User;
+    return this.paymentService.recordManualPayment(user, dto);
   }
 }
