@@ -7,6 +7,9 @@ import {
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { NotificationType } from '@prisma/client';
+import { Action } from './bookings.service'
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -224,17 +227,31 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Update the booking
-    return this.databaseService.classBooking.update({
-      where: { classBookingId: id },
-      data: updateData,
-      include: {
-        class: {
-          include: {
-            gym: true,
-            trainer: true,
+    return this.databaseService.$transaction( async (tx) => {
+
+      const updateBooking = await tx.classBooking.update({
+        where: { classBookingId: id },
+        data: updateData,
+        include: {
+          class: {
+            include: {
+              gym: true,
+              trainer: true,
+            },
           },
+          user: {
+            select: {
+              userName: true,
+            }
+          }
         },
-      },
+      });
+      
+      if (updateData.status == BookingStatus.CONFIRMED){
+        await this.createBookingNotifications(updateBooking, NotificationType.CLASS_BOOKING_CONFIRMED, Action.CONFIRMED, tx);
+      }
+
+      return updateBooking;
     });
   }
 
@@ -253,7 +270,8 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Update status to cancelled
-    return this.databaseService.classBooking.update({
+    return await this.databaseService.$transaction(async (tx) => {
+    const cancelBooking = await tx.classBooking.update({
       where: { classBookingId: id },
       data: { status: BookingStatus.CANCELLED },
       include: {
@@ -263,8 +281,18 @@ export class ClassBookingsService extends BookingsService {
             trainer: true,
           },
         },
+        user: {
+          select: {
+            userName: true,
+          }
+        }
       },
     });
+
+    await this.createBookingNotifications(cancelBooking, NotificationType.CLASS_BOOKING_CANCELLED, Action.CANCELLED, tx);
+
+    return cancelBooking;
+  });
   }
 
   async markNoShow(id: number, currentUserId: number) {
@@ -421,7 +449,8 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Create the booking
-    return this.databaseService.classBooking.create({
+    return await this.databaseService.$transaction( async (tx) => {
+      const createdBooking = await tx.classBooking.create({
       data: {
         userId,
         classId,
@@ -436,7 +465,54 @@ export class ClassBookingsService extends BookingsService {
             trainer: true,
           },
         },
+        user: {
+          select: { 
+            userName: true,
+          }
+        }
       },
+  
     });
+
+    await this.createBookingNotifications(createdBooking, NotificationType.NEW_CLASS_BOOKING, Action.BOOKED, tx);
+
+    return createdBooking;
+  });
+}
+
+  async createBookingNotifications(
+    booking: {
+      user: { userName: string };
+      class: {
+        className: string;
+        gym: { gymOwnerId: number };
+        trainerId: number;
+      };
+    },
+    notificationType: NotificationType, 
+    action: Action, tx?: Prisma.TransactionClient) {
+
+    const client = tx || this.databaseService;
+
+    await Promise.all([
+      client.notification.create({
+        data: {
+          userId: booking.class.gym.gymOwnerId,
+          type: notificationType,
+          message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`
+        }
+      }),
+
+      booking.class.trainerId !== booking.class.gym.gymOwnerId
+        ? client.notification.create({
+            data: {
+              userId: booking.class.trainerId,
+              type: notificationType,
+              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`
+            }
+        })
+        :Promise.resolve(),
+    ])
+
   }
 }
