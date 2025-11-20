@@ -6,11 +6,15 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, PaymentType } from '@prisma/client';
+import { PaymentService } from '../payments/payments.service';
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
-  constructor(protected readonly databaseService: DatabaseService) {
+  constructor(
+    protected readonly databaseService: DatabaseService,
+    private readonly paymentService: PaymentService,
+  ) {
     super(databaseService);
   }
 
@@ -281,6 +285,7 @@ export class ServiceBookingsService extends BookingsService {
     startTime?: Date,
     endTime?: Date,
     notes?: string,
+    returnUrl?: string,
   ) {
     // Check if service exists
     const service = await this.databaseService.service.findUnique({
@@ -338,13 +343,14 @@ export class ServiceBookingsService extends BookingsService {
       }
     }
 
-    return this.databaseService.serviceBooking.create({
+    const booking = await this.databaseService.serviceBooking.create({
       data: {
         userId,
         serviceId,
         startTime,
         endTime,
         notes,
+        status: BookingStatus.PENDING, // Default to PENDING until paid
       },
       include: {
         service: {
@@ -354,5 +360,37 @@ export class ServiceBookingsService extends BookingsService {
         },
       },
     });
+
+    // Initiate Payment if price > 0
+    let paymentResponse;
+    if (Number(service.price) > 0) {
+      if (!returnUrl) {
+        throw new BadRequestException(
+          'returnUrl is required for paid service bookings',
+        );
+      }
+
+      // Get user role for payment service
+      const user = await this.databaseService.user.findUnique({
+        where: { userId },
+        select: { role: true },
+      });
+
+      if (user) {
+        paymentResponse = await this.paymentService.createPayment(
+          { userId, role: user.role },
+          {
+            type: PaymentType.BOOKING,
+            serviceBookingId: booking.serviceBookingId,
+            returnUrl,
+          },
+        );
+      }
+    }
+
+    return {
+      booking,
+      payment: paymentResponse as Record<string, unknown> | undefined,
+    };
   }
 }
