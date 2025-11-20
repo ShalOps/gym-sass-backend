@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus } from '@prisma/client';
 // import { readdir, unlink } from 'fs/promises';
 // import { stat } from 'fs/promises';
 // import { join } from 'path';
@@ -65,6 +65,26 @@ export class TasksService {
       );
     } catch (error) {
       this.logger.error('Failed to auto-complete past bookings', error);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupPendingPayments() {
+    this.logger.log('Running cleanup for old pending payments...');
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    try {
+      const result = await this.databaseService.payment.deleteMany({
+        where: {
+          status: PaymentStatus.PENDING,
+          createdAt: {
+            lt: twentyFourHoursAgo,
+          },
+        },
+      });
+      this.logger.log(`Deleted ${result.count} old pending payments.`);
+    } catch (error) {
+      this.logger.error('Failed to cleanup pending payments', error);
     }
   }
 
