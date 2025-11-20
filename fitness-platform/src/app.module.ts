@@ -19,6 +19,7 @@ import { TasksService } from './tasks/tasks.service';
 import { ReviewsModule } from './gym-reviews/gym-reviews.module';
 import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
 import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
     AdminAnalyticsModule,
     ReviewsModule,
     GymClassReviewModule,
+    PaymentsModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
   ],

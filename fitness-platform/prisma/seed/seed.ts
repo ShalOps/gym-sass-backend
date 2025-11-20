@@ -1,5 +1,5 @@
 // /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +11,7 @@ async function main() {
     await tx.gymClassReview.deleteMany({});
     await tx.gymReviewResponse.deleteMany({});
     await tx.gymReview.deleteMany({});
+    await tx.payment.deleteMany({});
     await tx.serviceBooking.deleteMany({});
     await tx.classBooking.deleteMany({});
     await tx.serviceOptionAssignment.deleteMany({});
@@ -35,6 +36,7 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "GymReviewResponse_responseId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "GymClassReview_id_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "GymClassReviewResponse_responseId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "payments_id_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -205,7 +207,7 @@ async function main() {
       const numBookings = Math.min(3, customers.length); // Up to 3 bookings per class
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(gymClass.classId + b) % customers.length];
-        await tx.classBooking.create({
+        const booking = await tx.classBooking.create({
           data: {
             userId: customer.userId,
             classId: gymClass.classId,
@@ -214,7 +216,22 @@ async function main() {
             startTime: new Date(Date.now() + (b + 1) * 60 * 60 * 1000), // Future times
             endTime: new Date(Date.now() + (b + 2) * 60 * 60 * 1000),
             notes: b % 3 === 0 ? `Note for booking ${b}` : null,
-            paymentStatus: 'PENDING',
+          },
+        });
+
+        await tx.payment.create({
+          data: {
+            txRef: `tx-class-${booking.classBookingId}-${Date.now()}-${b}`,
+            amount: new Prisma.Decimal(gymClass.price),
+            currency: 'ETB',
+            status: b % 2 === 0 ? 'PROCESSED' : 'PENDING',
+            type: 'BOOKING',
+            userId: customer.userId,
+            classBookingId: booking.classBookingId,
+            customerEmail: customer.email,
+            customerFirstName: customer.firstName,
+            customerLastName: customer.lastName,
+            method: b % 2 === 0 ? 'telebirr' : null,
           },
         });
       }
@@ -225,7 +242,7 @@ async function main() {
       const numBookings = Math.min(2, customers.length); // Up to 2 bookings per service
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(service.serviceId + b) % customers.length];
-        await tx.serviceBooking.create({
+        const booking = await tx.serviceBooking.create({
           data: {
             userId: customer.userId,
             serviceId: service.serviceId,
@@ -240,7 +257,22 @@ async function main() {
                 ? new Date(Date.now() + (b + 30) * 24 * 60 * 60 * 1000)
                 : null,
             notes: b % 3 === 0 ? `Service booking note ${b}` : null,
-            paymentStatus: 'PENDING',
+          },
+        });
+
+        await tx.payment.create({
+          data: {
+            txRef: `tx-service-${booking.serviceBookingId}-${Date.now()}-${b}`,
+            amount: new Prisma.Decimal(service.price),
+            currency: 'ETB',
+            status: b % 2 === 0 ? 'PROCESSED' : 'PENDING',
+            type: 'BOOKING',
+            userId: customer.userId,
+            serviceBookingId: booking.serviceBookingId,
+            customerEmail: customer.email,
+            customerFirstName: customer.firstName,
+            customerLastName: customer.lastName,
+            method: b % 2 === 0 ? 'chapa' : null,
           },
         });
       }

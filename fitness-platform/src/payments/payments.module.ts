@@ -1,0 +1,23 @@
+import { Module } from '@nestjs/common';
+import { PaymentService } from './payments.service';
+import { PaymentController } from './payments.controller';
+import { DatabaseModule } from '../database/database.module';
+import { ChapaModule } from 'chapa-nestjs';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+    DatabaseModule,
+    ConfigModule,
+    ChapaModule.registerAsync({
+      useFactory: () => ({
+        secretKey: process.env.CHAPA_TEST_SECRET_KEY!,
+        webhookSecret: process.env.CHAPA_WEBHOOK_SECRET,
+      }),
+    }),
+  ],
+  controllers: [PaymentController],
+  providers: [PaymentService],
+  exports: [PaymentService],
+})
+export class PaymentsModule {}
