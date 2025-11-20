@@ -327,17 +327,24 @@ export class PaymentService {
     }
   }
 
-  async handleWebhook(payload: ChapaWebhookDto, signature?: string) {
+  async handleWebhook(
+    payload: ChapaWebhookDto,
+    signature?: string,
+    rawBody?: Buffer,
+  ) {
     // 1. Verify Signature
     const secret = process.env.CHAPA_WEBHOOK_SECRET;
     if (secret) {
       if (!signature) {
         throw new ForbiddenException('Missing signature');
       }
-      const stringPayload = JSON.stringify(payload);
+
+      // Use rawBody if available, otherwise fallback to JSON.stringify (less reliable)
+      const payloadToHash = rawBody ? rawBody : JSON.stringify(payload);
+
       const expectedSig = crypto
         .createHmac('sha256', secret)
-        .update(stringPayload)
+        .update(payloadToHash)
         .digest('hex');
 
       if (signature !== expectedSig) {

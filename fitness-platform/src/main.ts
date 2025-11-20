@@ -12,7 +12,9 @@ async function bootstrap() {
   // Ensure uploads directory exists
   await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // Security Headers
   app.use(helmet());
