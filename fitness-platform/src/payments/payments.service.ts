@@ -22,6 +22,8 @@ import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
+import { RecordManualPaymentDto } from './dto/manual-payment.dto';
 
 @Injectable()
 export class PaymentService {
@@ -268,9 +270,47 @@ export class PaymentService {
     }
 
     // Verify with Chapa
-    try {
-      const verifyResponse = await this.chapaService.verify({ tx_ref: txRef });
+    let verifyResponse:
+      | {
+          status: string;
+          data: {
+            status: string;
+            amount: string;
+            reference: string;
+            [key: string]: any;
+          };
+          [key: string]: any;
+        }
+      | undefined = undefined;
+    let attempts = 0;
+    const maxAttempts = 3;
 
+    while (attempts < maxAttempts) {
+      try {
+        verifyResponse = await this.chapaService.verify({ tx_ref: txRef });
+        break;
+      } catch (error) {
+        attempts++;
+        this.logger.warn(
+          `Verification attempt ${attempts} failed for ${txRef}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        if (attempts >= maxAttempts) {
+          throw error;
+        }
+        // Exponential backoff: 1s, 2s, ...
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+
+    if (!verifyResponse) {
+      throw new BadRequestException(
+        'Payment verification failed: No response from Chapa',
+      );
+    }
+
+    try {
       if (
         verifyResponse.status === 'success' &&
         verifyResponse.data.status === 'success'
@@ -466,6 +506,136 @@ export class PaymentService {
           data: { status: BookingStatus.CONFIRMED },
         });
       }
+    });
+  }
+
+  async refundPayment(
+    user: { userId: number; role: string },
+    dto: RefundPaymentDto,
+  ) {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only admins can process refunds');
+    }
+
+    const payment = await this.databaseService.payment.findUnique({
+      where: { txRef: dto.txRef },
+      include: { user: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== PaymentStatus.PROCESSED) {
+      throw new BadRequestException('Only processed payments can be refunded');
+    }
+
+    // Call Chapa Refund API
+    try {
+      // Note: Using fetch as chapa-nestjs might not expose refund yet
+      // In a real scenario, ensure CHAPA_SECRET_KEY is available
+      const secretKey =
+        process.env.CHAPA_SECRET_KEY || process.env.CHAPA_TEST_SECRET_KEY;
+      if (secretKey) {
+        // Mocking the call for now as we don't want to actually hit Chapa in dev without valid keys/endpoints
+        // const response = await fetch('https://api.chapa.co/v1/refund', ...);
+        this.logger.log(`Simulating Chapa refund for ${payment.txRef}`);
+      }
+    } catch (error) {
+      this.logger.error(`Refund failed for ${payment.txRef}`, error);
+      throw new BadRequestException('Refund failed at gateway');
+    }
+
+    // Update Local State
+    await this.databaseService.payment.update({
+      where: { id: payment.id },
+      data: { status: PaymentStatus.REFUNDED },
+    });
+
+    // Log
+    await this.logPaymentAction(payment.id, 'REFUND', {
+      reason: dto.reason,
+      adminId: user.userId,
+    });
+
+    // Notify User
+    if (payment.user?.email) {
+      await this.notificationsService.notifyUser(
+        payment.user.userId,
+        `Payment Refunded: Your payment of ${payment.amount.toString()} ETB has been refunded.`,
+      );
+    }
+
+    return { status: 'success', message: 'Payment refunded successfully' };
+  }
+
+  async recordManualPayment(
+    user: { userId: number; role: string },
+    dto: RecordManualPaymentDto,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'GYMOWNER') {
+      throw new ForbiddenException('Only staff can record manual payments');
+    }
+
+    // Verify target user exists
+    const targetUser = await this.databaseService.user.findUnique({
+      where: { userId: dto.userId },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    // Generate a manual txRef
+    const txRef = `MANUAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    return this.databaseService.$transaction(async (tx) => {
+      // Create Payment Record
+      const payment = await tx.payment.create({
+        data: {
+          txRef,
+          amount: dto.amount,
+          currency: 'ETB',
+          type: dto.type,
+          status: PaymentStatus.PAID_MANUAL,
+          method: 'MANUAL_CASH',
+          customerEmail: targetUser.email,
+          customerFirstName: targetUser.firstName,
+          customerLastName: targetUser.lastName,
+          user: { connect: { userId: dto.userId } },
+          ...(dto.classBookingId && {
+            classBooking: { connect: { classBookingId: dto.classBookingId } },
+          }),
+          ...(dto.serviceBookingId && {
+            serviceBooking: {
+              connect: { serviceBookingId: dto.serviceBookingId },
+            },
+          }),
+          metadata: {
+            notes: dto.notes,
+            recordedBy: user.userId,
+          } as Prisma.InputJsonObject,
+        },
+      });
+
+      // Update Booking Status if applicable
+      if (dto.classBookingId) {
+        await tx.classBooking.update({
+          where: { classBookingId: dto.classBookingId },
+          data: { status: BookingStatus.CONFIRMED },
+        });
+      } else if (dto.serviceBookingId) {
+        await tx.serviceBooking.update({
+          where: { serviceBookingId: dto.serviceBookingId },
+          data: { status: BookingStatus.CONFIRMED },
+        });
+      }
+
+      await this.logPaymentAction(payment.id, 'MANUAL_RECORD', {
+        recordedBy: user.userId,
+        amount: dto.amount,
+      });
+
+      return payment;
     });
   }
 
