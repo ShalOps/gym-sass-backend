@@ -31,6 +31,27 @@ export class PaymentService {
     private readonly chapaService: ChapaService,
   ) {}
 
+  private async logPaymentAction(
+    paymentId: number,
+    action: string,
+    details?: any,
+  ) {
+    try {
+      await this.databaseService.paymentLog.create({
+        data: {
+          paymentId,
+          action,
+          details: details as Prisma.InputJsonObject,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log payment action ${action} for payment ${paymentId}`,
+        error,
+      );
+    }
+  }
+
   async createPayment(
     user: { userId: number; role: string },
     dto: CreatePaymentDto,
@@ -141,7 +162,7 @@ export class PaymentService {
     });
 
     // 4. Create Local Payment Record (PENDING)
-    await this.databaseService.payment.create({
+    const payment = await this.databaseService.payment.create({
       data: {
         txRef,
         amount,
@@ -161,6 +182,12 @@ export class PaymentService {
           serviceBooking: { connect: { serviceBookingId } },
         }),
       },
+    });
+
+    await this.logPaymentAction(payment.id, 'INIT', {
+      amount,
+      type,
+      userId,
     });
 
     // 5. Initialize Chapa Payment
@@ -262,6 +289,12 @@ export class PaymentService {
           verifyResponse.data.reference,
           verifyResponse,
         );
+
+        await this.logPaymentAction(payment.id, 'VERIFY', {
+          status: 'SUCCESS',
+          chapaRef: verifyResponse.data.reference,
+        });
+
         // Refresh payment data
         const updatedPayment = await this.databaseService.payment.findUnique({
           where: { id: payment.id },
@@ -344,6 +377,7 @@ export class PaymentService {
         payload.reference || 'webhook-ref',
         payload,
       );
+      await this.logPaymentAction(payment.id, 'WEBHOOK_SUCCESS', payload);
       this.logger.log(`Webhook: Processed success for ${txRef}`);
     } else if (
       payload.event === 'charge.failed' ||
@@ -356,8 +390,10 @@ export class PaymentService {
           chapaResponse: payload as unknown as Prisma.InputJsonObject,
         },
       });
+      await this.logPaymentAction(payment.id, 'WEBHOOK_FAILED', payload);
       this.logger.warn(`Webhook: Payment failed for ${txRef}`);
     } else {
+      await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
       this.logger.log(`Webhook: Unhandled event ${payload.event} for ${txRef}`);
     }
   }
