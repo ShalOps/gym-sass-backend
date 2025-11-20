@@ -7,6 +7,7 @@ async function main() {
   // Wrapped the entire seeding logic inside a transaction for atomicity.
   await prisma.$transaction(async (tx) => {
     // Delete in reverse dependency order
+    await tx.paymentLog.deleteMany({});
     await tx.gymClassReviewResponse.deleteMany({});
     await tx.gymClassReview.deleteMany({});
     await tx.gymReviewResponse.deleteMany({});
@@ -219,21 +220,36 @@ async function main() {
           },
         });
 
-        await tx.payment.create({
+        const status =
+          b % 3 === 0 ? 'PROCESSED' : b % 3 === 1 ? 'PAID_MANUAL' : 'PENDING';
+        const method =
+          b % 3 === 0 ? 'telebirr' : b % 3 === 1 ? 'MANUAL_CASH' : null;
+
+        const payment = await tx.payment.create({
           data: {
             txRef: `tx-class-${booking.classBookingId}-${Date.now()}-${b}`,
             amount: new Prisma.Decimal(gymClass.price),
             currency: 'ETB',
-            status: b % 2 === 0 ? 'PROCESSED' : 'PENDING',
+            status: status,
             type: 'BOOKING',
             userId: customer.userId,
             classBookingId: booking.classBookingId,
             customerEmail: customer.email,
             customerFirstName: customer.firstName,
             customerLastName: customer.lastName,
-            method: b % 2 === 0 ? 'telebirr' : null,
+            method: method,
           },
         });
+
+        if (status !== 'PENDING') {
+          await tx.paymentLog.create({
+            data: {
+              paymentId: payment.id,
+              action: status === 'PROCESSED' ? 'VERIFY' : 'MANUAL_RECORD',
+              details: { seeded: true, method },
+            },
+          });
+        }
       }
     }
 
@@ -260,21 +276,36 @@ async function main() {
           },
         });
 
-        await tx.payment.create({
+        const status =
+          b % 3 === 0 ? 'PROCESSED' : b % 3 === 1 ? 'PAID_MANUAL' : 'PENDING';
+        const method =
+          b % 3 === 0 ? 'chapa' : b % 3 === 1 ? 'MANUAL_CASH' : null;
+
+        const payment = await tx.payment.create({
           data: {
             txRef: `tx-service-${booking.serviceBookingId}-${Date.now()}-${b}`,
             amount: new Prisma.Decimal(service.price),
             currency: 'ETB',
-            status: b % 2 === 0 ? 'PROCESSED' : 'PENDING',
+            status: status,
             type: 'BOOKING',
             userId: customer.userId,
             serviceBookingId: booking.serviceBookingId,
             customerEmail: customer.email,
             customerFirstName: customer.firstName,
             customerLastName: customer.lastName,
-            method: b % 2 === 0 ? 'chapa' : null,
+            method: method,
           },
         });
+
+        if (status !== 'PENDING') {
+          await tx.paymentLog.create({
+            data: {
+              paymentId: payment.id,
+              action: status === 'PROCESSED' ? 'VERIFY' : 'MANUAL_RECORD',
+              details: { seeded: true, method },
+            },
+          });
+        }
       }
     }
 
