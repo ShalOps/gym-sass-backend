@@ -3,17 +3,18 @@ import { GymAnalyticsService } from "./gym-analytics.service";
 import { DateRangeDto } from "./dto/date-range.dto";
 import { BookingStatsQueryDto } from "./dto/booking-stats.dto";
 import { UserActivityParamsDto } from "./dto/user-activity.dto";
+import { RevenueStatsQueryDto } from "./dto/revenue-stats.dto";
 
 @Controller('analytics')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 export class GymAnalyticsController {
-  constructor(private gymAnalyticsService: GymAnalyticsService) {}
+    constructor(private gymAnalyticsService: GymAnalyticsService) {}
 
 
-  @Get('gyms/:gymId/bookings/total')
-  async totalBookingsForGym(
-    @Param('gymId') gymId: string,
-    @Query() dateRange: DateRangeDto,
+    @Get('gyms/:gymId/bookings/total')
+      async totalBookingsForGym(
+        @Param('gymId') gymId: string,
+        @Query() dateRange: DateRangeDto,
   ) {
     return this.gymAnalyticsService.totalBookingsForGym(
         gymId,
@@ -31,6 +32,8 @@ export class GymAnalyticsController {
         return this.gymAnalyticsService.userActivity(params.userId, dateRange.startDate, dateRange.endDate);
     }
 
-    
-
+    @Get('revenue')
+      async revenue(@Query() q: RevenueStatsQueryDto) {
+        return this.gymAnalyticsService.revenueStats(q);
+    }
 }
