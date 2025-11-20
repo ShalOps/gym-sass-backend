@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, PaymentStatus, PaymentType } from '@prisma/client';
+import { BookingStatus, PaymentStatus } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
 
 @Injectable()

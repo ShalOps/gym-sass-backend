@@ -17,7 +17,6 @@ import {
   Payment,
   Prisma,
 } from '@prisma/client';
-import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
