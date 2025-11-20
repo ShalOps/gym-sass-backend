@@ -92,6 +92,7 @@ model Payment {
   user           User?           @relation("UserPayments", fields: [userId], references: [userId], onDelete: SetNull)
   serviceBooking ServiceBooking? @relation("ServiceBookingPayments", fields: [serviceBookingId], references: [serviceBookingId], onDelete: SetNull)
   classBooking   ClassBooking?   @relation("ClassBookingPayments", fields: [classBookingId], references: [classBookingId], onDelete: SetNull)
+  logs           PaymentLog[]
 
   @@index([txRef])
   @@index([chapaReference])
@@ -338,4 +339,16 @@ model GymClassReviewResponse {
   trainerId  Int?
   owner      User?          @relation("OwnerResponses", fields: [ownerId], references: [userId])
   ownerId    Int?
+}
+
+model PaymentLog {
+  id        String   @id @default(cuid())
+  paymentId Int      @map("payment_id")
+  action    String // e.g., 'INIT', 'VERIFY', 'WEBHOOK'
+  details   Json? // Non-sensitive metadata
+  timestamp DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
 }
