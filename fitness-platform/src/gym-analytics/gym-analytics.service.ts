@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "src/database/database.service";
 import { BookingStatsQueryDto } from "./dto/booking-stats.dto";
+import { RevenueStatsQueryDto } from "./dto/revenue-stats.dto";
 
 @Injectable()
 export class GymAnalyticsService {
@@ -101,6 +102,53 @@ export class GymAnalyticsService {
       cancelledBookings: Number(r.cancelled_bookings ?? 0),
       activeDays: Number(r.active_days ?? 0),
       lastBookingAt: r.last_booking_at ? new Date(r.last_booking_at).toISOString() : null,
+    };
+  }
+
+// this one will work when the payment module is ready
+  async revenueStats(qparams: RevenueStatsQueryDto) {
+    const { gymId, startDate, endDate, currency } = qparams;
+    const params: any[] = [];
+    const where: string[] = [];
+
+    if (gymId) {
+      params.push(gymId);
+      where.push(`b.gym_id = $${params.length}`);
+    }
+    if (startDate) {
+      params.push(startDate);
+      where.push(`p.created_at >= $${params.length}`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      where.push(`p.created_at <= $${params.length}`);
+    }
+    if (currency) {
+      params.push(currency);
+      where.push(`p.currency = $${params.length}`);
+    }
+
+    where.push(`p.status = 'paid'`);
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT
+        COALESCE(SUM(p.amount),0)::numeric::float8 AS total_revenue,
+        COUNT(p.*)::int AS payments_count
+        FROM payments p
+        JOIN bookings b ON b.id = p.booking_id
+        ${whereClause};
+    `;
+
+    const res = (await this.databaseService.$queryRawUnsafe(sql, ...params)) as Array<{
+      total_revenue: number;
+      payments_count: number;
+    }>;
+    const row = res[0] || {};
+    return {
+      totalRevenue: Number(row.total_revenue ?? 0),
+      paymentsCount: Number(row.payments_count ?? 0),
     };
   }
 }
