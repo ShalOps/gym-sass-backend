@@ -12,7 +12,6 @@ import {
   Req,
 } from '@nestjs/common';
 import { ServiceOptionService } from './service-option.service';
-import { Prisma } from '@prisma/client';
 import { CreateServiceOptionDto } from './dto/create-service-option.dto';
 import { UpdateServiceOptionDto } from './dto/update-service-option.dto';
 import {
