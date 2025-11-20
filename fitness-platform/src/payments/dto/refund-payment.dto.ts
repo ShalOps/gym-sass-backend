@@ -13,4 +13,8 @@ export class RefundPaymentDto {
   @IsString()
   @IsOptional()
   reason?: string;
+
+  @ApiProperty({ description: 'Amount to refund', required: false })
+  @IsOptional()
+  amount?: number;
 }

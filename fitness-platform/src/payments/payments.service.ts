@@ -517,6 +517,7 @@ export class PaymentService {
       throw new ForbiddenException('Only admins can process refunds');
     }
 
+    // 1. Fetch and validate payment from DB
     const payment = await this.databaseService.payment.findUnique({
       where: { txRef: dto.txRef },
       include: { user: true },
@@ -530,43 +531,121 @@ export class PaymentService {
       throw new BadRequestException('Only processed payments can be refunded');
     }
 
-    // Call Chapa Refund API
-    try {
-      // Note: Using fetch as chapa-nestjs might not expose refund yet
-      // In a real scenario, ensure CHAPA_SECRET_KEY is available
-      const secretKey =
-        process.env.CHAPA_SECRET_KEY || process.env.CHAPA_TEST_SECRET_KEY;
-      if (secretKey) {
-        // Mocking the call for now as we don't want to actually hit Chapa in dev without valid keys/endpoints
-        // const response = await fetch('https://api.chapa.co/v1/refund', ...);
-        this.logger.log(`Simulating Chapa refund for ${payment.txRef}`);
-      }
-    } catch (error) {
-      this.logger.error(`Refund failed for ${payment.txRef}`, error);
-      throw new BadRequestException('Refund failed at gateway');
-    }
-
-    // Update Local State
-    await this.databaseService.payment.update({
-      where: { id: payment.id },
-      data: { status: PaymentStatus.REFUNDED },
-    });
-
-    // Log
-    await this.logPaymentAction(payment.id, 'REFUND', {
-      reason: dto.reason,
-      adminId: user.userId,
-    });
-
-    // Notify User
-    if (payment.user?.email) {
-      await this.notificationsService.notifyUser(
-        payment.user.userId,
-        `Payment Refunded: Your payment of ${payment.amount.toString()} ETB has been refunded.`,
+    const refundAmount = dto.amount || Number(payment.amount);
+    if (refundAmount > Number(payment.amount)) {
+      throw new BadRequestException(
+        'Refund amount exceeds original payment amount',
       );
     }
 
-    return { status: 'success', message: 'Payment refunded successfully' };
+    // 2. Call Chapa Refund API
+    try {
+      const secretKey =
+        process.env.CHAPA_SECRET_KEY || process.env.CHAPA_TEST_SECRET_KEY;
+
+      if (!secretKey) {
+        throw new BadRequestException('Chapa keys not configured');
+      }
+
+      const chapaBaseUrl =
+        process.env.NODE_ENV === 'production'
+          ? 'https://api.chapa.co/v1'
+          : 'https://sandbox.chapa.co/v1';
+
+      const payload = {
+        tx_ref: dto.txRef,
+        amount: refundAmount,
+        reason: dto.reason || 'User requested refund',
+      };
+
+      const response = await fetch(`${chapaBaseUrl}/refund`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData: unknown = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData &&
+          typeof errorData === 'object' &&
+          errorData !== null &&
+          'message' in errorData
+            ? (errorData as { message?: string }).message
+            : response.statusText;
+        this.logger.error(
+          `Chapa refund failed for ${dto.txRef}: ${errorMessage}`,
+        );
+        // In dev/sandbox, refund might not be fully supported or might fail if tx is old
+        // For now, we'll throw, but in a real app we might want to handle specific error codes
+        throw new BadRequestException(
+          `Refund failed at gateway: ${
+            errorData &&
+            typeof errorData === 'object' &&
+            errorData !== null &&
+            'message' in errorData
+              ? (errorData as { message?: string }).message
+              : 'Unknown error'
+          }`,
+        );
+      }
+
+      const refundData = (await response.json()) as {
+        status: string;
+        refund_ref?: string;
+        message?: string;
+      };
+      if (refundData.status !== 'success') {
+        throw new BadRequestException(`Refund rejected: ${refundData.message}`);
+      }
+
+      this.logger.log(
+        `Refund successful for ${dto.txRef}: ${refundData.refund_ref}`,
+      );
+
+      // 3. Update Local State
+      await this.databaseService.payment.update({
+        where: { id: payment.id },
+        data: {
+          status:
+            refundAmount === Number(payment.amount)
+              ? PaymentStatus.REFUNDED
+              : PaymentStatus.PARTIALLY_REFUNDED,
+        },
+      });
+
+      // Log
+      await this.logPaymentAction(payment.id, 'REFUND', {
+        reason: dto.reason,
+        amount: refundAmount,
+        adminId: user.userId,
+        chapaRefundRef: refundData.refund_ref,
+      });
+
+      // Notify User
+      if (payment.user?.email) {
+        await this.notificationsService.notifyUser(
+          payment.user.userId,
+          `Payment Refunded: ${refundAmount} ETB has been refunded to your account.`,
+        );
+      }
+
+      return {
+        status: 'success',
+        message: 'Payment refunded successfully',
+        refundRef: refundData.refund_ref,
+      };
+    } catch (error) {
+      this.logger.error(`Refund failed for ${dto.txRef}`, error);
+      // If it's already a BadRequestException, rethrow it
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Refund failed at gateway');
+    }
   }
 
   async recordManualPayment(
