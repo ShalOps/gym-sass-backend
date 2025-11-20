@@ -21,6 +21,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentService {
@@ -29,6 +30,7 @@ export class PaymentService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly chapaService: ChapaService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async logPaymentAction(
@@ -379,6 +381,15 @@ export class PaymentService {
       );
       await this.logPaymentAction(payment.id, 'WEBHOOK_SUCCESS', payload);
       this.logger.log(`Webhook: Processed success for ${txRef}`);
+
+      // Send Email Receipt
+      if (payment.customerEmail) {
+        await this.notificationsService.sendEmailReceipt(
+          payment.customerEmail,
+          Number(payment.amount),
+          txRef,
+        );
+      }
     } else if (
       payload.event === 'charge.failed' ||
       payload.status === 'failed'
@@ -392,6 +403,14 @@ export class PaymentService {
       });
       await this.logPaymentAction(payment.id, 'WEBHOOK_FAILED', payload);
       this.logger.warn(`Webhook: Payment failed for ${txRef}`);
+
+      // Notify User
+      if (payment.userId) {
+        await this.notificationsService.notifyUser(
+          payment.userId,
+          `Payment failed for transaction ${txRef}. Please try again.`,
+        );
+      }
     } else {
       await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
       this.logger.log(`Webhook: Unhandled event ${payload.event} for ${txRef}`);

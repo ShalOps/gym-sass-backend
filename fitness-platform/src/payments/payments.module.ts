@@ -4,11 +4,13 @@ import { PaymentController } from './payments.controller';
 import { DatabaseModule } from '../database/database.module';
 import { ChapaModule } from 'chapa-nestjs';
 import { ConfigModule } from '@nestjs/config';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     DatabaseModule,
     ConfigModule,
+    NotificationsModule,
     ChapaModule.registerAsync({
       useFactory: () => ({
         secretKey: process.env.CHAPA_TEST_SECRET_KEY!,
