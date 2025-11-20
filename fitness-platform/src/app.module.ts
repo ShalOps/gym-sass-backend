@@ -20,6 +20,8 @@ import { ReviewsModule } from './gym-reviews/gym-reviews.module';
 import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
 import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 import { PaymentsModule } from './payments/payments.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -28,6 +30,12 @@ import { PaymentsModule } from './payments/payments.module';
     UsersModule,
     GymsModule,
     ConfigModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
     ServicesModule,
     ServiceOptionModule,
     GymClassesModule,
@@ -42,6 +50,13 @@ import { PaymentsModule } from './payments/payments.module';
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService, TasksService],
+  providers: [
+    AppService,
+    TasksService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

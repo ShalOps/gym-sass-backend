@@ -6,12 +6,16 @@ import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
+import helmet from 'helmet';
 
 async function bootstrap() {
   // Ensure uploads directory exists
   await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Security Headers
+  app.use(helmet());
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
