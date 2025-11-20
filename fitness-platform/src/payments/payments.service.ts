@@ -56,65 +56,34 @@ export class PaymentService {
     }
   }
 
-  async createPayment(
+  async initializePayment(
     user: { userId: number; role: string },
-    dto: CreatePaymentDto,
+    params: {
+      amount: number;
+      currency: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      returnUrl: string;
+      metadata?: Record<string, any>;
+      classBookingId?: number;
+      serviceBookingId?: number;
+      type?: PaymentType;
+    },
   ): Promise<InitializePaymentResponseDto> {
-    const { type, classBookingId, serviceBookingId, returnUrl, metadata } = dto;
+    const {
+      amount,
+      currency,
+      email,
+      firstName,
+      lastName,
+      returnUrl,
+      metadata,
+      classBookingId,
+      serviceBookingId,
+      type = PaymentType.BOOKING,
+    } = params;
     const userId = user.userId;
-
-    let amount = 0;
-    let description = '';
-    let email = '';
-    let firstName = '';
-    let lastName = '';
-
-    // 1. Validate & Calculate Price based on Type
-    if (type === PaymentType.BOOKING) {
-      if (classBookingId) {
-        const booking = await this.databaseService.classBooking.findUnique({
-          where: { classBookingId },
-          include: { class: true, user: true },
-        });
-
-        if (!booking) throw new NotFoundException('Class booking not found');
-        if (booking.userId !== userId)
-          throw new ForbiddenException('Booking does not belong to user');
-        if (booking.status === BookingStatus.CONFIRMED)
-          throw new BadRequestException('Booking is already confirmed');
-
-        amount = booking.class.price;
-        description = `Class: ${booking.class.className}`;
-        email = booking.user.email || '';
-        firstName = booking.user.firstName;
-        lastName = booking.user.lastName;
-      } else if (serviceBookingId) {
-        const booking = await this.databaseService.serviceBooking.findUnique({
-          where: { serviceBookingId },
-          include: { service: true, user: true },
-        });
-
-        if (!booking) throw new NotFoundException('Service booking not found');
-        if (booking.userId !== userId)
-          throw new ForbiddenException('Booking does not belong to user');
-        if (booking.status === BookingStatus.CONFIRMED)
-          throw new BadRequestException('Booking is already confirmed');
-
-        amount = booking.service.price;
-        description = `Service: ${booking.service.name}`;
-        email = booking.user.email || '';
-        firstName = booking.user.firstName;
-        lastName = booking.user.lastName;
-      } else {
-        throw new BadRequestException(
-          'Either classBookingId or serviceBookingId must be provided for BOOKING payment',
-        );
-      }
-    } else {
-      throw new UnprocessableEntityException(
-        `Payment type ${type} is not yet supported`,
-      );
-    }
 
     if (amount <= 0) {
       throw new BadRequestException(
@@ -170,7 +139,7 @@ export class PaymentService {
       data: {
         txRef,
         amount,
-        currency: 'ETB',
+        currency,
         type,
         status: PaymentStatus.PENDING,
         customerEmail: email,
@@ -198,7 +167,7 @@ export class PaymentService {
     try {
       const chapaResponse = await this.chapaService.initialize({
         amount: amount.toString(),
-        currency: 'ETB',
+        currency,
         email: email,
         first_name: firstName,
         last_name: lastName,
@@ -206,7 +175,12 @@ export class PaymentService {
         return_url: returnUrl,
         customization: {
           title: 'Gym Payment',
-          description,
+          description:
+            (metadata &&
+            typeof metadata === 'object' &&
+            'description' in metadata
+              ? (metadata as { description?: string }).description
+              : undefined) || 'Payment',
         },
       });
 

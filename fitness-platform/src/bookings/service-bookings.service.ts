@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
@@ -13,6 +15,7 @@ import { PaymentService } from '../payments/payments.service';
 export class ServiceBookingsService extends BookingsService {
   constructor(
     protected readonly databaseService: DatabaseService,
+    @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
   ) {
     super(databaseService);
@@ -278,6 +281,33 @@ export class ServiceBookingsService extends BookingsService {
     });
   }
 
+  async getPaymentDetails(bookingId: number, userId: number) {
+    const booking = await this.findOne(bookingId, userId);
+
+    // Check if already paid
+    if (booking.status === BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Booking is already paid or confirmed');
+    }
+
+    const amount = Number(booking.service.price);
+    if (amount <= 0) {
+      throw new BadRequestException('Booking is free, no payment needed');
+    }
+
+    return {
+      amount,
+      currency: 'ETB',
+      email: booking.user?.email,
+      firstName: booking.user?.firstName,
+      lastName: booking.user?.lastName,
+      description: `Payment for ${booking.service.name}`,
+      metadata: {
+        serviceBookingId: booking.serviceBookingId,
+        gymId: booking.service.gymId,
+      },
+    };
+  }
+
   // Additional method for creating a service booking
   async create(
     userId: number,
@@ -373,16 +403,23 @@ export class ServiceBookingsService extends BookingsService {
       // Get user role for payment service
       const user = await this.databaseService.user.findUnique({
         where: { userId },
-        select: { role: true },
+        select: { role: true, email: true, firstName: true, lastName: true },
       });
 
       if (user) {
-        paymentResponse = await this.paymentService.createPayment(
+        paymentResponse = await this.paymentService.initializePayment(
           { userId, role: user.role },
           {
-            type: PaymentType.BOOKING,
-            serviceBookingId: booking.serviceBookingId,
+            amount: Number(service.price),
+            currency: 'ETB',
+            email: user.email || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
             returnUrl,
+            metadata: {
+              serviceBookingId: booking.serviceBookingId,
+            },
+            serviceBookingId: booking.serviceBookingId,
           },
         );
       }

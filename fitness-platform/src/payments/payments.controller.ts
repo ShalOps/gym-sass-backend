@@ -8,6 +8,8 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  BadRequestException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import {
@@ -28,6 +30,9 @@ import { ChapaWebhookDto } from './dto/webhook.dto';
 import { Throttle } from '@nestjs/throttler';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { RecordManualPaymentDto } from './dto/manual-payment.dto';
+import { ClassBookingsService } from '../bookings/class-bookings.service';
+import { ServiceBookingsService } from '../bookings/service-bookings.service';
+import { PaymentType } from '@prisma/client';
 
 interface User {
   userId: number;
@@ -37,7 +42,11 @@ interface User {
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly classBookingsService: ClassBookingsService,
+    private readonly serviceBookingsService: ServiceBookingsService,
+  ) {}
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
@@ -56,7 +65,56 @@ export class PaymentController {
     @Body() dto: CreatePaymentDto,
   ): Promise<InitializePaymentResponseDto> {
     const user = req.user as User;
-    return this.paymentService.createPayment(user, dto);
+
+    type PaymentDetails = {
+      amount: number;
+      currency: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      metadata?: Record<string, any>;
+      classBookingId?: number;
+      serviceBookingId?: number;
+      type?: PaymentType;
+    };
+
+    let paymentDetails: PaymentDetails | undefined;
+
+    if (dto.type === PaymentType.BOOKING) {
+      if (dto.classBookingId) {
+        paymentDetails = (await this.classBookingsService.getPaymentDetails(
+          dto.classBookingId,
+          user.userId,
+        )) as PaymentDetails;
+      } else if (dto.serviceBookingId) {
+        paymentDetails = (await this.serviceBookingsService.getPaymentDetails(
+          dto.serviceBookingId,
+          user.userId,
+        )) as PaymentDetails;
+      } else {
+        throw new BadRequestException('Booking ID required');
+      }
+    } else {
+      throw new UnprocessableEntityException(
+        `Payment type ${dto.type} not supported`,
+      );
+    }
+
+    if (!paymentDetails) {
+      throw new BadRequestException('Payment details could not be determined');
+    }
+
+    return this.paymentService.initializePayment(user, {
+      ...paymentDetails,
+      returnUrl: dto.returnUrl,
+      metadata: {
+        ...(dto.metadata ?? {}),
+        ...(paymentDetails.metadata ?? {}),
+      },
+      type: dto.type,
+      classBookingId: dto.classBookingId,
+      serviceBookingId: dto.serviceBookingId,
+    });
   }
 
   @Post('webhook')

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
@@ -13,6 +15,7 @@ import { PaymentService } from '../payments/payments.service';
 export class ClassBookingsService extends BookingsService {
   constructor(
     protected readonly databaseService: DatabaseService,
+    @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
   ) {
     super(databaseService);
@@ -331,6 +334,33 @@ export class ClassBookingsService extends BookingsService {
     });
   }
 
+  async getPaymentDetails(bookingId: number, userId: number) {
+    const booking = await this.findOne(bookingId, userId);
+
+    // Check if already paid
+    if (booking.status === BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Booking is already paid or confirmed');
+    }
+
+    const amount = Number(booking.class.price);
+    if (amount <= 0) {
+      throw new BadRequestException('Booking is free, no payment needed');
+    }
+
+    return {
+      amount,
+      currency: 'ETB',
+      email: booking.user?.email,
+      firstName: booking.user?.firstName,
+      lastName: booking.user?.lastName,
+      description: `Payment for ${booking.class.className}`,
+      metadata: {
+        classBookingId: booking.classBookingId,
+        gymId: booking.class.gymId,
+      },
+    };
+  }
+
   async create(
     userId: number,
     classId: number,
@@ -457,16 +487,23 @@ export class ClassBookingsService extends BookingsService {
       // Get user role for payment service
       const user = await this.databaseService.user.findUnique({
         where: { userId },
-        select: { role: true },
+        select: { role: true, email: true, firstName: true, lastName: true },
       });
 
       if (user) {
-        paymentResponse = await this.paymentService.createPayment(
+        paymentResponse = await this.paymentService.initializePayment(
           { userId, role: user.role },
           {
-            type: PaymentType.BOOKING,
-            classBookingId: booking.classBookingId,
+            amount: Number(gymClass.price),
+            currency: 'ETB',
+            email: user.email || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
             returnUrl,
+            metadata: {
+              classBookingId: booking.classBookingId,
+            },
+            classBookingId: booking.classBookingId,
           },
         );
       }
