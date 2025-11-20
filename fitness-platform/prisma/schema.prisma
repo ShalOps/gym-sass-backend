@@ -50,6 +50,7 @@ enum PaymentStatus {
   PROCESSED
   FAILED
   REFUNDED
+  PAID_MANUAL
 }
 
 enum PaymentType {
