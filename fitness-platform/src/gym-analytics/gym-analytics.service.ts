@@ -64,4 +64,43 @@ export class GymAnalyticsService {
             count: Number(r.count || 0),
         }));
   }
+
+   async userActivity(userId: string, startDate?: string, endDate?: string) {
+    const params: any[] = [userId];
+    let whereClauses = ['b.user_id = $1'];
+
+    if (startDate) {
+      params.push(startDate);
+      whereClauses.push(`b.created_at >= $${params.length}`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      whereClauses.push(`b.created_at <= $${params.length}`);
+    }
+
+    const where = whereClauses.join(' AND ');
+    const q = `
+      SELECT
+        COUNT(*)::int AS total_bookings,
+        SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END)::int AS cancelled_bookings,
+        COUNT(DISTINCT date_trunc('day', b.created_at))::int AS active_days,
+        MAX(b.created_at) AS last_booking_at
+      FROM bookings b
+      WHERE ${where};
+    `;
+
+    const res = (await this.databaseService.$queryRawUnsafe(q, ...params)) as Array<{
+      total_bookings: number;
+      cancelled_bookings: number;
+      active_days: number;
+      last_booking_at: Date | null;
+    }>;
+    const r = res[0] || {};
+    return {
+      totalBookings: Number(r.total_bookings ?? 0),
+      cancelledBookings: Number(r.cancelled_bookings ?? 0),
+      activeDays: Number(r.active_days ?? 0),
+      lastBookingAt: r.last_booking_at ? new Date(r.last_booking_at).toISOString() : null,
+    };
+  }
 }
