@@ -37,6 +37,7 @@ model User {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   lastLogin  DateTime?
+  notifications         Notification[]
 
   @@index([location]) // For location filters
   @@index([gender]) // For gender filters
@@ -135,6 +136,8 @@ model GymClasses {
   trainerId     Int
   coverPhoto    Photo? @relation("classCover", fields: [coverPhotoId], references: [id])
   coverPhotoId  Int?   @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   classBookings ClassBooking[]
   reviews       GymClassReview[]
@@ -283,4 +286,33 @@ model GymClassReviewResponse {
   trainerId  Int?
   owner      User?          @relation("OwnerResponses", fields: [ownerId], references: [userId])
   ownerId    Int?
+}
+
+model Notification {
+  notificationId      Int                   @id @default(autoincrement())
+  userId              Int
+  user                User                  @relation(fields: [userId], references: [userId])
+  type                NotificationType
+  message             String
+  status              NotificationStatus    @default(UNREAD)
+  createdAt           DateTime              @default(now())
+  @@index([userId])
+}
+
+enum NotificationType {
+   
+  NEW_CLASS_BOOKING
+  NEW_SERVICE_BOOKING
+  CLASS_BOOKING_CANCELLED
+  SERVICE_BOOKING_CANCELLED
+  CLASS_BOOKING_CONFIRMED
+  SERVICE_BOOKING_CONFIRMED
+  NEW_GYM_CREATED
+
+}
+
+
+enum NotificationStatus {
+  UNREAD
+  READ
 }
