@@ -13,7 +13,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
     ChapaModule.registerAsync({
       useFactory: () => ({
-        secretKey: process.env.CHAPA_TEST_SECRET_KEY!,
+        secretKey: process.env.CHAPA_TEST_SECRET_KEY!, // subject to change for production
         webhookSecret: process.env.CHAPA_WEBHOOK_SECRET,
       }),
     }),
