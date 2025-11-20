@@ -33,6 +33,8 @@ import { RecordManualPaymentDto } from './dto/manual-payment.dto';
 import { ClassBookingsService } from '../bookings/class-bookings.service';
 import { ServiceBookingsService } from '../bookings/service-bookings.service';
 import { PaymentType } from '@prisma/client';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 interface User {
   userId: number;
@@ -190,7 +192,8 @@ export class PaymentController {
   }
 
   @Post('refund')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @ApiBearerAuth()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Refund a payment (Admin only)' })
@@ -201,7 +204,8 @@ export class PaymentController {
   }
 
   @Post('record-manual')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'GYMOWNER')
   @ApiBearerAuth()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Record a manual cash payment (Staff only)' })
