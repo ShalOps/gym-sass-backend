@@ -405,13 +405,20 @@ export class PaymentService {
       await this.logPaymentAction(payment.id, 'WEBHOOK_SUCCESS', payload);
       this.logger.log(`Webhook: Processed success for ${txRef}`);
 
-      // Send Email Receipt
+      // Send Email Receipt (Fire-and-forget)
       if (payment.customerEmail) {
-        await this.notificationsService.sendEmailReceipt(
-          payment.customerEmail,
-          Number(payment.amount),
-          txRef,
-        );
+        this.notificationsService
+          .sendEmailReceipt(
+            payment.customerEmail,
+            Number(payment.amount),
+            txRef,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send email receipt for ${txRef}`,
+              err instanceof Error ? err.stack : String(err),
+            ),
+          );
       }
     } else if (
       payload.event === 'charge.failed' ||
@@ -427,12 +434,19 @@ export class PaymentService {
       await this.logPaymentAction(payment.id, 'WEBHOOK_FAILED', payload);
       this.logger.warn(`Webhook: Payment failed for ${txRef}`);
 
-      // Notify User
+      // Notify User (Fire-and-forget)
       if (payment.userId) {
-        await this.notificationsService.notifyUser(
-          payment.userId,
-          `Payment failed for transaction ${txRef}. Please try again.`,
-        );
+        this.notificationsService
+          .notifyUser(
+            payment.userId,
+            `Payment failed for transaction ${txRef}. Please try again.`,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to notify user ${payment.userId} of failure`,
+              err instanceof Error ? err.stack : String(err),
+            ),
+          );
       }
     } else {
       await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
@@ -611,12 +625,19 @@ export class PaymentService {
         chapaRefundRef: refundData.refund_ref,
       });
 
-      // Notify User
+      // Notify User (Fire-and-forget)
       if (payment.user?.email) {
-        await this.notificationsService.notifyUser(
-          payment.user.userId,
-          `Payment Refunded: ${refundAmount} ETB has been refunded to your account.`,
-        );
+        this.notificationsService
+          .notifyUser(
+            payment.user.userId,
+            `Payment Refunded: ${refundAmount} ETB has been refunded to your account.`,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to notify user ${payment.user?.userId} of refund`,
+              err instanceof Error ? err.stack : String(err),
+            ),
+          );
       }
 
       return {
