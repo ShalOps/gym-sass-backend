@@ -408,21 +408,29 @@ export class ServiceBookingsService extends BookingsService {
       });
 
       if (user) {
-        paymentResponse = await this.paymentService.initializePayment(
-          { userId, role: user.role },
-          {
-            amount: Number(service.price),
-            currency: 'ETB',
-            email: user.email || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            returnUrl,
-            metadata: {
+        try {
+          paymentResponse = await this.paymentService.initializePayment(
+            { userId, role: user.role },
+            {
+              amount: Number(service.price),
+              currency: 'ETB',
+              email: user.email || '',
+              firstName: user.firstName || '',
+              lastName: user.lastName || '',
+              returnUrl: returnUrl!,
+              metadata: {
+                serviceBookingId: booking.serviceBookingId,
+              },
               serviceBookingId: booking.serviceBookingId,
             },
-            serviceBookingId: booking.serviceBookingId,
-          },
-        );
+          );
+        } catch (error) {
+          // If payment initialization fails, delete the booking to prevent "ghost" bookings
+          await this.databaseService.serviceBooking.delete({
+            where: { serviceBookingId: booking.serviceBookingId },
+          });
+          throw error;
+        }
       }
     }
 

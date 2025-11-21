@@ -492,21 +492,29 @@ export class ClassBookingsService extends BookingsService {
       });
 
       if (user) {
-        paymentResponse = await this.paymentService.initializePayment(
-          { userId, role: user.role },
-          {
-            amount: Number(gymClass.price),
-            currency: 'ETB',
-            email: user.email || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            returnUrl,
-            metadata: {
+        try {
+          paymentResponse = await this.paymentService.initializePayment(
+            { userId, role: user.role },
+            {
+              amount: Number(gymClass.price),
+              currency: 'ETB',
+              email: user.email || '',
+              firstName: user.firstName || '',
+              lastName: user.lastName || '',
+              returnUrl: returnUrl!,
+              metadata: {
+                classBookingId: booking.classBookingId,
+              },
               classBookingId: booking.classBookingId,
             },
-            classBookingId: booking.classBookingId,
-          },
-        );
+          );
+        } catch (error) {
+          // If payment initialization fails, delete the booking to prevent "ghost" bookings
+          await this.databaseService.classBooking.delete({
+            where: { classBookingId: booking.classBookingId },
+          });
+          throw error;
+        }
       }
     }
 
