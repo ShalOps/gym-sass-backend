@@ -10,6 +10,7 @@ import {
   UseGuards,
   BadRequestException,
   UnprocessableEntityException,
+  Query,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import {
@@ -30,6 +31,7 @@ import { ChapaWebhookDto } from './dto/webhook.dto';
 import { Throttle } from '@nestjs/throttler';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { RecordManualPaymentDto } from './dto/manual-payment.dto';
+import { TransactionHistoryDto } from './dto/transaction-history.dto';
 import { ClassBookingsService } from '../bookings/class-bookings.service';
 import { ServiceBookingsService } from '../bookings/service-bookings.service';
 import { PaymentType } from '@prisma/client';
@@ -208,5 +210,21 @@ export class PaymentController {
   async recordManual(@Body() dto: RecordManualPaymentDto, @Req() req: Request) {
     const user = req.user as User;
     return this.paymentService.recordManualPayment(user, dto);
+  }
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user transaction history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns paginated transaction history',
+  })
+  async getUserHistory(
+    @Req() req: Request,
+    @Query() query: TransactionHistoryDto,
+  ) {
+    const user = req.user as User;
+    return await this.paymentService.getUserTransactions(user, query);
   }
 }
