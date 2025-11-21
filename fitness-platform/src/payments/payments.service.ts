@@ -506,10 +506,18 @@ export class PaymentService {
       throw new BadRequestException('Only processed payments can be refunded');
     }
 
-    const refundAmount = dto.amount || Number(payment.amount);
-    if (refundAmount > Number(payment.amount)) {
+    const currentRefunded = Number(payment.refundedAmount || 0);
+    const refundAmount = dto.amount || Number(payment.amount) - currentRefunded;
+
+    if (refundAmount <= 0) {
+      throw new BadRequestException('Refund amount must be greater than zero');
+    }
+
+    if (refundAmount + currentRefunded > Number(payment.amount)) {
       throw new BadRequestException(
-        'Refund amount exceeds original payment amount',
+        `Refund amount exceeds remaining refundable balance (${
+          Number(payment.amount) - currentRefunded
+        } ETB)`,
       );
     }
 
@@ -586,10 +594,10 @@ export class PaymentService {
         where: { id: payment.id },
         data: {
           status:
-            refundAmount === Number(payment.amount)
+            refundAmount + currentRefunded >= Number(payment.amount)
               ? PaymentStatus.REFUNDED
               : PaymentStatus.PARTIALLY_REFUNDED,
-          refundedAmount: refundAmount,
+          refundedAmount: currentRefunded + refundAmount,
           refundedAt: new Date(),
         },
       });
