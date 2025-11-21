@@ -11,6 +11,7 @@ import {
   BadRequestException,
   UnprocessableEntityException,
   Query,
+  Res,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import {
@@ -24,11 +25,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { PaymentService } from './payments.service';
+import { PaymentExportService } from './payment-export.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ChapaWebhookDto } from './dto/webhook.dto';
 import { Throttle } from '@nestjs/throttler';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
@@ -43,6 +45,7 @@ import { Roles } from '../auth/roles.decorator';
 interface User {
   userId: number;
   role: string;
+  email: string;
 }
 
 @ApiTags('Payments')
@@ -50,6 +53,7 @@ interface User {
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
+    private readonly paymentExportService: PaymentExportService,
     private readonly classBookingsService: ClassBookingsService,
     private readonly serviceBookingsService: ServiceBookingsService,
   ) {}
@@ -291,5 +295,61 @@ export class PaymentController {
   ) {
     const user = req.user as User;
     return await this.paymentService.getUserTransactions(user, query);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Export user transaction history' })
+  @ApiQuery({
+    name: 'format',
+    enum: ['csv', 'pdf'],
+    required: true,
+    description: 'Export format',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: PaymentStatus,
+    description: 'Filter by payment status',
+  })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Filter by start date (ISO string)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'Filter by end date (ISO string)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the exported file',
+    content: {
+      'text/csv': { schema: { type: 'string', format: 'binary' } },
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  async exportHistory(
+    @Req() req: Request,
+    @Query('format') format: 'csv' | 'pdf',
+    @Query('status') status?: PaymentStatus,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Res() res?: Response,
+  ) {
+    const user = req.user as User;
+    if (!res) {
+      throw new BadRequestException('Response object is missing');
+    }
+    return this.paymentExportService.exportHistory(
+      user,
+      format,
+      { status, fromDate, toDate },
+      res,
+    );
   }
 }
