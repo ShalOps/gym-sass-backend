@@ -20,6 +20,8 @@ import {
   ApiOkResponse,
   ApiBearerAuth,
   ApiResponse,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { PaymentService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -34,7 +36,7 @@ import { RecordManualPaymentDto } from './dto/manual-payment.dto';
 import { TransactionHistoryDto } from './dto/transaction-history.dto';
 import { ClassBookingsService } from '../bookings/class-bookings.service';
 import { ServiceBookingsService } from '../bookings/service-bookings.service';
-import { PaymentType } from '@prisma/client';
+import { PaymentType, PaymentStatus } from '@prisma/client';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
@@ -54,7 +56,7 @@ export class PaymentController {
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // Stricter limit for payments
   @ApiOperation({ summary: 'Initialize Chapa payment for class or membership' })
   @ApiCreatedResponse({ type: InitializePaymentResponseDto })
@@ -64,6 +66,7 @@ export class PaymentController {
   })
   @ApiResponse({ status: 403, description: 'Booking does not belong to user' })
   @ApiResponse({ status: 404, description: 'Booking not found' })
+  @ApiResponse({ status: 422, description: 'Payment type not supported' })
   async createPayment(
     @Req() req: Request,
     @Body() dto: CreatePaymentDto,
@@ -125,6 +128,7 @@ export class PaymentController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 60, ttl: 60000 } }) // Allow more for webhooks
   @ApiOperation({ summary: 'Chapa webhook – do not protect with auth' })
+  @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
   async webhook(@Req() req: RawBodyRequest<Request>) {
     const signature = (req.headers['x-chapa-signature'] ||
       req.headers['chapa-signature']) as string;
@@ -139,10 +143,15 @@ export class PaymentController {
 
   @Get('verify/:txRef')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({
     summary: 'Manually verify payment status (used by frontend)',
+  })
+  @ApiParam({
+    name: 'txRef',
+    description: 'Transaction reference',
+    type: 'string',
   })
   @ApiOkResponse({ type: VerifyPaymentResponseDto })
   @ApiResponse({ status: 404, description: 'Payment not found' })
@@ -160,11 +169,15 @@ export class PaymentController {
 
   @Post('verify')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: 'Verify payment status (POST alternative)' })
   @ApiOkResponse({ type: VerifyPaymentResponseDto })
   @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User cannot verify this payment',
+  })
   async verifyPost(
     @Body('tx_ref') txRef: string,
     @Req() req: Request,
@@ -175,14 +188,19 @@ export class PaymentController {
 
   @Get('transactions/:txRef')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get transaction details by transaction reference' })
+  @ApiParam({
+    name: 'txRef',
+    description: 'Transaction reference',
+    type: 'string',
+  })
   @ApiOkResponse({ description: 'Transaction details retrieved successfully.' })
-  @ApiResponse({ status: 404, description: 'Transaction not found.' })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - User cannot view this transaction',
   })
+  @ApiResponse({ status: 404, description: 'Transaction not found.' })
   async getTransaction(@Param('txRef') txRef: string, @Req() req: Request) {
     const user = req.user as User;
     return await this.paymentService.getTransactionByTxRef(txRef, user);
@@ -191,10 +209,12 @@ export class PaymentController {
   @Post('refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Refund a payment (Admin only)' })
   @ApiResponse({ status: 200, description: 'Payment refunded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid refund request' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
   async refund(@Body() dto: RefundPaymentDto, @Req() req: Request) {
     const user = req.user as User;
     return this.paymentService.refundPayment(user, dto);
@@ -203,10 +223,12 @@ export class PaymentController {
   @Post('record-manual')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'GYMOWNER')
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Record a manual cash payment (Staff only)' })
   @ApiResponse({ status: 201, description: 'Manual payment recorded' })
+  @ApiResponse({ status: 400, description: 'Invalid payment details' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
   async recordManual(@Body() dto: RecordManualPaymentDto, @Req() req: Request) {
     const user = req.user as User;
     return this.paymentService.recordManualPayment(user, dto);
@@ -214,12 +236,55 @@ export class PaymentController {
 
   @Get('history')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get user transaction history' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: PaymentStatus,
+    description: 'Filter by payment status',
+  })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Filter by start date (ISO string)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'Filter by end date (ISO string)',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Field to sort by (default: createdAt)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (default: desc)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Returns paginated transaction history',
   })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   async getUserHistory(
     @Req() req: Request,
     @Query() query: TransactionHistoryDto,
