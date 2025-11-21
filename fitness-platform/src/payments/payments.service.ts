@@ -291,12 +291,13 @@ export class PaymentService {
         verifyResponse.data.status === 'success'
       ) {
         // Security Check: Verify Amount
-        if (
-          parseFloat(verifyResponse.data.amount) !==
-          parseFloat(payment.amount.toString())
-        ) {
+        // Normalize to 2 decimal places to avoid floating point issues and format mismatches
+        const chapaAmount = Number(verifyResponse.data.amount).toFixed(2);
+        const dbAmount = Number(payment.amount).toFixed(2);
+
+        if (chapaAmount !== dbAmount) {
           this.logger.error(
-            `Payment amount mismatch for ${txRef}. Expected: ${payment.amount.toString()}, Received: ${verifyResponse.data.amount}`,
+            `Payment amount mismatch for ${txRef}. Expected: ${dbAmount}, Received: ${chapaAmount}`,
           );
           throw new UnprocessableEntityException('Payment amount mismatch');
         }
