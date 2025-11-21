@@ -205,4 +205,16 @@ export class AdminAnalyticsController {
       query.to,
     );
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary:
+      'Retrieve total revenue analytics (with optional date range filter)',
+  })
+  @Get('revenue')
+  @ApiBearerAuth('JWT-auth')
+  getRevenueAnalytics(@Query() query: AdminAnalyticsQueryDto) {
+    return this.adminAnalyticsService.getRevenueAnalytics(query.from, query.to);
+  }
 }
