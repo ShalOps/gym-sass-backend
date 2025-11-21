@@ -167,7 +167,7 @@ export class PaymentService {
       const chapaResponse = await this.chapaService.initialize({
         amount: amount.toString(),
         currency,
-        email: email,
+        email: email.trim(),
         first_name: firstName,
         last_name: lastName,
         tx_ref: txRef,
@@ -209,7 +209,9 @@ export class PaymentService {
         typeof (error as { message?: unknown }).message === 'string'
           ? (error as { message: string }).message
           : String(error);
+
       this.logger.error(`Chapa initialization failed: ${errorMessage}`);
+
       // Mark as failed locally if initialization fails
       await this.databaseService.payment.update({
         where: { txRef },
