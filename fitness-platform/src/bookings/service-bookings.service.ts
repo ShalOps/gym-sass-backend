@@ -380,35 +380,36 @@ export class ServiceBookingsService extends BookingsService {
       );
     }
 
-    const booking = await this.databaseService.serviceBooking.create({
-      data: {
-        userId,
-        serviceId,
-        startTime,
-        endTime,
-        notes,
-        status: BookingStatus.PENDING, // Default to PENDING until paid
-      },
-      include: {
-        service: {
-          include: {
-            gym: true,
+    return this.databaseService.$transaction(async (tx) => {
+      const booking = await tx.serviceBooking.create({
+        data: {
+          userId,
+          serviceId,
+          startTime,
+          endTime,
+          notes,
+          status: BookingStatus.PENDING, // Default to PENDING until paid
+        },
+        include: {
+          service: {
+            include: {
+              gym: true,
+            },
           },
         },
-      },
-    });
-
-    // Initiate Payment if price > 0
-    let paymentResponse;
-    if (Number(service.price) > 0) {
-      // Get user role for payment service
-      const user = await this.databaseService.user.findUnique({
-        where: { userId },
-        select: { role: true, email: true, firstName: true, lastName: true },
       });
 
-      if (user) {
-        try {
+      // Initiate Payment if price > 0
+      let paymentResponse;
+      if (Number(service.price) > 0) {
+        // Get user role for payment service
+        const user = await this.databaseService.user.findUnique({
+          where: { userId },
+          select: { role: true, email: true, firstName: true, lastName: true },
+        });
+
+        if (user) {
+          // If payment initialization fails, the error propagates and triggers transaction rollback
           paymentResponse = await this.paymentService.initializePayment(
             { userId, role: user.role },
             {
@@ -424,19 +425,13 @@ export class ServiceBookingsService extends BookingsService {
               serviceBookingId: booking.serviceBookingId,
             },
           );
-        } catch (error) {
-          // If payment initialization fails, delete the booking to prevent "ghost" bookings
-          await this.databaseService.serviceBooking.delete({
-            where: { serviceBookingId: booking.serviceBookingId },
-          });
-          throw error;
         }
       }
-    }
 
-    return {
-      booking,
-      payment: paymentResponse as Record<string, unknown> | undefined,
-    };
+      return {
+        booking,
+        payment: paymentResponse as Record<string, unknown> | undefined,
+      };
+    });
   }
 }
