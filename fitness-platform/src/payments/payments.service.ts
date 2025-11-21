@@ -748,12 +748,11 @@ export class PaymentService {
     return this.mapPaymentToVerifyResponse(payment);
   }
 
-  async getUserTransactions(
+  buildTransactionFilter(
     user: { userId: number; role: string },
-    filters: TransactionHistoryDto,
-  ) {
-    const { page = 1, limit = 10, status, fromDate, toDate } = filters;
-    const skip = (page - 1) * limit;
+    filters: { status?: PaymentStatus; fromDate?: string; toDate?: string },
+  ): Prisma.PaymentWhereInput {
+    const { status, fromDate, toDate } = filters;
 
     let where: Prisma.PaymentWhereInput = {
       ...(status && { status }),
@@ -805,6 +804,18 @@ export class PaymentService {
         'You are not authorized to view transactions',
       );
     }
+
+    return where;
+  }
+
+  async getUserTransactions(
+    user: { userId: number; role: string },
+    filters: TransactionHistoryDto,
+  ) {
+    const { page = 1, limit = 10 } = filters;
+    const skip = (page - 1) * limit;
+
+    const where = this.buildTransactionFilter(user, filters);
 
     const [data, total] = await Promise.all([
       this.databaseService.payment.findMany({
