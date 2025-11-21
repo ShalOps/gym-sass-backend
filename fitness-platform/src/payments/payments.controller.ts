@@ -123,19 +123,14 @@ export class PaymentController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 60, ttl: 60000 } }) // Allow more for webhooks
   @ApiOperation({ summary: 'Chapa webhook – do not protect with auth' })
-  webhook(@Req() req: RawBodyRequest<Request>) {
+  async webhook(@Req() req: RawBodyRequest<Request>) {
     const signature = (req.headers['x-chapa-signature'] ||
       req.headers['chapa-signature']) as string;
     const payload = req.body as ChapaWebhookDto;
     const rawBody = req.rawBody;
 
-    // Verify authenticity and handle event
-    // We don't await this to return 200 OK immediately to Chapa
-    this.paymentService
-      .handleWebhook(payload, signature, rawBody)
-      .catch((err) => {
-        console.error('Webhook processing error:', err);
-      });
+    // Await the processing. If it fails, request throws 500, and Chapa will retry.
+    await this.paymentService.handleWebhook(payload, signature, rawBody);
 
     return { status: 'success' };
   }
