@@ -589,6 +589,8 @@ export class PaymentService {
             refundAmount === Number(payment.amount)
               ? PaymentStatus.REFUNDED
               : PaymentStatus.PARTIALLY_REFUNDED,
+          refundedAmount: refundAmount,
+          refundedAt: new Date(),
         },
       });
 

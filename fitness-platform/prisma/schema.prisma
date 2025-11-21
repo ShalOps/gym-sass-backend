@@ -83,9 +83,11 @@ model Payment {
   metadata      Json? // Custom metadata sent to Chapa
   chapaResponse Json? @map("chapa_response") // Full JSON response from Chapa (init or verify) for audit
 
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  verifiedAt DateTime? @map("verified_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  verifiedAt     DateTime? @map("verified_at")
+  refundedAt     DateTime? @map("refunded_at")
+  refundedAmount Decimal?  @default(0) @map("refunded_amount") @db.Decimal(12, 2)
 
   userId           Int?
   serviceBookingId Int?
