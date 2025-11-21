@@ -237,7 +237,7 @@ http POST http://localhost:3000/auth/login \
 
 ---
 
-### 2. Initialize Payment (Class Booking)
+### 2. Initialize Payment
 
 This step covers the initialization phase where the user decides to pay, and the system registers the transaction with Chapa.
 
@@ -254,6 +254,8 @@ This step covers the initialization phase where the user decides to pay, and the
 3. **Chapa Registration**: Backend registers with Chapa and gets a `checkoutUrl`.
 4. **Redirection**: Backend sends `checkoutUrl` to client for redirection.
 
+#### Option A: Class Booking
+
 * **Prerequisite**: A `ClassBooking` must exist (e.g., ID `1`) and belong to the user.
 
 ```bash
@@ -263,6 +265,15 @@ http POST http://localhost:3000/payments/create \
     classBookingId:=1 \
     returnUrl="https://google.com" \
     metadata:='{"notes": "First session", "promo": "SUMMER2025"}'
+```
+
+**Response**:
+
+```json
+{
+    "txRef": "GYM-1732195...",
+    "checkoutUrl": "https://checkout.chapa.co/checkout/payment/..."
+}
 ```
 
 *Alternatively, using explicit JSON body:*
@@ -280,6 +291,18 @@ http POST http://localhost:3000/payments/create \
             "promo": "SUMMER2025"
         }
     }'
+```
+
+#### Option B: Service Booking
+
+* **Prerequisite**: A `ServiceBooking` must exist (e.g., ID `10`) and belong to the user.
+
+```bash
+http POST http://localhost:3000/payments/create \
+    Authorization:"Bearer <TOKEN>" \
+    type="BOOKING" \
+    serviceBookingId:=10 \
+    returnUrl="https://google.com"
 ```
 
 **Response**:
@@ -361,9 +384,20 @@ http POST http://localhost:3000/payments/webhook \
 
 Check if the payment status has updated to `PROCESSED` and the booking to `CONFIRMED`.
 
+#### Method A: GET Request
+
 ```bash
 http GET http://localhost:3000/payments/verify/GYM-YOUR-TX-REF-HERE \
     Authorization:"Bearer <TOKEN>"
+```
+
+#### Method B: POST Request (Alternative)
+
+```bash
+http POST http://localhost:3000/payments/verify \
+    Authorization:"Bearer <TOKEN>" \
+    Content-Type:application/json \
+    <<< '{ "tx_ref": "GYM-YOUR-TX-REF-HERE" }'
 ```
 
 ---
@@ -390,6 +424,8 @@ http POST http://localhost:3000/payments/refund \
 
 Record a cash payment made physically at the gym.
 
+#### Option A: Class Booking (With Notes)
+
 ```bash
 http POST http://localhost:3000/payments/record-manual \
     Authorization:"Bearer <STAFF_TOKEN>" \
@@ -401,6 +437,84 @@ http POST http://localhost:3000/payments/record-manual \
         "classBookingId": 5,
         "notes": "Paid in cash at front desk"
     }'
+```
+
+#### Option B: Service Booking (Minimal)
+
+```bash
+http POST http://localhost:3000/payments/record-manual \
+    Authorization:"Bearer <STAFF_TOKEN>" \
+    Content-Type:application/json \
+    <<< '{
+        "userId": 2,
+        "amount": 150,
+        "type": "BOOKING",
+        "serviceBookingId": 8
+    }'
+```
+
+---
+
+### 7. Transaction Export (Admin/User)
+
+* **Prerequisite**: Login as any user.
+
+#### Basic Export (PDF from specific date)
+
+```bash
+http GET http://localhost:3000/payments/export \
+    Authorization:"Bearer <TOKEN>" \
+    format=="pdf" \
+    fromDate=="2025-01-01"
+```
+
+#### Export with Date Range (CSV)
+
+```bash
+http --download GET http://localhost:3000/payments/export \
+    Authorization:"Bearer <TOKEN>" \
+    format=="csv" \
+    fromDate=="2025-11-01" \
+    toDate=="2025-11-30" \
+    status=="SUCCESS"
+```
+
+---
+
+### 8. Get Transaction History
+
+Retrieve a paginated list of your transactions.
+
+#### Basic History (Paginated)
+
+```bash
+http GET http://localhost:3000/payments/history \
+    Authorization:"Bearer <TOKEN>" \
+    page==1 \
+    limit==10
+```
+
+#### Advanced Filtering (Date Range & Sorting)
+
+```bash
+http GET http://localhost:3000/payments/history \
+    Authorization:"Bearer <TOKEN>" \
+    status=="SUCCESS" \
+    fromDate=="2025-11-01" \
+    toDate=="2025-11-30" \
+    sortBy=="amount" \
+    sortOrder=="desc"
+```
+
+---
+
+### 9. Get Single Transaction Details
+
+Retrieve full details for a specific transaction.
+
+```bash
+http GET http://localhost:3000/payments/transactions/GYM-YOUR-TX-REF-HERE \
+    Authorization:"Bearer <TOKEN>"
 ```
 
 ---
