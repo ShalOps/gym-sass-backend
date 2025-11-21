@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsString,
   Length,
+  IsUrl,
 } from 'class-validator';
 
 export class CreateClassBookingDto {
@@ -47,6 +48,6 @@ export class CreateClassBookingDto {
     example: 'https://gymsass.com/bookings/success',
   })
   @IsOptional()
-  @IsString()
+  @IsUrl()
   returnUrl?: string;
 }

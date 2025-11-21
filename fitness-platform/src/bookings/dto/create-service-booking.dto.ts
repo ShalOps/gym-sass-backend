@@ -8,6 +8,7 @@ import {
   Length,
   IsArray,
   ArrayMinSize,
+  IsUrl,
 } from 'class-validator';
 
 export class CreateServiceBookingDto {
@@ -50,7 +51,7 @@ export class CreateServiceBookingDto {
     example: 'https://gymsass.com/bookings/success',
   })
   @IsOptional()
-  @IsString()
+  @IsUrl()
   returnUrl?: string;
 
   @ApiPropertyOptional({
