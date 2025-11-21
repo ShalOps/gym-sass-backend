@@ -455,6 +455,13 @@ export class ClassBookingsService extends BookingsService {
       throw new BadRequestException('Class is at full capacity');
     }
 
+    // Validate returnUrl for paid classes BEFORE creating the booking
+    if (Number(gymClass.price) > 0 && !returnUrl) {
+      throw new BadRequestException(
+        'returnUrl is required for paid class bookings',
+      );
+    }
+
     // Create the booking
     const booking = await this.databaseService.classBooking.create({
       data: {
@@ -478,12 +485,6 @@ export class ClassBookingsService extends BookingsService {
     // Initiate Payment if price > 0
     let paymentResponse;
     if (Number(gymClass.price) > 0) {
-      if (!returnUrl) {
-        throw new BadRequestException(
-          'returnUrl is required for paid class bookings',
-        );
-      }
-
       // Get user role for payment service
       const user = await this.databaseService.user.findUnique({
         where: { userId },

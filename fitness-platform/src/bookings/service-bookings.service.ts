@@ -373,6 +373,13 @@ export class ServiceBookingsService extends BookingsService {
       }
     }
 
+    // Validate returnUrl for paid services BEFORE creating the booking
+    if (Number(service.price) > 0 && !returnUrl) {
+      throw new BadRequestException(
+        'returnUrl is required for paid service bookings',
+      );
+    }
+
     const booking = await this.databaseService.serviceBooking.create({
       data: {
         userId,
@@ -394,12 +401,6 @@ export class ServiceBookingsService extends BookingsService {
     // Initiate Payment if price > 0
     let paymentResponse;
     if (Number(service.price) > 0) {
-      if (!returnUrl) {
-        throw new BadRequestException(
-          'returnUrl is required for paid service bookings',
-        );
-      }
-
       // Get user role for payment service
       const user = await this.databaseService.user.findUnique({
         where: { userId },
