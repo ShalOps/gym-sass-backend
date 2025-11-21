@@ -23,6 +23,7 @@ import { ChapaWebhookDto } from './dto/webhook.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { RecordManualPaymentDto } from './dto/manual-payment.dto';
+import { TransactionHistoryDto } from './dto/transaction-history.dto';
 
 @Injectable()
 export class PaymentService {
@@ -745,6 +746,86 @@ export class PaymentService {
     }
 
     return this.mapPaymentToVerifyResponse(payment);
+  }
+
+  async getUserTransactions(
+    user: { userId: number; role: string },
+    filters: TransactionHistoryDto,
+  ) {
+    const { page = 1, limit = 10, status, fromDate, toDate } = filters;
+    const skip = (page - 1) * limit;
+
+    let where: Prisma.PaymentWhereInput = {
+      ...(status && { status }),
+      ...(fromDate &&
+        toDate && {
+          createdAt: {
+            gte: new Date(fromDate),
+            lte: new Date(toDate),
+          },
+        }),
+    };
+
+    if (user.role === 'ADMIN') {
+      // Admin sees all transactions (no userId filter)
+    } else if (user.role === 'GYMOWNER') {
+      // Gym Owner sees transactions for their gym's classes/services
+      where = {
+        ...where,
+        OR: [
+          {
+            classBooking: {
+              class: {
+                gym: {
+                  gymOwnerId: user.userId,
+                },
+              },
+            },
+          },
+          {
+            serviceBooking: {
+              service: {
+                gym: {
+                  gymOwnerId: user.userId,
+                },
+              },
+            },
+          },
+        ],
+      };
+    } else if (user.role === 'CUSTOMER') {
+      // Customer sees only their own transactions
+      where = {
+        ...where,
+        userId: user.userId,
+      };
+    } else {
+      // Trainers or others cannot view transactions
+      throw new ForbiddenException(
+        'You are not authorized to view transactions',
+      );
+    }
+
+    const [data, total] = await Promise.all([
+      this.databaseService.payment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { classBooking: true, serviceBooking: true },
+      }),
+      this.databaseService.payment.count({ where }),
+    ]);
+
+    return {
+      data: data.map((payment) => this.mapPaymentToVerifyResponse(payment)),
+      meta: {
+        total,
+        page,
+        limit,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
   }
 
   private mapPaymentToVerifyResponse(
