@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { StringFormatParams } from 'zod/v4/core';
+import { PaymentStatus } from '@prisma/client';
 
 @Injectable()
 export class AdminAnalyticsService {
@@ -401,5 +402,33 @@ export class AdminAnalyticsService {
         };
       })
       .filter((g) => g.totalClasses > 0);
+  }
+
+  async getRevenueAnalytics(from?: string, to?: string) {
+    const dateFilter = this.buildDateFilter(from, to);
+    const whereCondition = {
+      status: { in: [PaymentStatus.PROCESSED, PaymentStatus.PAID_MANUAL] },
+      ...(dateFilter ? { createdAt: dateFilter } : {}),
+    };
+
+    const [totalRevenue, revenueByType] = await Promise.all([
+      this.databaseService.payment.aggregate({
+        _sum: { amount: true },
+        where: whereCondition,
+      }),
+      this.databaseService.payment.groupBy({
+        by: ['type'],
+        _sum: { amount: true },
+        where: whereCondition,
+      }),
+    ]);
+
+    return {
+      totalRevenue: Number(totalRevenue._sum.amount || 0),
+      revenueByType: revenueByType.map((item) => ({
+        type: item.type,
+        amount: Number(item._sum.amount || 0),
+      })),
+    };
   }
 }
