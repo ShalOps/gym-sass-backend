@@ -470,6 +470,13 @@ export class PaymentService {
     chapaReference: string,
     fullResponse: any,
   ) {
+    const response = fullResponse as {
+      payment_method?: string;
+      data?: { payment_method?: string };
+    };
+    const paymentMethod =
+      response?.payment_method || response?.data?.payment_method || 'UNKNOWN';
+
     return this.databaseService.$transaction(async (tx) => {
       // Re-fetch payment to ensure it hasn't been processed concurrently
       const currentPayment = await tx.payment.findUnique({
@@ -492,6 +499,7 @@ export class PaymentService {
           chapaReference,
           chapaResponse: fullResponse as Prisma.InputJsonObject,
           verifiedAt: new Date(),
+          method: paymentMethod,
         },
       });
 
@@ -877,6 +885,16 @@ export class PaymentService {
   private mapPaymentToVerifyResponse(
     payment: Payment,
   ): VerifyPaymentResponseDto {
+    let method = payment.method;
+    if (!method && payment.chapaResponse) {
+      const response = payment.chapaResponse as {
+        payment_method?: string;
+        data?: { payment_method?: string };
+      };
+      method =
+        response?.payment_method || response?.data?.payment_method || null;
+    }
+
     return {
       id: payment.id,
       txRef: payment.txRef,
@@ -884,6 +902,7 @@ export class PaymentService {
       amount: payment.amount.toString(),
       status: payment.status,
       type: payment.type,
+      method: method ?? undefined,
       verifiedAt: payment.verifiedAt?.toISOString(),
       chapaResponse: payment.chapaResponse,
     };

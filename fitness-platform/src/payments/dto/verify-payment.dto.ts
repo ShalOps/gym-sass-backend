@@ -20,6 +20,9 @@ export class VerifyPaymentResponseDto {
   @ApiProperty({ enum: PaymentType, example: PaymentType.BOOKING })
   type: PaymentType;
 
+  @ApiProperty({ example: 'telebirr', required: false })
+  method?: string;
+
   @ApiProperty({
     description: 'When payment was verified as successful',
     required: false,
