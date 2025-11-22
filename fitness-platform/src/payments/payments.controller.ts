@@ -26,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { PaymentService } from './payments.service';
 import { PaymentExportService } from './payment-export.service';
+import { PaymentHistoryService } from './payment-history.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
@@ -54,6 +55,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly paymentExportService: PaymentExportService,
+    private readonly paymentHistoryService: PaymentHistoryService,
     private readonly classBookingsService: ClassBookingsService,
     private readonly serviceBookingsService: ServiceBookingsService,
   ) {}
@@ -207,7 +209,7 @@ export class PaymentController {
   @ApiResponse({ status: 404, description: 'Transaction not found.' })
   async getTransaction(@Param('txRef') txRef: string, @Req() req: Request) {
     const user = req.user as User;
-    return await this.paymentService.getTransactionByTxRef(txRef, user);
+    return await this.paymentHistoryService.getTransactionByTxRef(txRef, user);
   }
 
   @Post('refund')
@@ -294,7 +296,7 @@ export class PaymentController {
     @Query() query: TransactionHistoryDto,
   ) {
     const user = req.user as User;
-    return await this.paymentService.getUserTransactions(user, query);
+    return await this.paymentHistoryService.getUserTransactions(user, query);
   }
 
   @Get('export')

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
-import { PaymentService } from './payments.service';
+import { PaymentHistoryService } from './payment-history.service';
 import { DatabaseService } from '../database/database.service';
 import { Transform } from 'json2csv';
 import { Readable } from 'stream';
@@ -21,7 +21,7 @@ type Transaction = {
 @Injectable()
 export class PaymentExportService {
   constructor(
-    private readonly paymentService: PaymentService,
+    private readonly paymentHistoryService: PaymentHistoryService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -31,8 +31,11 @@ export class PaymentExportService {
     filters: { status?: PaymentStatus; fromDate?: string; toDate?: string },
     res: Response,
   ) {
-    // 1. Build Filter (Reusing logic from PaymentService)
-    const where = this.paymentService.buildTransactionFilter(user, filters);
+    // 1. Build Filter (Reusing logic from PaymentHistoryService)
+    const where = this.paymentHistoryService.buildTransactionFilter(
+      user,
+      filters,
+    );
 
     // 2. Fetch Data (With Safety Limit)
     // We limit to 5000 records to prevent memory exhaustion.

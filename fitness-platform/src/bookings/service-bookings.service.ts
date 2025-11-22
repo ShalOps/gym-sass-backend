@@ -7,6 +7,7 @@ import {
   forwardRef,
   Logger,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
@@ -463,5 +464,45 @@ export class ServiceBookingsService extends BookingsService {
       }
       throw new InternalServerErrorException('Booking transaction failed');
     }
+  }
+
+  async validateBookingForPayment(
+    bookingId: number,
+    userId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    const booking = await db.serviceBooking.findUnique({
+      where: { serviceBookingId: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Service Booking #${bookingId} not found`);
+    }
+
+    if (booking.userId !== userId) {
+      throw new BadRequestException(
+        `Service Booking #${bookingId} does not belong to User #${userId}`,
+      );
+    }
+
+    if (booking.status === BookingStatus.CONFIRMED) {
+      throw new ConflictException(
+        `Service Booking #${bookingId} is already confirmed/paid`,
+      );
+    }
+
+    return booking;
+  }
+
+  async confirmBookingPayment(
+    bookingId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    return db.serviceBooking.update({
+      where: { serviceBookingId: bookingId },
+      data: { status: BookingStatus.CONFIRMED },
+    });
   }
 }

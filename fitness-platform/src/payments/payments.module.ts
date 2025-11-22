@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { PaymentService } from './payments.service';
 import { PaymentExportService } from './payment-export.service';
+import { PaymentHistoryService } from './payment-history.service';
 import { PaymentController } from './payments.controller';
 import { DatabaseModule } from '../database/database.module';
 import { ChapaModule } from 'chapa-nestjs';
@@ -22,7 +23,7 @@ import { BookingsModule } from '../bookings/bookings.module';
     }),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, PaymentExportService],
-  exports: [PaymentService, PaymentExportService],
+  providers: [PaymentService, PaymentExportService, PaymentHistoryService],
+  exports: [PaymentService, PaymentExportService, PaymentHistoryService],
 })
 export class PaymentsModule {}

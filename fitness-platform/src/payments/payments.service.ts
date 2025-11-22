@@ -7,24 +7,22 @@ import {
   ForbiddenException,
   ConflictException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { ChapaService } from 'chapa-nestjs';
-import {
-  PaymentStatus,
-  PaymentType,
-  BookingStatus,
-  Payment,
-  Prisma,
-} from '@prisma/client';
+import { PaymentStatus, PaymentType, Prisma } from '@prisma/client';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { RecordManualPaymentDto } from './dto/manual-payment.dto';
-import { TransactionHistoryDto } from './dto/transaction-history.dto';
+import { ClassBookingsService } from '../bookings/class-bookings.service';
+import { ServiceBookingsService } from '../bookings/service-bookings.service';
+import { PaymentMapper } from './payment.mapper';
 
 @Injectable()
 export class PaymentService {
@@ -34,6 +32,10 @@ export class PaymentService {
     private readonly databaseService: DatabaseService,
     private readonly chapaService: ChapaService,
     private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => ClassBookingsService))
+    private readonly classBookingsService: ClassBookingsService,
+    @Inject(forwardRef(() => ServiceBookingsService))
+    private readonly serviceBookingsService: ServiceBookingsService,
   ) {}
 
   private async logPaymentAction(
@@ -103,6 +105,23 @@ export class PaymentService {
     if (amount > 100000) {
       throw new BadRequestException(
         'Amount exceeds maximum limit of 100,000 ETB',
+      );
+    }
+
+    // 1. Validate Booking (Existence, Ownership, Status)
+    if (classBookingId) {
+      await this.classBookingsService.validateBookingForPayment(
+        classBookingId,
+        userId,
+        db,
+      );
+    }
+
+    if (serviceBookingId) {
+      await this.serviceBookingsService.validateBookingForPayment(
+        serviceBookingId,
+        userId,
+        db,
       );
     }
 
@@ -252,7 +271,7 @@ export class PaymentService {
 
     // If already processed, return immediately
     if (payment.status === PaymentStatus.PROCESSED) {
-      return this.mapPaymentToVerifyResponse(payment);
+      return PaymentMapper.toVerifyResponse(payment);
     }
 
     // Verify with Chapa
@@ -328,7 +347,7 @@ export class PaymentService {
         const updatedPayment = await this.databaseService.payment.findUnique({
           where: { id: payment.id },
         });
-        return this.mapPaymentToVerifyResponse(updatedPayment!);
+        return PaymentMapper.toVerifyResponse(updatedPayment!);
       } else {
         // Mark as failed
         await this.databaseService.payment.update({
@@ -505,15 +524,15 @@ export class PaymentService {
 
       // 2. Update Related Booking Status
       if (payment.classBookingId) {
-        await tx.classBooking.update({
-          where: { classBookingId: payment.classBookingId },
-          data: { status: BookingStatus.CONFIRMED },
-        });
+        await this.classBookingsService.confirmBookingPayment(
+          payment.classBookingId,
+          tx,
+        );
       } else if (payment.serviceBookingId) {
-        await tx.serviceBooking.update({
-          where: { serviceBookingId: payment.serviceBookingId },
-          data: { status: BookingStatus.CONFIRMED },
-        });
+        await this.serviceBookingsService.confirmBookingPayment(
+          payment.serviceBookingId,
+          tx,
+        );
       }
     });
   }
@@ -693,51 +712,25 @@ export class PaymentService {
     // Generate a manual txRef
     const txRef = `MANUAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // Validate Booking Status BEFORE creating payment
-    if (dto.classBookingId) {
-      const booking = await this.databaseService.classBooking.findUnique({
-        where: { classBookingId: dto.classBookingId },
-      });
-      if (!booking) {
-        throw new NotFoundException(
-          `Class Booking #${dto.classBookingId} not found`,
-        );
-      }
-      if (booking.userId !== dto.userId) {
-        throw new BadRequestException(
-          `Class Booking #${dto.classBookingId} does not belong to User #${dto.userId}`,
-        );
-      }
-      if (booking.status === BookingStatus.CONFIRMED) {
-        throw new ConflictException(
-          `Class Booking #${dto.classBookingId} is already confirmed/paid`,
-        );
-      }
-    }
-
-    if (dto.serviceBookingId) {
-      const booking = await this.databaseService.serviceBooking.findUnique({
-        where: { serviceBookingId: dto.serviceBookingId },
-      });
-      if (!booking) {
-        throw new NotFoundException(
-          `Service Booking #${dto.serviceBookingId} not found`,
-        );
-      }
-      if (booking.userId !== dto.userId) {
-        throw new BadRequestException(
-          `Service Booking #${dto.serviceBookingId} does not belong to User #${dto.userId}`,
-        );
-      }
-      if (booking.status === BookingStatus.CONFIRMED) {
-        throw new ConflictException(
-          `Service Booking #${dto.serviceBookingId} is already confirmed/paid`,
-        );
-      }
-    }
-
     try {
       return await this.databaseService.$transaction(async (tx) => {
+        // Validate Booking Status INSIDE transaction to prevent race conditions
+        if (dto.classBookingId) {
+          await this.classBookingsService.validateBookingForPayment(
+            dto.classBookingId,
+            dto.userId,
+            tx,
+          );
+        }
+
+        if (dto.serviceBookingId) {
+          await this.serviceBookingsService.validateBookingForPayment(
+            dto.serviceBookingId,
+            dto.userId,
+            tx,
+          );
+        }
+
         // Create Payment Record
         const payment = await tx.payment.create({
           data: {
@@ -768,15 +761,15 @@ export class PaymentService {
 
         // Update Booking Status if applicable
         if (dto.classBookingId) {
-          await tx.classBooking.update({
-            where: { classBookingId: dto.classBookingId },
-            data: { status: BookingStatus.CONFIRMED },
-          });
+          await this.classBookingsService.confirmBookingPayment(
+            dto.classBookingId,
+            tx,
+          );
         } else if (dto.serviceBookingId) {
-          await tx.serviceBooking.update({
-            where: { serviceBookingId: dto.serviceBookingId },
-            data: { status: BookingStatus.CONFIRMED },
-          });
+          await this.serviceBookingsService.confirmBookingPayment(
+            dto.serviceBookingId,
+            tx,
+          );
         }
 
         await this.logPaymentAction(
@@ -810,144 +803,5 @@ export class PaymentService {
       }
       throw new InternalServerErrorException('Failed to record manual payment');
     }
-  }
-
-  async getTransactionByTxRef(
-    txRef: string,
-    user: { userId: number; role: string },
-  ): Promise<VerifyPaymentResponseDto> {
-    const payment = await this.databaseService.payment.findUnique({
-      where: { txRef },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Transaction not found');
-    }
-
-    // Admin OR if the payment belongs to the user
-    if (user.role !== 'ADMIN' && payment.userId !== user.userId) {
-      throw new ForbiddenException(
-        'You do not have permission to view this transaction',
-      );
-    }
-
-    return this.mapPaymentToVerifyResponse(payment);
-  }
-
-  buildTransactionFilter(
-    user: { userId: number; role: string },
-    filters: { status?: PaymentStatus; fromDate?: string; toDate?: string },
-  ): Prisma.PaymentWhereInput {
-    const { status, fromDate, toDate } = filters;
-
-    let where: Prisma.PaymentWhereInput = {
-      ...(status && { status }),
-      ...(fromDate &&
-        toDate && {
-          createdAt: {
-            gte: new Date(fromDate),
-            lte: new Date(toDate),
-          },
-        }),
-    };
-
-    if (user.role === 'ADMIN') {
-      // Admin sees all transactions (no userId filter)
-    } else if (user.role === 'GYMOWNER') {
-      // Gym Owner sees transactions for their gym's classes/services
-      where = {
-        ...where,
-        OR: [
-          {
-            classBooking: {
-              class: {
-                gym: {
-                  gymOwnerId: user.userId,
-                },
-              },
-            },
-          },
-          {
-            serviceBooking: {
-              service: {
-                gym: {
-                  gymOwnerId: user.userId,
-                },
-              },
-            },
-          },
-        ],
-      };
-    } else if (user.role === 'CUSTOMER') {
-      // Customer sees only their own transactions
-      where = {
-        ...where,
-        userId: user.userId,
-      };
-    } else {
-      // Trainers or others cannot view transactions
-      throw new ForbiddenException(
-        'You are not authorized to view transactions',
-      );
-    }
-
-    return where;
-  }
-
-  async getUserTransactions(
-    user: { userId: number; role: string },
-    filters: TransactionHistoryDto,
-  ) {
-    const { page = 1, limit = 10 } = filters;
-    const skip = (page - 1) * limit;
-
-    const where = this.buildTransactionFilter(user, filters);
-
-    const [data, total] = await Promise.all([
-      this.databaseService.payment.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: { classBooking: true, serviceBooking: true },
-      }),
-      this.databaseService.payment.count({ where }),
-    ]);
-
-    return {
-      data: data.map((payment) => this.mapPaymentToVerifyResponse(payment)),
-      meta: {
-        total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  private mapPaymentToVerifyResponse(
-    payment: Payment,
-  ): VerifyPaymentResponseDto {
-    let method = payment.method;
-    if (!method && payment.chapaResponse) {
-      const response = payment.chapaResponse as {
-        payment_method?: string;
-        data?: { payment_method?: string };
-      };
-      method =
-        response?.payment_method || response?.data?.payment_method || null;
-    }
-
-    return {
-      id: payment.id,
-      txRef: payment.txRef,
-      chapaReference: payment.chapaReference ?? undefined,
-      amount: payment.amount.toString(),
-      status: payment.status,
-      type: payment.type,
-      method: method ?? undefined,
-      verifiedAt: payment.verifiedAt?.toISOString(),
-      chapaResponse: payment.chapaResponse,
-    };
   }
 }
