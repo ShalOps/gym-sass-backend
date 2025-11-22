@@ -39,9 +39,11 @@ export class PaymentService {
     paymentId: number,
     action: string,
     details?: any,
+    tx?: Prisma.TransactionClient,
   ) {
+    const db = tx || this.databaseService;
     try {
-      await this.databaseService.paymentLog.create({
+      await db.paymentLog.create({
         data: {
           paymentId,
           action,
@@ -70,7 +72,9 @@ export class PaymentService {
       serviceBookingId?: number;
       type?: PaymentType;
     },
+    tx?: Prisma.TransactionClient,
   ): Promise<InitializePaymentResponseDto> {
+    const db = tx || this.databaseService;
     const {
       amount,
       currency,
@@ -102,7 +106,7 @@ export class PaymentService {
     }
 
     // 2. Check for Existing Pending Payment (Prevent Double Payment)
-    const existingPayment = await this.databaseService.payment.findFirst({
+    const existingPayment = await db.payment.findFirst({
       where: {
         userId,
         status: PaymentStatus.PENDING,
@@ -135,7 +139,7 @@ export class PaymentService {
     });
 
     // 4. Create Local Payment Record (PENDING)
-    const payment = await this.databaseService.payment.create({
+    const payment = await db.payment.create({
       data: {
         txRef,
         amount,
@@ -157,11 +161,16 @@ export class PaymentService {
       },
     });
 
-    await this.logPaymentAction(payment.id, 'INIT', {
-      amount,
-      type,
-      userId,
-    });
+    await this.logPaymentAction(
+      payment.id,
+      'INIT',
+      {
+        amount,
+        type,
+        userId,
+      },
+      db,
+    );
 
     // 5. Initialize Chapa Payment
     try {
@@ -185,7 +194,7 @@ export class PaymentService {
       });
 
       // Update with Chapa response (optional, for debugging)
-      await this.databaseService.payment.update({
+      await db.payment.update({
         where: { txRef },
         data: {
           checkoutUrl: chapaResponse.data.checkout_url,
@@ -214,7 +223,7 @@ export class PaymentService {
       this.logger.error(`Chapa initialization failed: ${errorMessage}`);
 
       // Mark as failed locally if initialization fails
-      await this.databaseService.payment.update({
+      await db.payment.update({
         where: { txRef },
         data: { status: PaymentStatus.FAILED },
       });
@@ -717,10 +726,15 @@ export class PaymentService {
         });
       }
 
-      await this.logPaymentAction(payment.id, 'MANUAL_RECORD', {
-        recordedBy: user.userId,
-        amount: dto.amount,
-      });
+        await this.logPaymentAction(
+          payment.id,
+          'MANUAL_RECORD',
+          {
+            recordedBy: user.userId,
+            amount: dto.amount,
+          },
+          tx,
+        );
 
       return payment;
     });
