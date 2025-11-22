@@ -99,17 +99,27 @@ export class PaymentHistoryService {
     user: { userId: number; role: string },
     filters: TransactionHistoryDto,
   ) {
-    const { page = 1, limit = 10 } = filters;
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = filters;
     const skip = (page - 1) * limit;
 
     const where = this.buildTransactionFilter(user, filters);
+
+    const allowedSortFields = ['createdAt', 'amount', 'status'];
+    const orderByField = allowedSortFields.includes(sortBy)
+      ? sortBy
+      : 'createdAt';
 
     const [data, total] = await Promise.all([
       this.databaseService.payment.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [orderByField]: sortOrder },
         include: { classBooking: true, serviceBooking: true },
       }),
       this.databaseService.payment.count({ where }),

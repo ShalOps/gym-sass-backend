@@ -40,4 +40,22 @@ export class TransactionHistoryDto {
   @IsOptional()
   @IsDateString()
   toDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Field to sort by',
+    default: 'createdAt',
+  })
+  @IsOptional()
+  sortBy?: string = 'createdAt';
+
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    enum: ['asc', 'desc'],
+    default: 'desc',
+  })
+  @IsOptional()
+  @IsEnum(['asc', 'desc'], {
+    message: 'sortOrder must be one of the following values: asc, desc',
+  })
+  sortOrder?: 'asc' | 'desc' = 'desc';
 }
