@@ -5,14 +5,18 @@ import {
   BadRequestException,
   Inject,
   forwardRef,
+  Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
+  private readonly logger = new Logger(ServiceBookingsService.name);
+
   constructor(
     protected readonly databaseService: DatabaseService,
     @Inject(forwardRef(() => PaymentService))
@@ -308,7 +312,6 @@ export class ServiceBookingsService extends BookingsService {
     };
   }
 
-  // Additional method for creating a service booking
   async create(
     userId: number,
     serviceId: number,
@@ -380,58 +383,85 @@ export class ServiceBookingsService extends BookingsService {
       );
     }
 
-    return this.databaseService.$transaction(async (tx) => {
-      const booking = await tx.serviceBooking.create({
-        data: {
-          userId,
-          serviceId,
-          startTime,
-          endTime,
-          notes,
-          status: BookingStatus.PENDING, // Default to PENDING until paid
-        },
-        include: {
-          service: {
-            include: {
-              gym: true,
+    try {
+      return await this.databaseService.$transaction(async (tx) => {
+        const booking = await tx.serviceBooking.create({
+          data: {
+            userId,
+            serviceId,
+            startTime,
+            endTime,
+            notes,
+            status: BookingStatus.PENDING, // Default to PENDING until paid
+          },
+          include: {
+            service: {
+              include: {
+                gym: true,
+              },
             },
           },
-        },
-      });
-
-      // Initiate Payment if price > 0
-      let paymentResponse;
-      if (Number(service.price) > 0) {
-        // Get user role for payment service
-        const user = await this.databaseService.user.findUnique({
-          where: { userId },
-          select: { role: true, email: true, firstName: true, lastName: true },
         });
 
-        if (user) {
-          // If payment initialization fails, the error propagates and triggers transaction rollback
-          paymentResponse = await this.paymentService.initializePayment(
-            { userId, role: user.role },
-            {
-              amount: Number(service.price),
-              currency: 'ETB',
-              email: user.email || '',
-              firstName: user.firstName || '',
-              lastName: user.lastName || '',
-              returnUrl: returnUrl!,
-              metadata: {
+        // Initiate Payment if price > 0
+        let paymentResponse;
+        if (Number(service.price) > 0) {
+          // Get user role for payment service
+          const user = await this.databaseService.user.findUnique({
+            where: { userId },
+            select: {
+              role: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          });
+
+          if (user) {
+            // If payment initialization fails, the error propagates and triggers transaction rollback
+            paymentResponse = await this.paymentService.initializePayment(
+              { userId, role: user.role },
+              {
+                amount: Number(service.price),
+                currency: 'ETB',
+                email: user.email || '',
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                returnUrl: returnUrl!,
+                metadata: {
+                  serviceBookingId: booking.serviceBookingId,
+                },
                 serviceBookingId: booking.serviceBookingId,
               },
-              serviceBookingId: booking.serviceBookingId,
-            },
+              tx,
+            );
+          }
+        }
+
+        return {
+          booking,
+          payment: paymentResponse as Record<string, unknown> | undefined,
+        };
+      });
+    } catch (error) {
+      this.logger.error(
+        'Booking transaction failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new BadRequestException(
+            'Duplicate booking or payment reference.',
           );
         }
       }
-
-      return {
-        booking,
-        payment: paymentResponse as Record<string, unknown> | undefined,
-      };
-    });
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Booking transaction failed');
+    }
   }
 }
