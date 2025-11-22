@@ -13,7 +13,7 @@ import {
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { ChapaService } from 'chapa-nestjs';
-import { PaymentStatus, PaymentType, Prisma } from '@prisma/client';
+import { Payment, PaymentStatus, PaymentType, Prisma } from '@prisma/client';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
@@ -315,6 +315,32 @@ export class PaymentService {
       );
     }
 
+    return this._verifyAndProcess(
+      payment,
+      verifyResponse as {
+        status: string;
+        data: {
+          status: string;
+          amount: number | string;
+          reference: string;
+          payment_method?: string;
+        };
+      },
+    );
+  }
+
+  private async _verifyAndProcess(
+    payment: Payment,
+    verifyResponse: {
+      status: string;
+      data: {
+        status: string;
+        amount: number | string;
+        reference: string;
+        payment_method?: string;
+      };
+    },
+  ) {
     try {
       if (
         verifyResponse.status === 'success' &&
@@ -327,7 +353,7 @@ export class PaymentService {
 
         if (chapaAmount !== dbAmount) {
           this.logger.error(
-            `Payment amount mismatch for ${txRef}. Expected: ${dbAmount}, Received: ${chapaAmount}`,
+            `Payment amount mismatch for ${payment.txRef}. Expected: ${dbAmount}, Received: ${chapaAmount}`,
           );
           throw new UnprocessableEntityException('Payment amount mismatch');
         }
@@ -368,7 +394,9 @@ export class PaymentService {
         typeof (error as { message?: unknown }).message === 'string'
           ? (error as { message: string }).message
           : String(error);
-      this.logger.error(`Verification error for ${txRef}: ${errorMessage}`);
+      this.logger.error(
+        `Verification error for ${payment.txRef}: ${errorMessage}`,
+      );
       throw error;
     }
   }
@@ -427,28 +455,36 @@ export class PaymentService {
 
     // 2. Handle Events
     if (payload.event === 'charge.success' || payload.status === 'success') {
-      await this.processSuccessfulPayment(
-        payment.id,
-        payload.reference || 'webhook-ref',
-        payload,
-      );
-      await this.logPaymentAction(payment.id, 'WEBHOOK_SUCCESS', payload);
-      this.logger.log(`Webhook: Processed success for ${txRef}`);
+      // Double-check with Chapa API to ensure validity
+      try {
+        const verifyResponse = await this.chapaService.verify({
+          tx_ref: txRef,
+        });
+        await this._verifyAndProcess(payment, verifyResponse);
+        this.logger.log(`Webhook: Processed success for ${txRef}`);
 
-      // Send Email Receipt (Fire-and-forget)
-      if (payment.customerEmail) {
-        this.notificationsService
-          .sendEmailReceipt(
-            payment.customerEmail,
-            Number(payment.amount),
-            txRef,
-          )
-          .catch((err) =>
-            this.logger.error(
-              `Failed to send email receipt for ${txRef}`,
-              err instanceof Error ? err.stack : String(err),
-            ),
-          );
+        // Send Email Receipt (Fire-and-forget)
+        if (payment.customerEmail) {
+          this.notificationsService
+            .sendEmailReceipt(
+              payment.customerEmail,
+              Number(payment.amount),
+              txRef,
+            )
+            .catch((err) =>
+              this.logger.error(
+                `Failed to send email receipt for ${txRef}`,
+                err instanceof Error ? err.stack : String(err),
+              ),
+            );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Webhook verification failed for ${txRef}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+        // Log the error instead of throwing to prevent repeated webhook retries by Chapa in case of logical issues (e.g., amount mismatch).
+        // For network errors, consider throwing if retry behavior is desired. Logging is preferred for safety in most cases.
       }
     } else if (
       payload.event === 'charge.failed' ||
