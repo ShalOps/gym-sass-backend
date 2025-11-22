@@ -13,7 +13,13 @@ import {
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { ChapaService } from 'chapa-nestjs';
-import { Payment, PaymentStatus, PaymentType, Prisma } from '@prisma/client';
+import {
+  Payment,
+  PaymentStatus,
+  PaymentType,
+  Prisma,
+  BookingStatus,
+} from '@prisma/client';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
 import { ChapaWebhookDto } from './dto/webhook.dto';
@@ -441,6 +447,7 @@ export class PaymentService {
 
     const payment = await this.databaseService.payment.findUnique({
       where: { txRef },
+      include: { classBooking: true, serviceBooking: true },
     });
 
     if (!payment) {
@@ -450,6 +457,29 @@ export class PaymentService {
 
     if (payment.status === PaymentStatus.PROCESSED) {
       this.logger.log(`Webhook: Payment ${txRef} already processed`);
+      return;
+    }
+
+    // Defensive Webhook: Check if booking is already confirmed (by manual payment)
+    const isBookingConfirmed =
+      payment.classBooking?.status === BookingStatus.CONFIRMED ||
+      payment.serviceBooking?.status === BookingStatus.CONFIRMED;
+
+    if (isBookingConfirmed) {
+      this.logger.warn(
+        `Webhook: Duplicate payment detected for ${txRef}. Booking already confirmed.`,
+      );
+      await this.databaseService.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.DUPLICATE,
+          chapaResponse: payload as unknown as Prisma.InputJsonObject,
+          metadata: {
+            ...(payment.metadata as Prisma.JsonObject),
+            duplicateReason: 'Booking already confirmed by another payment',
+          },
+        },
+      });
       return;
     }
 
@@ -807,11 +837,41 @@ export class PaymentService {
             dto.classBookingId,
             tx,
           );
+
+          // Invalidate any pending online payments for this booking
+          await tx.payment.updateMany({
+            where: {
+              classBookingId: dto.classBookingId,
+              status: PaymentStatus.PENDING,
+            },
+            data: {
+              status: PaymentStatus.FAILED,
+              metadata: {
+                reason: 'Superseded by manual payment',
+                manualPaymentId: payment.id,
+              },
+            },
+          });
         } else if (dto.serviceBookingId) {
           await this.serviceBookingsService.confirmBookingPayment(
             dto.serviceBookingId,
             tx,
           );
+
+          // Invalidate any pending online payments for this booking
+          await tx.payment.updateMany({
+            where: {
+              serviceBookingId: dto.serviceBookingId,
+              status: PaymentStatus.PENDING,
+            },
+            data: {
+              status: PaymentStatus.FAILED,
+              metadata: {
+                reason: 'Superseded by manual payment',
+                manualPaymentId: payment.id,
+              },
+            },
+          });
         }
 
         await this.logPaymentAction(
