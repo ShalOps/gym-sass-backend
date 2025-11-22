@@ -7,10 +7,15 @@ export class PaymentMapper {
     if (!method && payment.chapaResponse) {
       const response = payment.chapaResponse as {
         payment_method?: string;
-        data?: { payment_method?: string };
+        method?: string;
+        data?: { payment_method?: string; method?: string };
       };
       method =
-        response?.payment_method || response?.data?.payment_method || null;
+        response?.payment_method ||
+        response?.data?.payment_method ||
+        response?.data?.method ||
+        response?.method ||
+        null;
     }
 
     return {
