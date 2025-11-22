@@ -299,12 +299,9 @@ export class UploadsService {
         photos,
       };
     } catch (error) {
-      this.logger.error(
-        'Failed to upload gym photos',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
+          this.logger.warn('Upload failed: Duplicate photo entry');
           throw new BadRequestException('Duplicate photo entry.');
         }
       }
@@ -313,8 +310,14 @@ export class UploadsService {
         error instanceof NotFoundException ||
         error instanceof ForbiddenException
       ) {
+        this.logger.warn(`Upload failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Failed to upload gym photos',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Failed to upload photos');
     }
   }
@@ -404,12 +407,9 @@ export class UploadsService {
         photos,
       };
     } catch (error) {
-      this.logger.error(
-        'Failed to upload class photos',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
+          this.logger.warn('Upload failed: Duplicate photo entry');
           throw new BadRequestException('Duplicate photo entry.');
         }
       }
@@ -418,8 +418,14 @@ export class UploadsService {
         error instanceof NotFoundException ||
         error instanceof ForbiddenException
       ) {
+        this.logger.warn(`Upload failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Failed to upload class photos',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Failed to upload photos');
     }
   }
@@ -716,17 +722,19 @@ export class UploadsService {
 
       return { message: 'Photo orders updated successfully' };
     } catch (error) {
-      this.logger.error(
-        'Failed to update gym photo orders',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException ||
         error instanceof ForbiddenException
       ) {
+        this.logger.warn(`Update photo orders failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Failed to update gym photo orders',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Failed to update photo orders');
     }
   }
@@ -788,17 +796,19 @@ export class UploadsService {
 
       return { message: 'Photo orders updated successfully' };
     } catch (error) {
-      this.logger.error(
-        'Failed to update class photo orders',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException ||
         error instanceof ForbiddenException
       ) {
+        this.logger.warn(`Update photo orders failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Failed to update class photo orders',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Failed to update photo orders');
     }
   }

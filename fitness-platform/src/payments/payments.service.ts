@@ -887,23 +887,29 @@ export class PaymentService {
         return payment;
       });
     } catch (error) {
-      this.logger.error(
-        'Manual payment recording failed',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
+          this.logger.warn(
+            'Manual payment failed: Duplicate payment reference',
+          );
           throw new BadRequestException('Duplicate payment reference.');
         }
       }
+
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException ||
         error instanceof ForbiddenException ||
         error instanceof ConflictException
       ) {
+        this.logger.warn(`Manual payment failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Manual payment recording failed',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Failed to record manual payment');
     }
   }

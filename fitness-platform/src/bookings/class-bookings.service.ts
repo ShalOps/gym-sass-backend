@@ -530,12 +530,11 @@ export class ClassBookingsService extends BookingsService {
         };
       });
     } catch (error) {
-      this.logger.error(
-        'Booking transaction failed',
-        error instanceof Error ? error.stack : String(error),
-      );
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
+          this.logger.warn(
+            'Booking failed: Duplicate booking or payment reference',
+          );
           throw new BadRequestException(
             'Duplicate booking or payment reference.',
           );
@@ -545,8 +544,14 @@ export class ClassBookingsService extends BookingsService {
         error instanceof BadRequestException ||
         error instanceof NotFoundException
       ) {
+        this.logger.warn(`Booking failed: ${error.message}`);
         throw error;
       }
+
+      this.logger.error(
+        'Booking transaction failed',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Booking transaction failed');
     }
   }
