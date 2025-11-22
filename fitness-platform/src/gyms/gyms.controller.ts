@@ -11,6 +11,7 @@ import {
   HttpCode,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
 import { Prisma } from '@prisma/client';
@@ -30,11 +31,26 @@ import {
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { DateRangeDto } from './dto/date-range.dto';
+import { Role } from 'generated/prisma';
 
 @ApiTags('gyms')
 @Controller('gyms')
 export class GymsController {
   constructor(private readonly gymsService: GymsService) {}
+  private checkOwnershipAndGetUserId(req: RequestWithUser, queryGymId?: number): { userId: number, isAdmin: boolean } {
+    const user = req.user;
+    const isAdmin = user.role === Role.ADMIN;
+    
+    if (!isAdmin && user.role !== Role.GYMOWNER) {
+       throw new ForbiddenException('Only Admins and Gym Owners can access analytics.');
+    }
+    
+    return { 
+      userId: user.userId, 
+      isAdmin: isAdmin 
+    };
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('GYMOWNER', 'ADMIN')
@@ -177,5 +193,65 @@ export class GymsController {
   @HttpCode(204)
   async remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     await this.gymsService.remove(+id, req.user.userId);
+  }
+
+  @Get('bookings/total')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GYMOWNER, Role.ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get total combined bookings (Classes + Services)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns the total count of bookings within the filter range.',
+    schema: { example: { total: 150 } }
+  })
+  getTotalBookings(@Query() query: DateRangeDto, @Req() req: RequestWithUser) {
+    const { userId, isAdmin } = this.checkOwnershipAndGetUserId(req, query.gymId);
+    return this.gymsService.getTotalBookings(query, userId, isAdmin);
+  }
+
+  @Get('bookings/monthly')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GYMOWNER, Role.ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get bookings grouped by month' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns booking counts aggregated by month.',
+    schema: { example: [{ period: "2023-10", total: 45 }, { period: "2023-11", total: 60 }] }
+  })
+  getMonthlyBookings(@Query() query: DateRangeDto, @Req() req: RequestWithUser) {
+    const { userId, isAdmin } = this.checkOwnershipAndGetUserId(req, query.gymId);
+    return this.gymsService.getMonthlyBookings(query, userId, isAdmin);
+  }
+
+  @Get('bookings/weekly')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GYMOWNER, Role.ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get bookings grouped by week' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns booking counts aggregated by week start date.',
+    schema: { example: [{ weekStart: "2023-10-02", total: 12 }, { weekStart: "2023-10-09", total: 15 }] }
+  })
+  getWeeklyBookings(@Query() query: DateRangeDto,  @Req() req: RequestWithUser) {
+    const { userId, isAdmin } = this.checkOwnershipAndGetUserId(req, query.gymId);
+    return this.gymsService.getWeeklyBookings(query, userId, isAdmin);
+  }
+
+  @Get('revenue')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.GYMOWNER, Role.ADMIN)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get total revenue from processed payments' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns total revenue sum.',
+    schema: { example: { totalRevenue: 5000.50 } }
+  })
+  getRevenueStats(@Query() query: DateRangeDto,  @Req() req: RequestWithUser) {
+    const { userId, isAdmin } = this.checkOwnershipAndGetUserId(req, query.gymId);
+    return this.gymsService.getRevenueStats(query, userId, isAdmin);
   }
 }

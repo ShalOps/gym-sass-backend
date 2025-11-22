@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateUsersDto } from './dto/update-users.dto';
 import * as bcrypt from 'bcrypt';
+import { DateRangeDto } from './dto/date-range.dto';
 
 @Injectable()
 export class UsersService {
@@ -122,5 +123,47 @@ export class UsersService {
         userId: currentUserId,
       },
     });
+  }
+
+ async getUserActivity(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+    const { startDate, endDate } = query;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    const ownerFilter = isAdmin ? '' : `WHERE u."userId" IN (
+      SELECT DISTINCT "userId" FROM "Gym" WHERE "gymOwnerId" = ${actingUserId}
+    )`;
+
+    return this.databaseservice.$queryRaw`
+      WITH "AllBookings" AS (
+          SELECT "userId", "bookedAt", "status" FROM "ClassBooking"
+          UNION ALL
+          SELECT "userId", "bookedAt", "status" FROM "ServiceBooking"
+      )
+      SELECT 
+        u."userId",
+        u."userName",
+        
+        -- Count total bookings within date range
+        COUNT(b."userId")::int AS totalBookings,
+
+        -- Count unique active days within date range
+        COUNT(DISTINCT DATE(b."bookedAt"))::int AS activeDays,
+
+        -- Count cancelled within date range
+        COUNT(CASE WHEN b.status = 'CANCELLED' THEN 1 END)::int AS cancelled,
+
+        -- Count completed within date range
+        COUNT(CASE WHEN b.status = 'COMPLETED' THEN 1 END)::int AS completed
+
+      FROM "User" u
+      LEFT JOIN "AllBookings" b ON u."userId" = b."userId"
+      
+      WHERE 
+          (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
+      
+      GROUP BY u."userId", u."userName"
+      ORDER BY totalBookings DESC;
+    `;
   }
 }
