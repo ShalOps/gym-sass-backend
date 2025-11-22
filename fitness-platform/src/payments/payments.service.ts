@@ -797,7 +797,8 @@ export class PaymentService {
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException ||
-        error instanceof ForbiddenException
+        error instanceof ForbiddenException ||
+        error instanceof ConflictException
       ) {
         throw error;
       }
