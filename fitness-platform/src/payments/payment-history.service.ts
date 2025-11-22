@@ -43,14 +43,14 @@ export class PaymentHistoryService {
 
     let where: Prisma.PaymentWhereInput = {
       ...(status && { status }),
-      ...(fromDate &&
-        toDate && {
-          createdAt: {
-            gte: new Date(fromDate),
-            lte: new Date(toDate),
-          },
-        }),
     };
+
+    if (fromDate || toDate) {
+      where.createdAt = {
+        ...(fromDate && { gte: new Date(fromDate) }),
+        ...(toDate && { lte: new Date(toDate) }),
+      };
+    }
 
     if (user.role === 'ADMIN') {
       // Admin sees all transactions (no userId filter)
