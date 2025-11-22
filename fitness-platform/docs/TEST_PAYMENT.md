@@ -424,6 +424,8 @@ http POST http://localhost:3000/payments/refund \
 
 Record a cash payment made physically at the gym.
 
+> **Note:** To record a manual payment, the user or admin must first create a booking that is not paid via Chapa (e.g., select "Pay Later 🚧 (Not Implemented)" or skip online payment). The customer then goes to the gym, where the staff records the payment manually using the endpoint below.
+
 #### Option A: Class Booking (With Notes)
 
 ```bash
@@ -499,7 +501,7 @@ http GET http://localhost:3000/payments/history \
 ```bash
 http GET http://localhost:3000/payments/history \
     Authorization:"Bearer <TOKEN>" \
-    status=="SUCCESS" \
+    status=="PROCESSED" \
     fromDate=="2025-11-01" \
     toDate=="2025-11-30" \
     sortBy=="amount" \
