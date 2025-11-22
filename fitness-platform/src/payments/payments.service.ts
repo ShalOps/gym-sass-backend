@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
   ForbiddenException,
   ConflictException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
@@ -684,47 +685,48 @@ export class PaymentService {
     // Generate a manual txRef
     const txRef = `MANUAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    return this.databaseService.$transaction(async (tx) => {
-      // Create Payment Record
-      const payment = await tx.payment.create({
-        data: {
-          txRef,
-          amount: dto.amount,
-          currency: 'ETB',
-          type: dto.type,
-          status: PaymentStatus.PAID_MANUAL,
-          method: 'MANUAL_CASH',
-          customerEmail: targetUser.email,
-          customerFirstName: targetUser.firstName,
-          customerLastName: targetUser.lastName,
-          user: { connect: { userId: dto.userId } },
-          ...(dto.classBookingId && {
-            classBooking: { connect: { classBookingId: dto.classBookingId } },
-          }),
-          ...(dto.serviceBookingId && {
-            serviceBooking: {
-              connect: { serviceBookingId: dto.serviceBookingId },
-            },
-          }),
-          metadata: {
-            notes: dto.notes,
-            recordedBy: user.userId,
-          } as Prisma.InputJsonObject,
-        },
-      });
+    try {
+      return await this.databaseService.$transaction(async (tx) => {
+        // Create Payment Record
+        const payment = await tx.payment.create({
+          data: {
+            txRef,
+            amount: dto.amount,
+            currency: 'ETB',
+            type: dto.type,
+            status: PaymentStatus.PAID_MANUAL,
+            method: 'MANUAL_CASH',
+            customerEmail: targetUser.email,
+            customerFirstName: targetUser.firstName,
+            customerLastName: targetUser.lastName,
+            user: { connect: { userId: dto.userId } },
+            ...(dto.classBookingId && {
+              classBooking: { connect: { classBookingId: dto.classBookingId } },
+            }),
+            ...(dto.serviceBookingId && {
+              serviceBooking: {
+                connect: { serviceBookingId: dto.serviceBookingId },
+              },
+            }),
+            metadata: {
+              notes: dto.notes,
+              recordedBy: user.userId,
+            } as Prisma.InputJsonObject,
+          },
+        });
 
-      // Update Booking Status if applicable
-      if (dto.classBookingId) {
-        await tx.classBooking.update({
-          where: { classBookingId: dto.classBookingId },
-          data: { status: BookingStatus.CONFIRMED },
-        });
-      } else if (dto.serviceBookingId) {
-        await tx.serviceBooking.update({
-          where: { serviceBookingId: dto.serviceBookingId },
-          data: { status: BookingStatus.CONFIRMED },
-        });
-      }
+        // Update Booking Status if applicable
+        if (dto.classBookingId) {
+          await tx.classBooking.update({
+            where: { classBookingId: dto.classBookingId },
+            data: { status: BookingStatus.CONFIRMED },
+          });
+        } else if (dto.serviceBookingId) {
+          await tx.serviceBooking.update({
+            where: { serviceBookingId: dto.serviceBookingId },
+            data: { status: BookingStatus.CONFIRMED },
+          });
+        }
 
         await this.logPaymentAction(
           payment.id,
@@ -736,8 +738,27 @@ export class PaymentService {
           tx,
         );
 
-      return payment;
-    });
+        return payment;
+      });
+    } catch (error) {
+      this.logger.error(
+        'Manual payment recording failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new BadRequestException('Duplicate payment reference.');
+        }
+      }
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to record manual payment');
+    }
   }
 
   async getTransactionByTxRef(
