@@ -527,10 +527,15 @@ export class PaymentService {
   ) {
     const response = fullResponse as {
       payment_method?: string;
-      data?: { payment_method?: string };
+      method?: string;
+      data?: { payment_method?: string; method?: string };
     };
     const paymentMethod =
-      response?.payment_method || response?.data?.payment_method || 'UNKNOWN';
+      response?.payment_method ||
+      response?.data?.payment_method ||
+      response?.data?.method ||
+      response?.method ||
+      'UNKNOWN';
 
     return this.databaseService.$transaction(async (tx) => {
       // Re-fetch payment to ensure it hasn't been processed concurrently
