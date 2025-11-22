@@ -52,6 +52,7 @@ enum PaymentStatus {
   REFUNDED
   PARTIALLY_REFUNDED
   PAID_MANUAL
+  DUPLICATE
 }
 
 enum PaymentType {
