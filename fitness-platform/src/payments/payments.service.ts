@@ -693,6 +693,49 @@ export class PaymentService {
     // Generate a manual txRef
     const txRef = `MANUAL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    // Validate Booking Status BEFORE creating payment
+    if (dto.classBookingId) {
+      const booking = await this.databaseService.classBooking.findUnique({
+        where: { classBookingId: dto.classBookingId },
+      });
+      if (!booking) {
+        throw new NotFoundException(
+          `Class Booking #${dto.classBookingId} not found`,
+        );
+      }
+      if (booking.userId !== dto.userId) {
+        throw new BadRequestException(
+          `Class Booking #${dto.classBookingId} does not belong to User #${dto.userId}`,
+        );
+      }
+      if (booking.status === BookingStatus.CONFIRMED) {
+        throw new ConflictException(
+          `Class Booking #${dto.classBookingId} is already confirmed/paid`,
+        );
+      }
+    }
+
+    if (dto.serviceBookingId) {
+      const booking = await this.databaseService.serviceBooking.findUnique({
+        where: { serviceBookingId: dto.serviceBookingId },
+      });
+      if (!booking) {
+        throw new NotFoundException(
+          `Service Booking #${dto.serviceBookingId} not found`,
+        );
+      }
+      if (booking.userId !== dto.userId) {
+        throw new BadRequestException(
+          `Service Booking #${dto.serviceBookingId} does not belong to User #${dto.userId}`,
+        );
+      }
+      if (booking.status === BookingStatus.CONFIRMED) {
+        throw new ConflictException(
+          `Service Booking #${dto.serviceBookingId} is already confirmed/paid`,
+        );
+      }
+    }
+
     try {
       return await this.databaseService.$transaction(async (tx) => {
         // Create Payment Record
