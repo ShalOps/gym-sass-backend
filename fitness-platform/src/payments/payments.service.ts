@@ -781,6 +781,7 @@ export class PaymentService {
             type: dto.type,
             status: PaymentStatus.PAID_MANUAL,
             method: 'MANUAL_CASH',
+            verifiedAt: new Date(),
             customerEmail: targetUser.email,
             customerFirstName: targetUser.firstName,
             customerLastName: targetUser.lastName,
