@@ -17,6 +17,7 @@ export class CreatePaymentDto {
     example: 1,
   })
   @ValidateIf((o: CreatePaymentDto) => o.type === PaymentType.BOOKING)
+  @IsOptional()
   @IsInt()
   classBookingId?: number;
 
@@ -26,6 +27,7 @@ export class CreatePaymentDto {
     example: 1,
   })
   @ValidateIf((o: CreatePaymentDto) => o.type === PaymentType.BOOKING)
+  @IsOptional()
   @IsInt()
   serviceBookingId?: number;
 
