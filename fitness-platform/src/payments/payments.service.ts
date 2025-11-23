@@ -626,8 +626,13 @@ export class PaymentService {
       throw new NotFoundException('Payment not found');
     }
 
-    if (payment.status !== PaymentStatus.PROCESSED) {
-      throw new BadRequestException('Only processed payments can be refunded');
+    if (
+      payment.status !== PaymentStatus.PROCESSED &&
+      payment.status !== PaymentStatus.DUPLICATE
+    ) {
+      throw new BadRequestException(
+        'Only processed or duplicate payments can be refunded',
+      );
     }
 
     const currentRefunded = Number(payment.refundedAmount || 0);
@@ -723,6 +728,12 @@ export class PaymentService {
               : PaymentStatus.PARTIALLY_REFUNDED,
           refundedAmount: currentRefunded + refundAmount,
           refundedAt: new Date(),
+          // If the previous status was 'DUPLICATE', retain a note for audit purposes
+          metadata: {
+            ...(payment.metadata as Prisma.JsonObject),
+            refundReason: dto.reason,
+            previousStatus: payment.status, // Track if it was DUPLICATE before refund
+          },
         },
       });
 
