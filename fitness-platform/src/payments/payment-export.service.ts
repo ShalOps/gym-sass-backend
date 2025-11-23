@@ -11,11 +11,15 @@ type Transaction = {
   createdAt: Date;
   txRef: string;
   amount: number;
+  currency: string;
   status: string;
   type: string;
-  customerEmail?: string;
-  user?: { email?: string; firstName?: string; lastName?: string };
+  method: string;
+  description: string;
+  customerName: string;
+  customerEmail: string;
   chapaReference?: string;
+  refundedAmount: number;
 };
 
 @Injectable()
@@ -31,15 +35,34 @@ export class PaymentExportService {
     filters: { status?: PaymentStatus; fromDate?: string; toDate?: string },
     res: Response,
   ) {
+    // 0. Ensure User Email (JWT payload might lack it)
+    let userEmail = user.email;
+    let userFirstName = '';
+    let userLastName = '';
+
+    if (!userEmail) {
+      const dbUser = await this.databaseService.user.findUnique({
+        where: { userId: user.userId },
+        select: { email: true, firstName: true, lastName: true },
+      });
+      userEmail = dbUser?.email || 'Unknown';
+      userFirstName = dbUser?.firstName || '';
+      userLastName = dbUser?.lastName || '';
+    }
+    const exportUser = {
+      ...user,
+      email: userEmail,
+      firstName: userFirstName,
+      lastName: userLastName,
+    };
+
     // 1. Build Filter (Reusing logic from PaymentHistoryService)
     const where = this.paymentHistoryService.buildTransactionFilter(
-      user,
+      exportUser,
       filters,
     );
 
     // 2. Fetch Data (With Safety Limit)
-    // We limit to 5000 records to prevent memory exhaustion.
-    // For larger exports, we would need a background job + email delivery system.
     const limit = 5000;
     const transactions = await this.databaseService.payment.findMany({
       where,
@@ -49,6 +72,12 @@ export class PaymentExportService {
         user: {
           select: { email: true, firstName: true, lastName: true },
         },
+        classBooking: {
+          include: { class: true },
+        },
+        serviceBooking: {
+          include: { service: true },
+        },
       },
     });
 
@@ -57,49 +86,72 @@ export class PaymentExportService {
     }
 
     // 3. Generate Output
-    const mappedTransactions: Transaction[] = transactions.map((t) => ({
-      createdAt: t.createdAt,
-      txRef: t.txRef,
-      amount:
-        typeof t.amount === 'object' && 'toNumber' in t.amount
-          ? t.amount.toNumber()
-          : Number(t.amount),
-      status: t.status,
-      type: t.type,
-      customerEmail: t.customerEmail ?? undefined,
-      user: t.user
-        ? {
-            email: t.user.email ?? undefined,
-            firstName: t.user.firstName ?? undefined,
-            lastName: t.user.lastName ?? undefined,
-          }
-        : undefined,
-      chapaReference: t.chapaReference ?? undefined,
-    }));
+    const mappedTransactions: Transaction[] = transactions.map((t) => {
+      // Derive Description
+      let description = t.type.toString();
+      if (t.classBooking?.class?.className) {
+        description = `Class: ${t.classBooking.class.className}`;
+      } else if (t.serviceBooking?.service?.name) {
+        description = `Service: ${t.serviceBooking.service.name}`;
+      }
+
+      // Derive Customer Name
+      const customerName = t.user
+        ? `${t.user.firstName} ${t.user.lastName}`
+        : t.customerFirstName
+          ? `${t.customerFirstName} ${t.customerLastName}`
+          : 'Guest';
+
+      return {
+        createdAt: t.createdAt,
+        txRef: t.txRef,
+        amount:
+          typeof t.amount === 'object' && 'toNumber' in t.amount
+            ? t.amount.toNumber()
+            : Number(t.amount),
+        currency: t.currency,
+        status: t.status,
+        type: t.type,
+        method: t.method || 'N/A',
+        description,
+        customerName,
+        customerEmail: t.user?.email || t.customerEmail || 'N/A',
+        chapaReference: t.chapaReference || undefined,
+        refundedAmount:
+          t.refundedAmount &&
+          typeof t.refundedAmount === 'object' &&
+          'toNumber' in t.refundedAmount
+            ? t.refundedAmount.toNumber()
+            : Number(t.refundedAmount || 0),
+      };
+    });
 
     if (format === 'csv') {
-      return this.generateCsv(mappedTransactions, res);
+      return this.generateCsv(mappedTransactions, exportUser, res);
     } else {
-      return this.generatePdf(mappedTransactions, user, res);
+      return this.generatePdf(mappedTransactions, exportUser, res);
     }
   }
 
-  private generateCsv(transactions: Transaction[], res: Response) {
+  private generateCsv(
+    transactions: Transaction[],
+    user: { userId: number; role: string; email: string },
+    res: Response,
+  ) {
     const fields = [
       {
         label: 'Date',
         value: (row: Transaction) => row.createdAt.toISOString(),
       },
+      { label: 'Description', value: 'description' },
+      { label: 'Method', value: 'method' },
       { label: 'Transaction Ref', value: 'txRef' },
-      { label: 'Amount (ETB)', value: 'amount' },
-      { label: 'Status', value: 'status' },
-      { label: 'Type', value: 'type' },
-      {
-        label: 'Customer',
-        value: (row: Transaction) =>
-          row.customerEmail || row.user?.email || 'N/A',
-      },
       { label: 'Chapa Ref', value: 'chapaReference' },
+      { label: 'Status', value: 'status' },
+      { label: 'Currency', value: 'currency' },
+      { label: 'Amount', value: 'amount' },
+      { label: 'Customer Name', value: 'customerName' },
+      { label: 'Customer Email', value: 'customerEmail' },
     ];
 
     const json2csv = new Transform({ fields }, { objectMode: true });
@@ -109,6 +161,9 @@ export class PaymentExportService {
       'Content-Disposition',
       `attachment; filename=transactions_${Date.now()}.csv`,
     );
+
+    res.write(`Generated for: ${user.email}\n`);
+    res.write(`Date: ${new Date().toLocaleDateString()}\n\n`);
 
     const input = new Readable({ objectMode: true });
     input._read = () => {}; // No-op
@@ -121,10 +176,16 @@ export class PaymentExportService {
 
   private generatePdf(
     transactions: Transaction[],
-    user: { userId: number; role: string; email: string },
+    user: {
+      userId: number;
+      role: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    },
     res: Response,
   ) {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
     res.header('Content-Type', 'application/pdf');
     res.header(
@@ -134,67 +195,186 @@ export class PaymentExportService {
 
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(20).text('Transaction History', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Generated for: ${user.email}`);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`);
-    doc.moveDown();
+    // --- Header Section ---
+    doc
+      .fontSize(20)
+      .text('Fitness Platform', 50, 50, { align: 'left' })
+      .fontSize(10)
+      .text('123 Fitness Blvd, Addis Ababa', 50, 75, { align: 'left' });
 
-    // Table Header
-    const tableTop = 150;
+    doc.fontSize(16).text('Transaction History', 50, 50, { align: 'right' });
+
+    this.generateHr(doc, 100);
+
+    // --- Customer Info & Summary ---
+    const customerY = 120;
+    const isAdminOrOwner = user.role === 'ADMIN' || user.role === 'GYMOWNER';
+
+    if (isAdminOrOwner) {
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('Report Generated By:', 50, customerY);
+      doc
+        .font('Helvetica')
+        .text(
+          `${user.firstName || ''} ${user.lastName || ''} (${user.role})`.trim(),
+          50,
+          customerY + 15,
+        )
+        .text(user.email, 50, customerY + 30);
+    } else {
+      doc.fontSize(10).font('Helvetica-Bold').text('Bill To:', 50, customerY);
+      doc
+        .font('Helvetica')
+        .text(
+          `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Customer',
+          50,
+          customerY + 15,
+        )
+        .text(user.email, 50, customerY + 30);
+    }
+
+    const summaryY = 120;
+    // Calculate Net Revenue
+    // Revenue = (PROCESSED + PAID_MANUAL) + (PARTIALLY_REFUNDED - refundedAmount)
+    // Excludes: FAILED, PENDING, DUPLICATE, REFUNDED (assuming full refund)
+    const netRevenue = transactions.reduce((sum, t) => {
+      if (['PROCESSED', 'PAID_MANUAL'].includes(t.status)) {
+        return sum + t.amount;
+      }
+      if (t.status === 'PARTIALLY_REFUNDED') {
+        return sum + (t.amount - t.refundedAmount);
+      }
+      return sum;
+    }, 0);
+
+    const totalCount = transactions.length;
+
+    doc.font('Helvetica-Bold').text('Summary:', 350, summaryY);
+    doc
+      .font('Helvetica')
+      .text(`Total Transactions: ${totalCount}`, 350, summaryY + 15)
+      .text(
+        `${isAdminOrOwner ? 'Net Revenue' : 'Total Amount'}: ${netRevenue.toFixed(2)} ETB`,
+        350,
+        summaryY + 30,
+      );
+
+    doc.moveDown(4);
+
+    // --- Table Header ---
+    const tableTop = 200;
     let y = tableTop;
 
-    this.drawTableRow(doc, y, 'Date', 'Tx Ref', 'Amount', 'Status');
+    this.drawTableHeader(doc, y, isAdminOrOwner);
     this.generateHr(doc, y + 20);
     y += 30;
 
-    // Table Rows
+    // --- Table Rows ---
+    doc.font('Helvetica');
     transactions.forEach((t) => {
-      // Check for page break
       if (y > 700) {
         doc.addPage();
         y = 50;
-        this.drawTableRow(doc, y, 'Date', 'Tx Ref', 'Amount', 'Status');
+        this.drawTableHeader(doc, y, isAdminOrOwner);
         this.generateHr(doc, y + 20);
         y += 30;
       }
 
       const date = new Date(t.createdAt).toLocaleDateString();
-      const amount = `${t.amount} ETB`;
+      const amount = `${t.amount.toFixed(2)}`;
 
-      this.drawTableRow(doc, y, date, t.txRef, amount, t.status);
+      this.drawTableRow(
+        doc,
+        y,
+        date,
+        t.description,
+        t.method,
+        t.txRef,
+        t.status,
+        amount,
+        isAdminOrOwner,
+        t.customerName,
+      );
       y += 20;
     });
 
-    // Footer
-    const totalAmount = transactions.reduce(
-      (sum, t) => sum + Number(t.amount),
-      0,
-    );
-    doc.moveDown();
+    // --- Footer ---
     this.generateHr(doc, y);
-    doc.fontSize(14).text(`Total: ${totalAmount.toFixed(2)} ETB`, 350, y + 10, {
-      align: 'right',
-    });
+    const bottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+
+    doc
+      .fontSize(10)
+      .fillColor('grey')
+      .text(
+        `Generated on ${new Date().toLocaleString()}`,
+        50,
+        doc.page.height - 50,
+        {
+          align: 'center',
+        },
+      );
+
+    doc.page.margins.bottom = bottomMargin;
 
     doc.end();
+  }
+
+  private drawTableHeader(
+    doc: PDFKit.PDFDocument,
+    y: number,
+    isAdminOrOwner: boolean,
+  ) {
+    doc.fontSize(9).font('Helvetica-Bold');
+    doc.text('Date', 40, y);
+
+    if (isAdminOrOwner) {
+      doc.text('Customer', 90, y);
+      doc.text('Description', 170, y);
+      doc.text('Method', 260, y);
+      doc.text('Ref', 330, y);
+      doc.text('Status', 400, y);
+      doc.text('Amount (ETB)', 480, y, { align: 'right', width: 70 });
+    } else {
+      doc.text('Description', 110, y);
+      doc.text('Method', 220, y);
+      doc.text('Ref', 290, y);
+      doc.text('Status', 380, y);
+      doc.text('Amount (ETB)', 460, y, { align: 'right', width: 90 });
+    }
   }
 
   private drawTableRow(
     doc: PDFKit.PDFDocument,
     y: number,
     date: string,
+    desc: string,
+    method: string,
     ref: string,
-    amount: string,
     status: string,
+    amount: string,
+    isAdminOrOwner: boolean,
+    customerName?: string,
   ) {
-    doc
-      .fontSize(10)
-      .text(date, 50, y)
-      .text(ref, 150, y)
-      .text(amount, 350, y, { width: 90, align: 'right' })
-      .text(status, 450, y, { align: 'right' });
+    doc.fontSize(8).font('Helvetica');
+    doc.text(date, 40, y);
+
+    if (isAdminOrOwner) {
+      doc.text((customerName || 'Guest').substring(0, 15), 90, y);
+      doc.text(desc.substring(0, 15), 170, y);
+      doc.text(method.substring(0, 12), 260, y);
+      doc.text(ref.substring(0, 10) + '...', 330, y);
+      doc.text(status, 400, y);
+      doc.text(amount, 480, y, { align: 'right', width: 70 });
+    } else {
+      doc.text(desc.substring(0, 20), 110, y);
+      doc.text(method.substring(0, 15), 220, y);
+      doc.text(ref.substring(0, 15) + '...', 290, y);
+      doc.text(status, 380, y);
+      doc.text(amount, 460, y, { align: 'right', width: 90 });
+    }
   }
 
   private generateHr(doc: PDFKit.PDFDocument, y: number) {
