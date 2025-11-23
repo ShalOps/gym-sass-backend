@@ -783,6 +783,12 @@ export class PaymentService {
       throw new ForbiddenException('Only staff can record manual payments');
     }
 
+    if (dto.classBookingId && dto.serviceBookingId) {
+      throw new BadRequestException(
+        'Cannot record payment for both class and service booking simultaneously',
+      );
+    }
+
     // Verify target user exists
     const targetUser = await this.databaseService.user.findUnique({
       where: { userId: dto.userId },
@@ -850,7 +856,7 @@ export class PaymentService {
           );
 
           // Invalidate any pending online payments for this booking
-          await tx.payment.updateMany({
+          const { count } = await tx.payment.updateMany({
             where: {
               classBookingId: dto.classBookingId,
               status: PaymentStatus.PENDING,
@@ -863,6 +869,12 @@ export class PaymentService {
               },
             },
           });
+
+          if (count > 0) {
+            this.logger.log(
+              `Invalidated ${count} pending payments for class booking ${dto.classBookingId}`,
+            );
+          }
         } else if (dto.serviceBookingId) {
           await this.serviceBookingsService.confirmBookingPayment(
             dto.serviceBookingId,
@@ -870,7 +882,7 @@ export class PaymentService {
           );
 
           // Invalidate any pending online payments for this booking
-          await tx.payment.updateMany({
+          const { count } = await tx.payment.updateMany({
             where: {
               serviceBookingId: dto.serviceBookingId,
               status: PaymentStatus.PENDING,
@@ -883,6 +895,12 @@ export class PaymentService {
               },
             },
           });
+
+          if (count > 0) {
+            this.logger.log(
+              `Invalidated ${count} pending payments for service booking ${dto.serviceBookingId}`,
+            );
+          }
         }
 
         await this.logPaymentAction(
