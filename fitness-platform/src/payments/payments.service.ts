@@ -257,6 +257,14 @@ export class PaymentService {
         where: { txRef },
         data: { status: PaymentStatus.FAILED },
       });
+
+      await this.logPaymentAction(
+        payment.id,
+        'INIT_FAILED',
+        { error: errorMessage },
+        db,
+      );
+
       throw new BadRequestException('Payment initialization failed');
     }
   }
@@ -393,6 +401,11 @@ export class PaymentService {
             chapaResponse: verifyResponse as unknown as Prisma.InputJsonObject,
           },
         });
+
+        await this.logPaymentAction(payment.id, 'VERIFY_FAILED', {
+          chapaResponse: verifyResponse,
+        });
+
         throw new BadRequestException('Payment verification failed at gateway');
       }
     } catch (error) {
@@ -484,6 +497,12 @@ export class PaymentService {
           },
         },
       });
+
+      await this.logPaymentAction(payment.id, 'WEBHOOK_DUPLICATE', {
+        reason: 'Booking already confirmed',
+        payload,
+      });
+
       return;
     }
 
@@ -917,6 +936,15 @@ export class PaymentService {
 
           for (const p of pendingPayments) {
             await this.cancelChapaTransaction(p.txRef);
+            await this.logPaymentAction(
+              p.id,
+              'SYSTEM_CANCEL',
+              {
+                reason: 'Superseded by manual payment',
+                manualPaymentId: payment.id,
+              },
+              tx,
+            );
           }
 
           const { count } = await tx.payment.updateMany({
@@ -954,6 +982,15 @@ export class PaymentService {
 
           for (const p of pendingPayments) {
             await this.cancelChapaTransaction(p.txRef);
+            await this.logPaymentAction(
+              p.id,
+              'SYSTEM_CANCEL',
+              {
+                reason: 'Superseded by manual payment',
+                manualPaymentId: payment.id,
+              },
+              tx,
+            );
           }
 
           const { count } = await tx.payment.updateMany({
