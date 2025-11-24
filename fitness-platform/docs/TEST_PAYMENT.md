@@ -470,6 +470,27 @@ http GET http://localhost:3000/payments/export \
     fromDate=="2025-01-01"
 ```
 
+```bash
+http --download GET http://localhost:3000/payments/export \
+    Authorization:"Bearer <TOKEN>" \
+    format=="pdf" \
+    fromDate=="2025-01-01"
+```
+
+> **Note:** The downloaded file will be named according to your role:
+>
+> * **Admin/Gym Owner:** `Total_Transaction_Report_YYYY_MM_DD_THH:MM_AM/PM.pdf`
+> * **Customer:** `FirstName_LastName_Transaction_Report_YYYY_MM_DD_THH:MM_AM/PM.pdf`
+
+OR
+
+```bash
+http GET <http://localhost:3000/payments/export> \
+  Authorization:"Bearer <TOKEN>" \
+  format==pdf \
+  --output transactions.pdf
+```
+
 #### Export with Date Range (CSV)
 
 ```bash
@@ -480,6 +501,11 @@ http --download GET http://localhost:3000/payments/export \
     toDate=="2025-11-30" \
     status=="SUCCESS"
 ```
+
+> **Note:** The downloaded file will be named according to your role:
+>
+> * **Admin/Gym Owner:** `Total_Transaction_Report_YYYY_MM_DD_THH:MM_AM/PM.csv`
+> * **Customer:** `FirstName_LastName_Transaction_Report_YYYY_MM_DD_THH:MM_AM/PM.csv`
 
 ---
 

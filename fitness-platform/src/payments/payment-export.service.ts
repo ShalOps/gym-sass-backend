@@ -22,6 +22,30 @@ type Transaction = {
   refundedAmount: number;
 };
 
+const EXPORT_FILENAME_CONFIG = {
+  getAdminFilename: (dateStr: string) => `Total_Transaction_Report_${dateStr}`,
+  getCustomerFilename: (firstName: string, lastName: string, dateStr: string) =>
+    `${firstName}_${lastName}_Transaction_Report_${dateStr}`,
+  formatDate: (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+
+    return `${yyyy}_${mm}_${dd}_T${hours}-${minutes}_${ampm}`;
+  },
+};
+
+const PDF_HEADER_CONFIG = {
+  companyName: 'Fitness Platform',
+  companyAddress: '123 Fitness Blvd, Addis Ababa',
+};
+
 @Injectable()
 export class PaymentExportService {
   constructor(
@@ -133,11 +157,44 @@ export class PaymentExportService {
     }
   }
 
+  private getFilename(
+    user: { role: string; firstName?: string; lastName?: string },
+    extension: string,
+  ): string {
+    const dateStr = EXPORT_FILENAME_CONFIG.formatDate(new Date());
+    const isAdminOrOwner = user.role === 'ADMIN' || user.role === 'GYMOWNER';
+
+    let filename = '';
+    if (isAdminOrOwner) {
+      filename = EXPORT_FILENAME_CONFIG.getAdminFilename(dateStr);
+    } else {
+      const first = user.firstName || 'Customer';
+      const last = user.lastName || '';
+      filename = EXPORT_FILENAME_CONFIG.getCustomerFilename(
+        first,
+        last,
+        dateStr,
+      );
+    }
+
+    // Sanitize spaces to underscores if any
+    filename = filename.replace(/\s+/g, '_');
+    return `${filename}.${extension}`;
+  }
+
   private generateCsv(
     transactions: Transaction[],
-    user: { userId: number; role: string; email: string },
+    user: {
+      userId: number;
+      role: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    },
     res: Response,
   ) {
+    const isAdminOrOwner = user.role === 'ADMIN' || user.role === 'GYMOWNER';
+
     const fields = [
       {
         label: 'Date',
@@ -150,20 +207,42 @@ export class PaymentExportService {
       { label: 'Status', value: 'status' },
       { label: 'Currency', value: 'currency' },
       { label: 'Amount', value: 'amount' },
-      { label: 'Customer Name', value: 'customerName' },
-      { label: 'Customer Email', value: 'customerEmail' },
     ];
+
+    if (isAdminOrOwner) {
+      fields.push(
+        { label: 'Customer Name', value: 'customerName' },
+        { label: 'Customer Email', value: 'customerEmail' },
+      );
+    }
+
+    // Calculate Net Revenue
+    const netRevenue = transactions.reduce((sum, t) => {
+      if (['PROCESSED', 'PAID_MANUAL'].includes(t.status)) {
+        return sum + t.amount;
+      }
+      if (t.status === 'PARTIALLY_REFUNDED') {
+        return sum + (t.amount - t.refundedAmount);
+      }
+      return sum;
+    }, 0);
+
+    const totalCount = transactions.length;
 
     const json2csv = new Transform({ fields }, { objectMode: true });
 
     res.header('Content-Type', 'text/csv');
     res.header(
       'Content-Disposition',
-      `attachment; filename=transactions_${Date.now()}.csv`,
+      `attachment; filename=${this.getFilename(user, 'csv')}`,
     );
 
     res.write(`Generated for: ${user.email}\n`);
-    res.write(`Date: ${new Date().toLocaleDateString()}\n\n`);
+    res.write(`Date: ${new Date().toLocaleDateString()}\n`);
+    res.write(`Total Transactions: ${totalCount}\n`);
+    res.write(
+      `${isAdminOrOwner ? 'Net Revenue' : 'Total Amount'}: ${netRevenue.toFixed(2)} ETB\n\n`,
+    );
 
     const input = new Readable({ objectMode: true });
     input._read = () => {}; // No-op
@@ -190,7 +269,7 @@ export class PaymentExportService {
     res.header('Content-Type', 'application/pdf');
     res.header(
       'Content-Disposition',
-      `attachment; filename=transactions_${Date.now()}.pdf`,
+      `attachment; filename=${this.getFilename(user, 'pdf')}`,
     );
 
     doc.pipe(res);
@@ -198,9 +277,9 @@ export class PaymentExportService {
     // --- Header Section ---
     doc
       .fontSize(20)
-      .text('Fitness Platform', 50, 50, { align: 'left' })
+      .text(PDF_HEADER_CONFIG.companyName, 50, 50, { align: 'left' })
       .fontSize(10)
-      .text('123 Fitness Blvd, Addis Ababa', 50, 75, { align: 'left' });
+      .text(PDF_HEADER_CONFIG.companyAddress, 50, 75, { align: 'left' });
 
     doc.fontSize(16).text('Transaction History', 50, 50, { align: 'right' });
 
