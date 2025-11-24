@@ -8,6 +8,7 @@ import {
   forwardRef,
   Logger,
   ConflictException,
+  GatewayTimeoutException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
@@ -467,68 +468,73 @@ export class ClassBookingsService extends BookingsService {
       );
     }
 
-    try {
-      return await this.databaseService.$transaction(async (tx) => {
-        // Create the booking
-        const booking = await tx.classBooking.create({
-          data: {
-            userId,
-            classId,
-            startTime,
-            endTime,
-            notes,
-            status: BookingStatus.PENDING, // Default to PENDING until paid
-          },
-          include: {
-            class: {
-              include: {
-                gym: true,
-                trainer: true,
-              },
-            },
-          },
-        });
+    const transactionStartTime = Date.now();
 
-        // Initiate Payment if price > 0
-        let paymentResponse;
-        if (Number(gymClass.price) > 0) {
-          // Get user role for payment service
-          const user = await this.databaseService.user.findUnique({
-            where: { userId },
-            select: {
-              role: true,
-              email: true,
-              firstName: true,
-              lastName: true,
+    try {
+      return await this.databaseService.$transaction(
+        async (tx) => {
+          // Create the booking
+          const booking = await tx.classBooking.create({
+            data: {
+              userId,
+              classId,
+              startTime,
+              endTime,
+              notes,
+              status: BookingStatus.PENDING, // Default to PENDING until paid
+            },
+            include: {
+              class: {
+                include: {
+                  gym: true,
+                  trainer: true,
+                },
+              },
             },
           });
 
-          if (user) {
-            // If payment initialization fails, the error propagates and triggers transaction rollback
-            paymentResponse = await this.paymentService.initializePayment(
-              { userId, role: user.role },
-              {
-                amount: Number(gymClass.price),
-                currency: 'ETB',
-                email: user.email || '',
-                firstName: user.firstName || '',
-                lastName: user.lastName || '',
-                returnUrl: returnUrl!,
-                metadata: {
+          // Initiate Payment if price > 0
+          let paymentResponse;
+          if (Number(gymClass.price) > 0) {
+            // Get user role for payment service
+            const user = await this.databaseService.user.findUnique({
+              where: { userId },
+              select: {
+                role: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            });
+
+            if (user) {
+              // If payment initialization fails, the error propagates and triggers transaction rollback
+              paymentResponse = await this.paymentService.initializePayment(
+                { userId, role: user.role },
+                {
+                  amount: Number(gymClass.price),
+                  currency: 'ETB',
+                  email: user.email || '',
+                  firstName: user.firstName || '',
+                  lastName: user.lastName || '',
+                  returnUrl: returnUrl!,
+                  metadata: {
+                    classBookingId: booking.classBookingId,
+                  },
                   classBookingId: booking.classBookingId,
                 },
-                classBookingId: booking.classBookingId,
-              },
-              tx,
-            );
+                tx,
+              );
+            }
           }
-        }
 
-        return {
-          booking,
-          payment: paymentResponse as Record<string, unknown> | undefined,
-        };
-      });
+          return {
+            booking,
+            payment: paymentResponse as Record<string, unknown> | undefined,
+          };
+        },
+        { timeout: 20000 },
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -540,6 +546,20 @@ export class ClassBookingsService extends BookingsService {
           );
         }
       }
+
+      // Handle transaction timeout specifically
+      if (
+        error instanceof Error &&
+        (error.message.includes('Transaction already closed') ||
+          error.message.includes('Timed out'))
+      ) {
+        const elapsed = Date.now() - transactionStartTime;
+        const seconds = (elapsed / 1000).toFixed(1);
+        throw new GatewayTimeoutException(
+          `Payment provider is taking too long to respond (${seconds}s). Please try again.`,
+        );
+      }
+
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException
