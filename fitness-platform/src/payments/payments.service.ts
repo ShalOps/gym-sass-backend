@@ -200,6 +200,10 @@ export class PaymentService {
 
     // 5. Initialize Chapa Payment
     try {
+      // Append tx_ref to returnUrl so frontend knows which transaction to verify
+      const separator = returnUrl.includes('?') ? '&' : '?';
+      const returnUrlWithRef = `${returnUrl}${separator}tx_ref=${txRef}`;
+
       const chapaResponse = await this.chapaService.initialize({
         amount: amount.toString(),
         currency,
@@ -207,7 +211,7 @@ export class PaymentService {
         first_name: firstName,
         last_name: lastName,
         tx_ref: txRef,
-        return_url: returnUrl,
+        return_url: returnUrlWithRef,
         customization: {
           title: 'Gym Payment',
           description:
