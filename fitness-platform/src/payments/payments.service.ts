@@ -779,6 +779,53 @@ export class PaymentService {
     }
   }
 
+  private async cancelChapaTransaction(txRef: string) {
+    try {
+      const secretKey =
+        process.env.CHAPA_SECRET_KEY || process.env.CHAPA_TEST_SECRET_KEY;
+
+      if (!secretKey) {
+        this.logger.warn(
+          'Chapa keys not configured, cannot cancel transaction remotely',
+        );
+        return;
+      }
+
+      const chapaBaseUrl =
+        process.env.NODE_ENV === 'production'
+          ? 'https://api.chapa.co/v1'
+          : 'https://sandbox.chapa.co/v1';
+
+      // Cancel the transaction on Chapa to prevent future payment
+      const response = await fetch(
+        `${chapaBaseUrl}/transaction/cancel/${txRef}`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        // It's possible the transaction is already in a state that can't be cancelled,
+        // so we just warn rather than throwing.
+        this.logger.warn(
+          `Failed to cancel Chapa transaction ${txRef}: ${errorText}`,
+        );
+      } else {
+        this.logger.log(`Successfully cancelled Chapa transaction ${txRef}`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error cancelling Chapa transaction ${txRef}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
   async recordManualPayment(
     user: { userId: number; role: string },
     dto: RecordManualPaymentDto,
@@ -860,13 +907,24 @@ export class PaymentService {
           );
 
           // Invalidate any pending online payments for this booking
-          const { count } = await tx.payment.updateMany({
+          const pendingPayments = await tx.payment.findMany({
             where: {
               classBookingId: dto.classBookingId,
               status: PaymentStatus.PENDING,
             },
+            select: { id: true, txRef: true },
+          });
+
+          for (const p of pendingPayments) {
+            await this.cancelChapaTransaction(p.txRef);
+          }
+
+          const { count } = await tx.payment.updateMany({
+            where: {
+              id: { in: pendingPayments.map((p) => p.id) },
+            },
             data: {
-              status: PaymentStatus.FAILED,
+              status: PaymentStatus.CANCELLED,
               metadata: {
                 reason: 'Superseded by manual payment',
                 manualPaymentId: payment.id,
@@ -886,13 +944,24 @@ export class PaymentService {
           );
 
           // Invalidate any pending online payments for this booking
-          const { count } = await tx.payment.updateMany({
+          const pendingPayments = await tx.payment.findMany({
             where: {
               serviceBookingId: dto.serviceBookingId,
               status: PaymentStatus.PENDING,
             },
+            select: { id: true, txRef: true },
+          });
+
+          for (const p of pendingPayments) {
+            await this.cancelChapaTransaction(p.txRef);
+          }
+
+          const { count } = await tx.payment.updateMany({
+            where: {
+              id: { in: pendingPayments.map((p) => p.id) },
+            },
             data: {
-              status: PaymentStatus.FAILED,
+              status: PaymentStatus.CANCELLED,
               metadata: {
                 reason: 'Superseded by manual payment',
                 manualPaymentId: payment.id,
