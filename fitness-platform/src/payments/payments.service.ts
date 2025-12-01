@@ -385,7 +385,7 @@ export class PaymentService {
       );
     }
 
-    return this._verifyAndProcess(
+    const result = await this._verifyAndProcess(
       payment,
       verifyResponse as {
         status: string;
@@ -397,6 +397,8 @@ export class PaymentService {
         };
       },
     );
+
+    return result.dto;
   }
 
   private async _verifyAndProcess(
@@ -428,22 +430,27 @@ export class PaymentService {
           throw new UnprocessableEntityException('Payment amount mismatch');
         }
 
-        await this.processSuccessfulPayment(
+        const processed = await this.processSuccessfulPayment(
           payment.id,
           verifyResponse.data.reference,
           verifyResponse,
         );
 
-        await this.logPaymentAction(payment.id, 'VERIFY', {
-          status: 'SUCCESS',
-          chapaRef: verifyResponse.data.reference,
-        });
+        if (processed) {
+          await this.logPaymentAction(payment.id, 'VERIFY', {
+            status: 'SUCCESS',
+            chapaRef: verifyResponse.data.reference,
+          });
+        }
 
         // Refresh payment data
         const updatedPayment = await this.databaseService.payment.findUnique({
           where: { id: payment.id },
         });
-        return PaymentMapper.toVerifyResponse(updatedPayment!);
+        return {
+          processed,
+          dto: PaymentMapper.toVerifyResponse(updatedPayment!),
+        };
       } else {
         // Mark as failed
         await this.databaseService.payment.update({
@@ -565,11 +572,11 @@ export class PaymentService {
         const verifyResponse = await this.chapaService.verify({
           tx_ref: txRef,
         });
-        await this._verifyAndProcess(payment, verifyResponse);
+        const result = await this._verifyAndProcess(payment, verifyResponse);
         this.logger.log(`Webhook: Processed success for ${txRef}`);
 
         // Send Email Receipt (Fire-and-forget)
-        if (payment.customerEmail) {
+        if (result.processed && payment.customerEmail) {
           this.notificationsService
             .sendEmailReceipt(
               payment.customerEmail,
@@ -629,7 +636,7 @@ export class PaymentService {
     paymentId: number,
     chapaReference: string,
     fullResponse: any,
-  ) {
+  ): Promise<boolean> {
     const response = fullResponse as {
       payment_method?: string;
       method?: string;
@@ -648,12 +655,12 @@ export class PaymentService {
         where: { id: paymentId },
       });
 
-      if (!currentPayment) return; // Should not happen
+      if (!currentPayment) return false; // Should not happen
       if (currentPayment.status === PaymentStatus.PROCESSED) {
         this.logger.log(
           `Payment ${paymentId} already processed, skipping concurrent update.`,
         );
-        return;
+        return false;
       }
 
       // 1. Update Payment Record
@@ -680,6 +687,8 @@ export class PaymentService {
           tx,
         );
       }
+
+      return true;
     });
   }
 
