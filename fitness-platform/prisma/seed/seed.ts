@@ -56,7 +56,7 @@ async function main() {
           password: 'password123', // Hash in production!
           birthDate: new Date(1990 + (i % 10), i % 12, (i % 28) + 1),
           gender: genders[i % 2],
-          email: i % 5 === 0 ? null : `user${i}@example.com`, // Some without email
+          email: `user${i}@example.com`,
           phoneNo: `123456789${String(i).padStart(2, '0')}`, // Ensure unique
           profilePic: i % 10 === 0 ? `https://example.com/pic${i}.jpg` : null,
           bio: i % 8 === 0 ? `Bio for user ${i}` : null,

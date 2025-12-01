@@ -9,6 +9,7 @@ import {
   InternalServerErrorException,
   Inject,
   forwardRef,
+  HttpException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
@@ -67,6 +68,53 @@ export class PaymentService {
     }
   }
 
+  private sanitizePaymentError(error: unknown): HttpException {
+    const errorMessage =
+      error &&
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : String(error);
+
+    // Log the raw error internally for debugging
+    this.logger.error(`Payment operation failed: ${errorMessage}`, error);
+
+    // Check for known user-facing errors
+    if (
+      errorMessage.includes('email') &&
+      errorMessage.includes('valid email address')
+    ) {
+      return new BadRequestException(
+        'Invalid email address provided. Please correct and try again.',
+      );
+    }
+
+    if (
+      errorMessage.includes('Server took forever to respond') ||
+      errorMessage.includes('temporarily unavailable')
+    ) {
+      return new BadRequestException(
+        'Payment service temporarily unavailable. Please try again later.',
+      );
+    }
+
+    if (
+      errorMessage.includes('ECONNREFUSED') ||
+      errorMessage.includes('ETIMEDOUT')
+    ) {
+      return new BadRequestException(
+        'Unable to connect to payment gateway. Please check your internet connection.',
+      );
+    }
+
+    // Default safe error message - hide internal details
+    return new BadRequestException(
+      'Payment initialization failed. Please try again or contact support.',
+    );
+  }
+
   async initializePayment(
     user: { userId: number; role: string },
     params: {
@@ -97,6 +145,12 @@ export class PaymentService {
       type = PaymentType.BOOKING,
     } = params;
     const userId = user.userId;
+
+    if (!email || !email.trim()) {
+      throw new BadRequestException(
+        'Email is required for payment initialization',
+      );
+    }
 
     if (amount <= 0) {
       throw new BadRequestException(
@@ -241,6 +295,12 @@ export class PaymentService {
         checkoutUrl: chapaResponse.data.checkout_url,
       };
     } catch (error) {
+      // Mark as failed locally if initialization fails
+      await db.payment.update({
+        where: { txRef },
+        data: { status: PaymentStatus.FAILED },
+      });
+
       const errorMessage =
         error &&
         typeof error === 'object' &&
@@ -250,14 +310,6 @@ export class PaymentService {
           ? (error as { message: string }).message
           : String(error);
 
-      this.logger.error(`Chapa initialization failed: ${errorMessage}`);
-
-      // Mark as failed locally if initialization fails
-      await db.payment.update({
-        where: { txRef },
-        data: { status: PaymentStatus.FAILED },
-      });
-
       await this.logPaymentAction(
         payment.id,
         'INIT_FAILED',
@@ -265,7 +317,7 @@ export class PaymentService {
         db,
       );
 
-      throw new BadRequestException('Payment initialization failed');
+      throw this.sanitizePaymentError(error);
     }
   }
 

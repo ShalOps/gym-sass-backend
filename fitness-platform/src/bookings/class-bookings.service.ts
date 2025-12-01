@@ -514,9 +514,9 @@ export class ClassBookingsService extends BookingsService {
                 {
                   amount: Number(gymClass.price),
                   currency: 'ETB',
-                  email: user.email || '',
-                  firstName: user.firstName || '',
-                  lastName: user.lastName || '',
+                  email: user.email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
                   returnUrl: returnUrl!,
                   metadata: {
                     classBookingId: booking.classBookingId,

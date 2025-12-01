@@ -429,9 +429,9 @@ export class ServiceBookingsService extends BookingsService {
                 {
                   amount: Number(service.price),
                   currency: 'ETB',
-                  email: user.email || '',
-                  firstName: user.firstName || '',
-                  lastName: user.lastName || '',
+                  email: user.email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
                   returnUrl: returnUrl!,
                   metadata: {
                     serviceBookingId: booking.serviceBookingId,
