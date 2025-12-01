@@ -530,4 +530,39 @@ export class ServiceBookingsService extends BookingsService {
       data: { status: BookingStatus.CONFIRMED },
     });
   }
+
+  async processRefundCancellation(
+    bookingId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    const booking = await db.serviceBooking.findUnique({
+      where: { serviceBookingId: bookingId },
+    });
+
+    if (!booking) {
+      this.logger.warn(
+        `Attempted to cancel non-existent service booking #${bookingId} after refund`,
+      );
+      return;
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      return; // Already cancelled
+    }
+
+    await db.serviceBooking.update({
+      where: { serviceBookingId: bookingId },
+      data: {
+        status: BookingStatus.CANCELLED,
+        notes: booking.notes
+          ? `${booking.notes}\n[System] Cancelled due to payment refund`
+          : '[System] Cancelled due to payment refund',
+      },
+    });
+
+    this.logger.log(
+      `Cancelled service booking #${bookingId} due to payment refund`,
+    );
+  }
 }

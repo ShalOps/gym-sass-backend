@@ -812,6 +812,29 @@ export class PaymentService {
         },
       });
 
+      // Auto-cancel booking if fully refunded
+      if (refundAmount + currentRefunded >= Number(payment.amount)) {
+        try {
+          if (payment.classBookingId) {
+            await this.classBookingsService.processRefundCancellation(
+              payment.classBookingId,
+            );
+          } else if (payment.serviceBookingId) {
+            await this.serviceBookingsService.processRefundCancellation(
+              payment.serviceBookingId,
+            );
+          }
+        } catch (cancelError) {
+          // Don't fail the refund if cancellation fails, but log it
+          this.logger.error(
+            `Failed to auto-cancel booking for refunded payment ${payment.txRef}`,
+            cancelError instanceof Error
+              ? cancelError.stack
+              : String(cancelError),
+          );
+        }
+      }
+
       // Log
       await this.logPaymentAction(payment.id, 'REFUND', {
         reason: dto.reason,
