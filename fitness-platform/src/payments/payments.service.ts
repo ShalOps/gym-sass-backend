@@ -46,7 +46,7 @@ export class PaymentService {
   ) {}
 
   private async logPaymentAction(
-    paymentId: number,
+    paymentId: number | undefined | null,
     action: string,
     details?: any,
     tx?: Prisma.TransactionClient,
@@ -55,7 +55,7 @@ export class PaymentService {
     try {
       await db.paymentLog.create({
         data: {
-          paymentId,
+          paymentId: paymentId ?? null,
           action,
           details: details as Prisma.InputJsonObject,
         },
@@ -296,10 +296,15 @@ export class PaymentService {
       };
     } catch (error) {
       // Mark as failed locally if initialization fails
-      await db.payment.update({
-        where: { txRef },
-        data: { status: PaymentStatus.FAILED },
-      });
+      // Note: If running in a transaction that rolls back, this update will be lost.
+      try {
+        await db.payment.update({
+          where: { txRef },
+          data: { status: PaymentStatus.FAILED },
+        });
+      } catch {
+        // Silently ignore update errors if the transaction will be rolled back
+      }
 
       const errorMessage =
         error &&
@@ -310,11 +315,19 @@ export class PaymentService {
           ? (error as { message: string }).message
           : String(error);
 
+      // Log the failure using the main database connection (bypassing the rolling-back transaction)
+      // We pass null/undefined for paymentId because the payment record will be deleted by the rollback
       await this.logPaymentAction(
-        payment.id,
+        undefined,
         'INIT_FAILED',
-        { error: errorMessage },
-        db,
+        {
+          error: errorMessage,
+          txRef,
+          userId,
+          amount,
+          email,
+        },
+        this.databaseService, // Force use of main connection
       );
 
       throw this.sanitizePaymentError(error);
