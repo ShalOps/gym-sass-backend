@@ -178,14 +178,14 @@ export class GymsService {
       }
     }
 
-    // if (
-    //   updateGymsDto.timezone &&
-    //   !DateUtil.isValidTimezone(updateGymsDto.timezone)
-    // ) {
-    //   throw new BadRequestException(
-    //     `Invalid timezone: ${updateGymsDto.timezone}`,
-    //   );
-    // }
+    if (
+      updateGymsDto.timezone &&
+      !DateUtil.isValidTimezone(updateGymsDto.timezone)
+    ) {
+      throw new BadRequestException(
+        `Invalid timezone: ${updateGymsDto.timezone}`,
+      );
+    }
 
     return this.databaseservice.gym.update({
       where: {
