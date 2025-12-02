@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DateUtil } from '../common/utils/date.util';
 
 @Injectable()
 export class NotificationsService {
@@ -8,6 +9,26 @@ export class NotificationsService {
     // TODO: Integrate Nodemailer/SMS
     this.logger.log(
       `[MOCK EMAIL] Sending receipt to ${email} for ${amount} ETB (Ref: ${txRef})`,
+    );
+  }
+
+  async sendBookingConfirmation(
+    email: string,
+    bookingDetails: {
+      BookingName: string;
+      startTime: Date;
+      gymName: string;
+      timezone: string;
+    },
+  ) {
+    // TODO: Integrate in Both Booking Services
+    const formattedTime = DateUtil.formatInTimezone(
+      bookingDetails.startTime,
+      bookingDetails.timezone,
+    );
+
+    this.logger.log(
+      `[MOCK EMAIL] Sending booking confirmation to ${email} for "${bookingDetails.BookingName}" at ${formattedTime} (${bookingDetails.gymName})`,
     );
   }
 

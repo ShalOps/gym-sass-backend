@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { CreateGymsDto } from './dto/create-gyms.dto';
 import { UpdateGymsDto } from './dto/update-gyms.dto';
+import { DateUtil } from '../common/utils/date.util';
 
 @Injectable()
 export class GymsService {
@@ -30,6 +32,15 @@ export class GymsService {
     if (gymOwner.role !== 'GYMOWNER') {
       throw new ForbiddenException(
         `User with ID ${currentUserId} is not a Gym owner`,
+      );
+    }
+
+    if (
+      createGymsDto.timezone &&
+      !DateUtil.isValidTimezone(createGymsDto.timezone)
+    ) {
+      throw new BadRequestException(
+        `Invalid timezone: ${createGymsDto.timezone}`,
       );
     }
 
@@ -166,6 +177,15 @@ export class GymsService {
         );
       }
     }
+
+    // if (
+    //   updateGymsDto.timezone &&
+    //   !DateUtil.isValidTimezone(updateGymsDto.timezone)
+    // ) {
+    //   throw new BadRequestException(
+    //     `Invalid timezone: ${updateGymsDto.timezone}`,
+    //   );
+    // }
 
     return this.databaseservice.gym.update({
       where: {

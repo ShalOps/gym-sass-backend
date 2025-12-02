@@ -153,6 +153,7 @@ model Gym {
   contactNo               String?
   location                String
   workingHours            String?
+  timezone                String                    @default("UTC")
   verified                Boolean                   @default(false)
   gymOwner                User                      @relation(fields: [gymOwnerId], references: [userId], onDelete: Restrict)
   gymOwnerId              Int
