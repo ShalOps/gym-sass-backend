@@ -37,6 +37,11 @@ export class NotificationsService {
     this.logger.log(`[MOCK NOTIFICATION] User ${userId}: ${message}`);
   }
 
+  async notifyStaff(email: string, message: string) {
+    // TODO: Integrate Email/SMS for staff (Trainers/Owners)
+    this.logger.log(`[MOCK STAFF NOTIFICATION] To ${email}: ${message}`);
+  }
+
   async notifyAdmin(message: string) {
     // TODO: Integrate Slack/Telegram for admin alerts
     this.logger.log(`[MOCK ADMIN ALERT] ${message}`);

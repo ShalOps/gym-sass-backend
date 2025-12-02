@@ -245,17 +245,43 @@ export class ServiceBookingsService extends BookingsService {
     }
 
     // Update status to cancelled
-    return this.databaseService.serviceBooking.update({
+    const cancelledBooking = await this.databaseService.serviceBooking.update({
       where: { serviceBookingId: id },
       data: { status: BookingStatus.CANCELLED },
       include: {
         service: {
           include: {
-            gym: true,
+            gym: {
+              include: {
+                gymOwner: true,
+              },
+            },
           },
         },
+        user: true,
       },
     });
+
+    // Notify Gym Owner
+    if (cancelledBooking.service.gym.gymOwner?.email) {
+      const ownerEmail = cancelledBooking.service.gym.gymOwner.email;
+      const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
+      const serviceName = cancelledBooking.service.name;
+      const startTime = cancelledBooking.startTime
+        ? cancelledBooking.startTime.toLocaleString()
+        : 'N/A';
+
+      this.notificationsService
+        .notifyStaff(
+          ownerEmail,
+          `Service Booking cancelled by ${userName} for ${serviceName} at ${startTime}`,
+        )
+        .catch((err) =>
+          this.logger.error('Failed to notify gym owner of cancellation', err),
+        );
+    }
+
+    return cancelledBooking;
   }
 
   async markNoShow(id: number, currentUserId: number) {

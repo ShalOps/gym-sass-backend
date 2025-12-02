@@ -305,7 +305,7 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Update status to cancelled
-    return this.databaseService.classBooking.update({
+    const cancelledBooking = await this.databaseService.classBooking.update({
       where: { classBookingId: id },
       data: { status: BookingStatus.CANCELLED },
       include: {
@@ -315,8 +315,30 @@ export class ClassBookingsService extends BookingsService {
             trainer: true,
           },
         },
+        user: true,
       },
     });
+
+    // Notify Trainer
+    if (cancelledBooking.class.trainer?.email) {
+      const trainerEmail = cancelledBooking.class.trainer.email;
+      const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
+      const className = cancelledBooking.class.className;
+      const startTime = cancelledBooking.startTime
+        ? cancelledBooking.startTime.toLocaleString()
+        : 'N/A';
+
+      this.notificationsService
+        .notifyStaff(
+          trainerEmail,
+          `Booking cancelled by ${userName} for ${className} at ${startTime}`,
+        )
+        .catch((err) =>
+          this.logger.error('Failed to notify trainer of cancellation', err),
+        );
+    }
+
+    return cancelledBooking;
   }
 
   async markNoShow(id: number, currentUserId: number) {
