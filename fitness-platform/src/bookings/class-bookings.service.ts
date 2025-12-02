@@ -207,6 +207,8 @@ export class ClassBookingsService extends BookingsService {
     updateData: {
       status?: BookingStatus;
       notes?: string;
+      startTime?: Date;
+      endTime?: Date;
     },
     userId: number,
   ) {
@@ -218,6 +220,22 @@ export class ClassBookingsService extends BookingsService {
       throw new BadRequestException(
         'Cannot update status of a completed booking',
       );
+    }
+
+    // Handle Rescheduling (Time Change)
+    if (updateData.startTime || updateData.endTime) {
+      // 1. Validate Time Logic
+      const newStartTime = updateData.startTime || booking.startTime;
+      const newEndTime = updateData.endTime || booking.endTime;
+
+      if (newStartTime && newEndTime && newStartTime >= newEndTime) {
+        throw new BadRequestException('Start time must be before end time');
+      }
+
+      // 2. Check for Conflicts
+      if (newStartTime && newEndTime) {
+        await this.checkUserTimeConflict(userId, newStartTime, newEndTime, id);
+      }
     }
 
     // Check capacity if status is being changed to CONFIRMED
@@ -423,44 +441,7 @@ export class ClassBookingsService extends BookingsService {
 
     // Check for time conflicts if startTime and endTime are provided
     if (startTime && endTime) {
-      const conflictingBooking =
-        await this.databaseService.classBooking.findFirst({
-          where: {
-            userId,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-            OR: [
-              {
-                AND: [
-                  { startTime: { lte: startTime } },
-                  { endTime: { gt: startTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { lt: endTime } },
-                  { endTime: { gte: endTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { gte: startTime } },
-                  { endTime: { lte: endTime } },
-                ],
-              },
-            ],
-          },
-          include: {
-            class: true,
-          },
-        });
-
-      if (conflictingBooking) {
-        throw new BadRequestException(
-          `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
-        );
-      }
+      await this.checkUserTimeConflict(userId, startTime, endTime);
 
       // Verify Trainer Availability
       // Make sure the trainer is not assigned to another class during this time slot.
@@ -739,5 +720,54 @@ export class ClassBookingsService extends BookingsService {
     this.logger.log(
       `Cancelled class booking #${bookingId} due to payment refund`,
     );
+  }
+
+  private async checkUserTimeConflict(
+    userId: number,
+    startTime: Date,
+    endTime: Date,
+    excludeBookingId?: number,
+  ) {
+    const conflictingBooking =
+      await this.databaseService.classBooking.findFirst({
+        where: {
+          userId,
+          ...(excludeBookingId
+            ? { classBookingId: { not: excludeBookingId } }
+            : {}),
+          status: {
+            not: BookingStatus.CANCELLED,
+          },
+          OR: [
+            {
+              AND: [
+                { startTime: { lte: startTime } },
+                { endTime: { gt: startTime } },
+              ],
+            },
+            {
+              AND: [
+                { startTime: { lt: endTime } },
+                { endTime: { gte: endTime } },
+              ],
+            },
+            {
+              AND: [
+                { startTime: { gte: startTime } },
+                { endTime: { lte: endTime } },
+              ],
+            },
+          ],
+        },
+        include: {
+          class: true,
+        },
+      });
+
+    if (conflictingBooking) {
+      throw new BadRequestException(
+        `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
+      );
+    }
   }
 }
