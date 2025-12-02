@@ -235,6 +235,12 @@ export class ClassBookingsService extends BookingsService {
       // 2. Check for Conflicts
       if (newStartTime && newEndTime) {
         await this.checkUserTimeConflict(userId, newStartTime, newEndTime, id);
+        await this.checkTrainerAvailability(
+          booking.class.trainerId,
+          newStartTime,
+          newEndTime,
+          booking.classId,
+        );
       }
     }
 
@@ -444,51 +450,12 @@ export class ClassBookingsService extends BookingsService {
       await this.checkUserTimeConflict(userId, startTime, endTime);
 
       // Verify Trainer Availability
-      // Make sure the trainer is not assigned to another class during this time slot.
-      const trainerConflict = await this.databaseService.classBooking.findFirst(
-        {
-          where: {
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-            class: {
-              trainerId: gymClass.trainerId,
-            },
-            classId: {
-              not: classId, // Ignore bookings for the same class
-            },
-            OR: [
-              {
-                AND: [
-                  { startTime: { lte: startTime } },
-                  { endTime: { gt: startTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { lt: endTime } },
-                  { endTime: { gte: endTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { gte: startTime } },
-                  { endTime: { lte: endTime } },
-                ],
-              },
-            ],
-          },
-          include: {
-            class: true,
-          },
-        },
+      await this.checkTrainerAvailability(
+        gymClass.trainerId,
+        startTime,
+        endTime,
+        classId,
       );
-
-      if (trainerConflict) {
-        throw new ConflictException(
-          `Trainer is unavailable. They are teaching "${trainerConflict.class.className}" during this time slot.`,
-        );
-      }
     }
 
     // Check capacity: count current confirmed bookings for this class at this time
@@ -767,6 +734,54 @@ export class ClassBookingsService extends BookingsService {
     if (conflictingBooking) {
       throw new BadRequestException(
         `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
+      );
+    }
+  }
+
+  private async checkTrainerAvailability(
+    trainerId: number,
+    startTime: Date,
+    endTime: Date,
+    excludeClassId?: number,
+  ) {
+    const trainerConflict = await this.databaseService.classBooking.findFirst({
+      where: {
+        status: {
+          not: BookingStatus.CANCELLED,
+        },
+        class: {
+          trainerId: trainerId,
+        },
+        ...(excludeClassId ? { classId: { not: excludeClassId } } : {}),
+        OR: [
+          {
+            AND: [
+              { startTime: { lte: startTime } },
+              { endTime: { gt: startTime } },
+            ],
+          },
+          {
+            AND: [
+              { startTime: { lt: endTime } },
+              { endTime: { gte: endTime } },
+            ],
+          },
+          {
+            AND: [
+              { startTime: { gte: startTime } },
+              { endTime: { lte: endTime } },
+            ],
+          },
+        ],
+      },
+      include: {
+        class: true,
+      },
+    });
+
+    if (trainerConflict) {
+      throw new ConflictException(
+        `Trainer is unavailable. They are teaching "${trainerConflict.class.className}" during this time slot.`,
       );
     }
   }
