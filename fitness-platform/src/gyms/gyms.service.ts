@@ -4,11 +4,13 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { DatabaseService } from '../database/database.service'; 
+import { DatabaseService } from '../database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { CreateGymsDto } from './dto/create-gyms.dto';
 import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { DateRangeDto } from './dto/date-range.dto';
+import { NotificationType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class GymsService {
@@ -34,8 +36,31 @@ export class GymsService {
       );
     }
 
-    return this.databaseservice.gym.create({
-      data: { ...createGymsDto, gymOwnerId: currentUserId },
+    return await this.databaseservice.$transaction( async (tx) => {
+
+      const newGym = await tx.gym.create({
+        data: { ...createGymsDto, gymOwnerId: currentUserId },
+      });
+
+      const adminIdList = await tx.user.findMany({
+        where: {
+          role: Role.ADMIN
+        },
+        select: {
+          userId: true
+        }
+      })
+      for (const adminId of adminIdList){
+        await tx.notification.create({
+          data:
+          {
+            userId: adminId.userId,
+            type: NotificationType.NEW_GYM_CREATED,
+            message: `Gym with gym name ${newGym.gymName} was created by a user check credentials and update verification`,
+          }
+        })
+      }
+
     });
   }
 
@@ -219,7 +244,7 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
 
-    const ownerFilter = isAdmin 
+    const ownerFilter = isAdmin
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
 
@@ -229,21 +254,21 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         SELECT cb."bookedAt", gc."gymId"
         FROM "ClassBooking" cb
         INNER JOIN "GymClasses" gc ON gc."classId" = cb."classId"
-        
+
         UNION ALL
-        
+
         SELECT sb."bookedAt", s."gymId"
         FROM "ServiceBooking" sb
         INNER JOIN "Service" s ON s."serviceId" = sb."serviceId"
       )
-      
+
         SELECT
           COUNT(*)::int AS total
         FROM "AllBookings" b
-        
-        INNER JOIN "Gym" g 
+
+        INNER JOIN "Gym" g
             ON g."gymId" = b."gymId" ${ownerFilter}
-            
+
         WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
           AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
           AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
@@ -262,10 +287,10 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
 
-    const ownerFilter = isAdmin 
+    const ownerFilter = isAdmin
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
-    
+
     try {
 
       const result = await this.databaseservice.$queryRaw`
@@ -302,7 +327,7 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
 
-    const ownerFilter = isAdmin 
+    const ownerFilter = isAdmin
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
 
@@ -322,7 +347,7 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
           JOIN "Service" s ON s."serviceId" = sb."serviceId"
         ) b
         INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
-        
+
         WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
         AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
         AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
@@ -342,13 +367,13 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
 
-    const ownerFilter = isAdmin 
+    const ownerFilter = isAdmin
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
     try {
       const result = await this.databaseservice
       .$queryRaw<{ totalRevenue: number }[]>`
-        SELECT 
+        SELECT
           COALESCE(SUM(b.price), 0)::float AS totalRevenue
         FROM (
           SELECT gc.price, cb."bookedAt", gc."gymId", cb."paymentStatus"

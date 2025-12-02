@@ -1,6 +1,15 @@
 import { DatabaseService } from '../database/database.service';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
 
+export enum Action{
+    BOOKED = 'booked',
+    CANCELLED = 'cancelled',
+    PENDING = 'pending',
+    CONFIRMED = 'confirmed',
+    COMPLETED = 'completed',
+    NO_SHOW = 'no_show'
+}
+
 export abstract class BookingsService {
   protected constructor(protected readonly databaseService: DatabaseService) {}
 
