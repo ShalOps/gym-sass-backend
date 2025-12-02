@@ -74,15 +74,24 @@ export class TasksService {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     try {
-      const result = await this.databaseService.payment.deleteMany({
+      // Payments are not deleted to preserve the txRef, which is necessary for handling
+      // late webhooks or "Zombie Links" (cases where users pay using old links).
+      // Instead, we update their status to CANCELLED to indicate they are no longer valid.
+      const result = await this.databaseService.payment.updateMany({
         where: {
           status: PaymentStatus.PENDING,
           createdAt: {
             lt: twentyFourHoursAgo,
           },
         },
+        data: {
+          status: PaymentStatus.CANCELLED,
+          metadata: {
+            reason: 'Auto-cancelled by system (24h timeout)',
+          },
+        },
       });
-      this.logger.log(`Deleted ${result.count} old pending payments.`);
+      this.logger.log(`Cancelled ${result.count} old pending payments.`);
     } catch (error) {
       this.logger.error('Failed to cleanup pending payments', error);
     }
