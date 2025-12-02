@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { BookingStatus, Prisma } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
 
 @Injectable()
