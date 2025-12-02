@@ -46,4 +46,15 @@ export class NotificationsService {
     // TODO: Integrate Slack/Telegram for admin alerts
     this.logger.log(`[MOCK ADMIN ALERT] ${message}`);
   }
+
+  async sendBookingReminder(
+    email: string,
+    details: { bookingName: string; startTime: Date },
+  ) {
+    // TODO: Integrate Email/SMS
+    this.logger.log(
+      `[MOCK REMINDER] Sending reminder to ${email} for "${details.bookingName}" at ${details.startTime.toISOString()}`,
+    );
+    return Promise.resolve();
+  }
 }

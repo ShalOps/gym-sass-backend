@@ -2,21 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
-// import { readdir, unlink } from 'fs/promises';
-// import { stat } from 'fs/promises';
-// import { join } from 'path';
-// import {
-//   UPLOADS_DIR_ABSOLUTE,
-//   THUMBNAIL_DIR_ABSOLUTE,
-//   UPLOADS_WEB_PREFIX,
-//   THUMBNAIL_WEB_PREFIX,
-// } from '../config/paths.config';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Runs daily at 2 AM to auto-complete past bookings
@@ -94,6 +89,78 @@ export class TasksService {
       this.logger.log(`Cancelled ${result.count} old pending payments.`);
     } catch (error) {
       this.logger.error('Failed to cleanup pending payments', error);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async sendBookingReminders() {
+    this.logger.log('Running booking reminders check...');
+    const startWindow = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h from now
+    const endWindow = new Date(startWindow.getTime() + 60 * 60 * 1000); // 24h + 1h from now
+
+    try {
+      // 1. Find Class Bookings
+      const classBookings = await this.databaseService.classBooking.findMany({
+        where: {
+          status: BookingStatus.CONFIRMED,
+          startTime: {
+            gte: startWindow,
+            lt: endWindow,
+          },
+        },
+        include: {
+          user: true,
+          class: true,
+        },
+      });
+
+      for (const booking of classBookings) {
+        if (booking.user.email && booking.startTime) {
+          await this.notificationsService.sendBookingReminder(
+            booking.user.email,
+            {
+              bookingName: booking.class.className,
+              startTime: booking.startTime,
+            },
+          );
+        }
+      }
+
+      // 2. Find Service Bookings
+      const serviceBookings =
+        await this.databaseService.serviceBooking.findMany({
+          where: {
+            status: BookingStatus.CONFIRMED,
+            startTime: {
+              gte: startWindow,
+              lt: endWindow,
+            },
+          },
+          include: {
+            user: true,
+            service: true,
+          },
+        });
+
+      for (const booking of serviceBookings) {
+        if (booking.user.email && booking.startTime) {
+          await this.notificationsService.sendBookingReminder(
+            booking.user.email,
+            {
+              bookingName: booking.service.name,
+              startTime: booking.startTime,
+            },
+          );
+        }
+      }
+
+      if (classBookings.length > 0 || serviceBookings.length > 0) {
+        this.logger.log(
+          `Sent reminders for ${classBookings.length} classes and ${serviceBookings.length} services.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to send booking reminders', error);
     }
   }
 
