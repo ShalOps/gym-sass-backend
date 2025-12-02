@@ -12,8 +12,9 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, Prisma } from '@prisma/client';
+import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -23,6 +24,7 @@ export class ClassBookingsService extends BookingsService {
     protected readonly databaseService: DatabaseService,
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
+    private readonly notificationsService: NotificationsService,
   ) {
     super(databaseService);
   }
@@ -205,7 +207,6 @@ export class ClassBookingsService extends BookingsService {
     updateData: {
       status?: BookingStatus;
       notes?: string;
-      paymentStatus?: PaymentStatus;
     },
     userId: number,
   ) {
@@ -262,6 +263,20 @@ export class ClassBookingsService extends BookingsService {
     ) {
       throw new BadRequestException(
         'Cannot cancel a completed or already cancelled booking',
+      );
+    }
+
+    // Check for successful payments
+    const successfulPayment = await this.databaseService.payment.findFirst({
+      where: {
+        classBookingId: id,
+        status: PaymentStatus.PROCESSED,
+      },
+    });
+
+    if (successfulPayment) {
+      throw new BadRequestException(
+        'This booking is paid. Please request a refund to cancel.',
       );
     }
 
@@ -657,10 +672,38 @@ export class ClassBookingsService extends BookingsService {
     tx?: Prisma.TransactionClient,
   ) {
     const db = tx || this.databaseService;
-    return db.classBooking.update({
+    const booking = await db.classBooking.update({
       where: { classBookingId: bookingId },
       data: { status: BookingStatus.CONFIRMED },
+      include: {
+        class: {
+          include: {
+            gym: true,
+          },
+        },
+        user: true,
+      },
     });
+
+    // // Send confirmation email with localized time
+    // if (booking.user?.email && booking.startTime) {
+    //   // We don't await this to avoid blocking the transaction/response
+    //   this.notificationsService
+    //     .sendBookingConfirmation(booking.user.email, {
+    //       BookingName: booking.class.className,
+    //       startTime: booking.startTime,
+    //       gymName: booking.class.gym.gymName,
+    //       timezone: booking.class.gym.timezone,
+    //     })
+    //     .catch((err) =>
+    //       this.logger.error(
+    //         `Failed to send booking confirmation for ${bookingId}`,
+    //         err,
+    //       ),
+    //     );
+    // }
+
+    return booking;
   }
 
   async processRefundCancellation(
