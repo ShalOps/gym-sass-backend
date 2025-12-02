@@ -223,29 +223,38 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
 
-    const result = await this.databaseservice.$queryRaw<{ total: number }[]>`
-      SELECT
-        (
-          SELECT COUNT(*)::int FROM "ClassBooking" cb
-          JOIN "GymClasses" gc ON gc."classId" = cb."classId"
-          JOIN "Gym" g ON g."gymId" = gc."gymId"
-          WHERE (${gymId}::int IS NULL OR gc."gymId" = ${gymId})
-          AND (${start}::timestamp IS NULL OR cb."bookedAt" >= ${start})
-          AND (${end}::timestamp IS NULL OR cb."bookedAt" <= ${end})
-          ${ownerFilter}
-        ) +
-        (
-          SELECT COUNT(*)::int FROM "ServiceBooking" sb
-          JOIN "Service" s ON s."serviceId" = sb."serviceId"
-          JOIN "Gym" g ON g."gymId" = s."gymId"
-          WHERE (${gymId}::int IS NULL OR s."gymId" = ${gymId})
-          AND (${start}::timestamp IS NULL OR sb."bookedAt" >= ${start})
-          AND (${end}::timestamp IS NULL OR sb."bookedAt" <= ${end})
-          ${ownerFilter}
-        ) AS total;
+    try {
+      const result = await this.databaseservice.$queryRaw<{ total: number }[]>`
+      WITH "AllBookings" AS (
+        SELECT cb."bookedAt", gc."gymId"
+        FROM "ClassBooking" cb
+        INNER JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+        
+        UNION ALL
+        
+        SELECT sb."bookedAt", s."gymId"
+        FROM "ServiceBooking" sb
+        INNER JOIN "Service" s ON s."serviceId" = sb."serviceId"
+      )
+      
+        SELECT
+          COUNT(*)::int AS total
+        FROM "AllBookings" b
+        
+        INNER JOIN "Gym" g 
+            ON g."gymId" = b."gymId" ${ownerFilter}
+            
+        WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+          AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+          AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
     `;
 
     return (result && result.length > 0) ? result[0] : { total: 0 };
+
+    } catch (error) {
+      console.log('Error fetching total bookings:', error);
+      throw new Error('Could not fetch total bookings');
+    }
   }
 
   async getMonthlyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
@@ -257,7 +266,9 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
     
-    return this.databaseservice.$queryRaw`
+    try {
+
+      const result = await this.databaseservice.$queryRaw`
       SELECT TO_CHAR(b."bookedAt", 'YYYY-MM') AS period,
              COUNT(*)::int AS total
       FROM (
@@ -271,14 +282,19 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         FROM "ServiceBooking" sb
         JOIN "Service" s ON s."serviceId" = sb."serviceId"
       ) b
-      JOIN "Gym" g ON g."gymId" = b."gymId"
+      INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
 
       WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
       AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
-      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
+      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
       GROUP BY period
       ORDER BY period ASC;
     `;
+    return result;
+    } catch (error) {
+      console.log('Error fetching monthly bookings:', error);
+      throw new Error('Could not fetch monthly bookings');
+    }
   }
 
   async getWeeklyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
@@ -290,27 +306,35 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
 
-    return this.databaseservice.$queryRaw`
-      SELECT TO_CHAR(DATE_TRUNC('week', b."bookedAt"), 'YYYY-MM-DD') AS weekStart,
-             COUNT(*)::int AS total
-      FROM (
-        SELECT cb."bookedAt", gc."gymId"
-        FROM "ClassBooking" cb
-        JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+    try {
+      const result = await this.databaseservice.$queryRaw`
+        SELECT TO_CHAR(DATE_TRUNC('week', b."bookedAt"), 'YYYY-MM-DD') AS weekStart,
+              COUNT(*)::int AS total
+        FROM (
+          SELECT cb."bookedAt", gc."gymId"
+          FROM "ClassBooking" cb
+          JOIN "GymClasses" gc ON gc."classId" = cb."classId"
 
-        UNION ALL
+          UNION ALL
 
-        SELECT sb."bookedAt", s."gymId"
-        FROM "ServiceBooking" sb
-        JOIN "Service" s ON s."serviceId" = sb."serviceId"
-      ) b
-      JOIN "Gym" g ON g."gymId" = b."gymId"
-      WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
-      AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
-      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
-      GROUP BY weekStart
-      ORDER BY weekStart ASC;
+          SELECT sb."bookedAt", s."gymId"
+          FROM "ServiceBooking" sb
+          JOIN "Service" s ON s."serviceId" = sb."serviceId"
+        ) b
+        INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
+        
+        WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+        AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+        AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
+        GROUP BY weekStart
+        ORDER BY weekStart ASC;
     `;
+    return result;
+
+    } catch (error) {
+      console.log('Error fetching weekly bookings:', error);
+      throw new Error('Could not fetch weekly bookings');
+    }
   }
 
   async getRevenueStats(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
@@ -320,30 +344,36 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
 
     const ownerFilter = isAdmin 
       ? Prisma.sql``
-      : Prisma.sql`AND b."gymId" IN (
-          SELECT g."gymId" FROM "Gym" g WHERE g."gymOwnerId" = ${actingUserId}
-        )`;
-    const result = await this.databaseservice
+      : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
+    try {
+      const result = await this.databaseservice
       .$queryRaw<{ totalRevenue: number }[]>`
-      SELECT 
-        COALESCE(SUM(b.price), 0)::float AS totalRevenue
-      FROM (
-        SELECT gc.price, cb."bookedAt", gc."gymId", cb."paymentStatus"
-        FROM "ClassBooking" cb
-        JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+        SELECT 
+          COALESCE(SUM(b.price), 0)::float AS totalRevenue
+        FROM (
+          SELECT gc.price, cb."bookedAt", gc."gymId", cb."paymentStatus"
+          FROM "ClassBooking" cb
+          JOIN "GymClasses" gc ON gc."classId" = cb."classId"
 
-        UNION ALL
+          UNION ALL
 
-        SELECT s.price, sb."bookedAt", s."gymId", sb."paymentStatus"
-        FROM "ServiceBooking" sb
-        JOIN "Service" s ON s."serviceId" = sb."serviceId"
-      ) b
-      WHERE b."paymentStatus" = 'PROCESSED'
-      AND (${gymId}::int IS NULL OR b."gymId" = ${gymId})
-      AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
-      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter};
+          SELECT s.price, sb."bookedAt", s."gymId", sb."paymentStatus"
+          FROM "ServiceBooking" sb
+          JOIN "Service" s ON s."serviceId" = sb."serviceId"
+        ) b
+
+        INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
+
+        WHERE b."paymentStatus" = 'PROCESSED'
+        AND (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+        AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+        AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
     `;
-
     return result[0] || { totalRevenue: 0 };
+
+    } catch (error) {
+      console.log('Error fetching revenue stats:', error);
+      throw new Error('Could not fetch revenue stats');
+    }
   }
 }
