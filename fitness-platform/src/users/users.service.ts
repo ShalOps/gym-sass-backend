@@ -125,45 +125,68 @@ export class UsersService {
     });
   }
 
- async getUserActivity(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+async getUserActivity(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
     const { startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
-    const ownerFilter = isAdmin ? '' : `WHERE u."userId" IN (
-      SELECT DISTINCT "userId" FROM "Gym" WHERE "gymOwnerId" = ${actingUserId}
-    )`;
+    if (end) end.setHours(23, 59, 59, 999);
 
-    return this.databaseservice.$queryRaw`
-      WITH "AllBookings" AS (
-          SELECT "userId", "bookedAt", "status" FROM "ClassBooking"
+    const customerFilter = isAdmin 
+        ? Prisma.sql`` 
+        : Prisma.sql`
+            INNER JOIN "OwnerCustomers" oc ON u."userId" = oc."userId"
+        `;
+    try {
+      
+      const result = await this.databaseservice.$queryRaw`
+      WITH "RelevantBookings" AS (
+          SELECT b."userId", b."bookedAt", b."status", g."gymOwnerId"
+          FROM "ClassBooking" b
+          INNER JOIN "GymClasses" c ON b."classId" = c."classId"
+          INNER JOIN "Gym" g ON c."gymId" = g."gymId"
+          WHERE (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+            AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
+
           UNION ALL
-          SELECT "userId", "bookedAt", "status" FROM "ServiceBooking"
+
+          SELECT b."userId", b."bookedAt", b."status", g."gymOwnerId"
+          FROM "ServiceBooking" b
+          INNER JOIN "Service" s ON b."serviceId" = s."serviceId"
+          INNER JOIN "Gym" g ON s."gymId" = g."gymId"
+          WHERE (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+            AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
+      ),
+      
+      "OwnerCustomers" AS (
+          SELECT "userId" FROM "RelevantBookings"
+          WHERE "gymOwnerId" = ${actingUserId}
       )
+      
       SELECT 
         u."userId",
         u."userName",
-        
-        -- Count total bookings within date range
         COUNT(b."userId")::int AS totalBookings,
-
-        -- Count unique active days within date range
         COUNT(DISTINCT DATE(b."bookedAt"))::int AS activeDays,
-
-        -- Count cancelled within date range
         COUNT(CASE WHEN b.status = 'CANCELLED' THEN 1 END)::int AS cancelled,
-
-        -- Count completed within date range
         COUNT(CASE WHEN b.status = 'COMPLETED' THEN 1 END)::int AS completed
 
       FROM "User" u
-      LEFT JOIN "AllBookings" b ON u."userId" = b."userId"
       
-      WHERE 
-          (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
-      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
+      ${customerFilter} 
+      
+      LEFT JOIN "RelevantBookings" b 
+          ON u."userId" = b."userId" 
+          AND (${isAdmin} OR b."gymOwnerId" = ${actingUserId})
       
       GROUP BY u."userId", u."userName"
       ORDER BY totalBookings DESC;
     `;
-  }
+
+    return result;
+
+    } catch (error) {
+      console.log('Error fetching user activity:', error);
+      throw new Error('Failed to fetch user activity');
+    }
+}
 }

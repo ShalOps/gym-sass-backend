@@ -271,6 +271,8 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         FROM "ServiceBooking" sb
         JOIN "Service" s ON s."serviceId" = sb."serviceId"
       ) b
+      JOIN "Gym" g ON g."gymId" = b."gymId"
+
       WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
       AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
       AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
@@ -302,6 +304,7 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         FROM "ServiceBooking" sb
         JOIN "Service" s ON s."serviceId" = sb."serviceId"
       ) b
+      JOIN "Gym" g ON g."gymId" = b."gymId"
       WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
       AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
       AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})${ownerFilter}
