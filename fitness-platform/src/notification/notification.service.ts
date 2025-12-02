@@ -1,58 +1,86 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
-import { NotificationStatus } from '@prisma/client';
+import { Notification, NotificationStatus } from '@prisma/client';
 
+const PAGE_SIZE = 10
 
 @Injectable()
 export class NotificationService {
   constructor(private readonly databaseservice: DatabaseService) {}
 
-  async findOlder(currentUserId: number) {
-    return await this.databaseservice.notification.findMany(
+  async paginate(notifications: Notification[], direction: 'asc' | 'desc'){
+
+    const hasMore = notifications.length > PAGE_SIZE;
+    const data = hasMore ? notifications.slice(0, PAGE_SIZE) : notifications;
+    const nextCursor = hasMore ? notifications[notifications.length  - 1].notificationId : null;
+
+    return { data, hasMore, nextCursor };
+  }
+
+  async findOlder(currentUserId: number, cursor?: number) {
+    const notifications = await this.databaseservice.notification.findMany(
       {
         where: {
           userId: currentUserId,
+          ...(cursor ? { notificationId: { gt: cursor }} : {} )
         },
         orderBy: {
-          createdAt: 'asc'
-        }
-    }
-    );
+          notificationId : 'asc',
+        },
+        take : PAGE_SIZE + 1
+
+    });
+    return this.paginate(notifications, 'asc')
   }
 
-  async findLatest(currentUserId: number) {
-    return await this.databaseservice.notification.findMany(
+  async findLatest(currentUserId: number, cursor?: number) {
+    const notifications = await this.databaseservice.notification.findMany(
       {
         where: {
           userId: currentUserId,
+          ...(cursor ? {notificationId : { lt : cursor}} : {})
         },
         orderBy: {
-          createdAt: 'desc'
-        }
-    }
-    );
+          notificationId: 'desc'
+        },
+        take: PAGE_SIZE + 1
+    });
+
+    return this.paginate(notifications, 'desc')
   }
 
-  async findUnread(currentUserId: number) {
-    return await this.databaseservice.notification.findMany(
+  async findUnread(currentUserId: number, cursor?: number) {
+    const notifications = await this.databaseservice.notification.findMany(
       {
         where: {
           userId: currentUserId,
-          status: NotificationStatus.UNREAD
-        }
-      }
-      );
+          status: NotificationStatus.UNREAD,
+          ...(cursor ? { notificationId : { lt : cursor } } : {}),
+        },
+        orderBy: {
+          notificationId : 'desc'
+        },
+        take: PAGE_SIZE + 1
+      });
+
+      return this.paginate(notifications, 'desc')
   }
 
-  async findRead(currentUserId: number) {
-    return await this.databaseservice.notification.findMany(
+  async findRead(currentUserId: number, cursor?: number ) {
+    const notificatoins = await this.databaseservice.notification.findMany(
       {
         where: {
           userId: currentUserId,
-          status: NotificationStatus.READ
-        }
-      }
-      );
+          status: NotificationStatus.READ,
+          ...(cursor ? {notificationId: {lt: cursor}} : {}),
+        },
+        orderBy: {
+          notificationId: 'desc'
+        },
+        take: PAGE_SIZE + 1,
+      });
+
+      return this.paginate(notificatoins, 'desc')
   }
 
   async findOne(id: number){
@@ -65,6 +93,11 @@ export class NotificationService {
         userId: true,
       }
     })
+
+    if (!notification) {
+      throw new NotFoundException('This notification was not found')
+    }
+
     return notification;
   }
 
@@ -77,7 +110,7 @@ export class NotificationService {
     }
 
     if(notification.userId !== currentUserId){
-      throw new NotFoundException('Cannot update another persons message')
+      throw new ForbiddenException('Cannot update another persons message')
     }
     return await this.databaseservice.notification.update({
       where: {
@@ -98,7 +131,7 @@ export class NotificationService {
     }
 
     if(notification.userId !== currentUserId){
-      throw new NotFoundException('Cannot delete another persons message')
+      throw new ForbiddenException('Cannot delete another persons message')
     }
 
     return await this.databaseservice.notification.delete({
@@ -107,5 +140,49 @@ export class NotificationService {
       }
   });
   }
+
+  async markAllAsRead(currentUserId: number) {
+    const result = await this.databaseservice.notification.updateMany({
+      where: {
+        userId: currentUserId,
+        status: NotificationStatus.UNREAD,
+      },
+      data: {
+        status: NotificationStatus.READ,
+      },
+    });
+
+    return {
+      success: true,
+      count: result.count,
+    };
+  }
+
+
+  async deleteAllRead(currentUserId: number) {
+    const result = await this.databaseservice.notification.deleteMany({
+      where: {
+        userId: currentUserId,
+        status: NotificationStatus.READ,
+      },
+    });
+
+    return {
+      success: true,
+      count: result.count,
+    };
+  }
+
+  async getUnreadCount(currentUserId: number) {
+    const count = await this.databaseservice.notification.count({
+      where: {
+        userId: currentUserId,
+        status: NotificationStatus.UNREAD,
+      },
+    });
+
+    return { count: count };
+  }
+
 
 }
