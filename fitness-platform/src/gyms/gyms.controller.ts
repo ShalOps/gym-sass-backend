@@ -14,7 +14,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { GymsService } from './gyms.service';
-import { Prisma } from '@prisma/client';
 import { CreateGymsDto } from './dto/create-gyms.dto';
 import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';

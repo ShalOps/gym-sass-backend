@@ -1,5 +1,5 @@
 // /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +7,12 @@ async function main() {
   // Wrapped the entire seeding logic inside a transaction for atomicity.
   await prisma.$transaction(async (tx) => {
     // Delete in reverse dependency order
+    await tx.paymentLog.deleteMany({});
+    await tx.gymClassReviewResponse.deleteMany({});
+    await tx.gymClassReview.deleteMany({});
+    await tx.gymReviewResponse.deleteMany({});
+    await tx.gymReview.deleteMany({});
+    await tx.payment.deleteMany({});
     await tx.serviceBooking.deleteMany({});
     await tx.classBooking.deleteMany({});
     await tx.serviceOptionAssignment.deleteMany({});
@@ -18,7 +24,6 @@ async function main() {
     await tx.user.deleteMany({});
 
     // Reset sequences to restart IDs from 1
-    await tx.$executeRaw`ALTER SEQUENCE "Gym_gymId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "User_userId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "Gym_gymId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "Service_serviceId_seq" RESTART WITH 1;`;
@@ -28,6 +33,11 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "Photo_id_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "ClassBooking_classBookingId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "ServiceBooking_serviceBookingId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymReview_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymReviewResponse_responseId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymClassReview_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "GymClassReviewResponse_responseId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "payments_id_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -46,7 +56,7 @@ async function main() {
           password: 'password123', // Hash in production!
           birthDate: new Date(1990 + (i % 10), i % 12, (i % 28) + 1),
           gender: genders[i % 2],
-          email: i % 5 === 0 ? null : `user${i}@example.com`, // Some without email
+          email: `user${i}@example.com`,
           phoneNo: `123456789${String(i).padStart(2, '0')}`, // Ensure unique
           profilePic: i % 10 === 0 ? `https://example.com/pic${i}.jpg` : null,
           bio: i % 8 === 0 ? `Bio for user ${i}` : null,
@@ -198,7 +208,7 @@ async function main() {
       const numBookings = Math.min(3, customers.length); // Up to 3 bookings per class
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(gymClass.classId + b) % customers.length];
-        await tx.classBooking.create({
+        const booking = await tx.classBooking.create({
           data: {
             userId: customer.userId,
             classId: gymClass.classId,
@@ -207,9 +217,39 @@ async function main() {
             startTime: new Date(Date.now() + (b + 1) * 60 * 60 * 1000), // Future times
             endTime: new Date(Date.now() + (b + 2) * 60 * 60 * 1000),
             notes: b % 3 === 0 ? `Note for booking ${b}` : null,
-            paymentStatus: 'PENDING',
           },
         });
+
+        const status =
+          b % 3 === 0 ? 'PROCESSED' : b % 3 === 1 ? 'PAID_MANUAL' : 'PENDING';
+        const method =
+          b % 3 === 0 ? 'telebirr' : b % 3 === 1 ? 'MANUAL_CASH' : null;
+
+        const payment = await tx.payment.create({
+          data: {
+            txRef: `tx-class-${booking.classBookingId}-${Date.now()}-${b}`,
+            amount: new Prisma.Decimal(gymClass.price),
+            currency: 'ETB',
+            status: status,
+            type: 'BOOKING',
+            userId: customer.userId,
+            classBookingId: booking.classBookingId,
+            customerEmail: customer.email,
+            customerFirstName: customer.firstName,
+            customerLastName: customer.lastName,
+            method: method,
+          },
+        });
+
+        if (status !== 'PENDING') {
+          await tx.paymentLog.create({
+            data: {
+              paymentId: payment.id,
+              action: status === 'PROCESSED' ? 'VERIFY' : 'MANUAL_RECORD',
+              details: { seeded: true, method },
+            },
+          });
+        }
       }
     }
 
@@ -218,7 +258,7 @@ async function main() {
       const numBookings = Math.min(2, customers.length); // Up to 2 bookings per service
       for (let b = 0; b < numBookings; b++) {
         const customer = customers[(service.serviceId + b) % customers.length];
-        await tx.serviceBooking.create({
+        const booking = await tx.serviceBooking.create({
           data: {
             userId: customer.userId,
             serviceId: service.serviceId,
@@ -233,9 +273,91 @@ async function main() {
                 ? new Date(Date.now() + (b + 30) * 24 * 60 * 60 * 1000)
                 : null,
             notes: b % 3 === 0 ? `Service booking note ${b}` : null,
-            paymentStatus: 'PENDING',
           },
         });
+
+        const status =
+          b % 3 === 0 ? 'PROCESSED' : b % 3 === 1 ? 'PAID_MANUAL' : 'PENDING';
+        const method =
+          b % 3 === 0 ? 'chapa' : b % 3 === 1 ? 'MANUAL_CASH' : null;
+
+        const payment = await tx.payment.create({
+          data: {
+            txRef: `tx-service-${booking.serviceBookingId}-${Date.now()}-${b}`,
+            amount: new Prisma.Decimal(service.price),
+            currency: 'ETB',
+            status: status,
+            type: 'BOOKING',
+            userId: customer.userId,
+            serviceBookingId: booking.serviceBookingId,
+            customerEmail: customer.email,
+            customerFirstName: customer.firstName,
+            customerLastName: customer.lastName,
+            method: method,
+          },
+        });
+
+        if (status !== 'PENDING') {
+          await tx.paymentLog.create({
+            data: {
+              paymentId: payment.id,
+              action: status === 'PROCESSED' ? 'VERIFY' : 'MANUAL_RECORD',
+              details: { seeded: true, method },
+            },
+          });
+        }
+      }
+    }
+
+    // Seed gym reviews
+    for (const gym of gyms) {
+      const numReviews = Math.min(5, customers.length);
+      for (let r = 0; r < numReviews; r++) {
+        const customer = customers[(gym.gymId + r) % customers.length];
+        const review = await tx.gymReview.create({
+          data: {
+            rating: (r % 5) + 1,
+            comment: r % 2 === 0 ? `Great gym experience!` : null,
+            gymId: gym.gymId,
+            userId: customer.userId,
+          },
+        });
+        // Add response for some reviews
+        if (r % 3 === 0) {
+          await tx.gymReviewResponse.create({
+            data: {
+              message: `Thank you for your feedback!`,
+              reviewId: review.id,
+              ownerId: gym.gymOwnerId,
+            },
+          });
+        }
+      }
+    }
+
+    // Seed class reviews
+    for (const gymClass of gymClasses) {
+      const numReviews = Math.min(3, customers.length);
+      for (let r = 0; r < numReviews; r++) {
+        const customer = customers[(gymClass.classId + r) % customers.length];
+        const review = await tx.gymClassReview.create({
+          data: {
+            rating: (r % 5) + 1,
+            comment: r % 2 === 0 ? `Excellent class!` : null,
+            classId: gymClass.classId,
+            userId: customer.userId,
+          },
+        });
+        // Add response for some reviews
+        if (r % 2 === 0) {
+          await tx.gymClassReviewResponse.create({
+            data: {
+              message: `We're glad you enjoyed it!`,
+              reviewId: review.id,
+              trainerId: gymClass.trainerId,
+            },
+          });
+        }
       }
     }
   }); // end transaction

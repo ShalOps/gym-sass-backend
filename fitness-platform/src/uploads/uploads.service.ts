@@ -3,12 +3,14 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { unlink } from 'fs/promises';
 import { mkdir } from 'fs/promises';
 import sharp from 'sharp';
-import { Photo } from '@prisma/client';
+import { Photo, Prisma } from '@prisma/client';
 import {
   UPLOADS_DIR_ABSOLUTE,
   THUMBNAIL_DIR_ABSOLUTE,
@@ -18,6 +20,8 @@ import {
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
+
   constructor(private readonly db: DatabaseService) {}
 
   private async generateThumbnails(photos: Photo[]): Promise<void> {
@@ -278,21 +282,44 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos = await this.createPhotos(
-      'GYM',
-      +gymId,
-      filePaths,
-      coverIndex,
-      orders,
-    );
+    try {
+      const photos = await this.createPhotos(
+        'GYM',
+        +gymId,
+        filePaths,
+        coverIndex,
+        orders,
+      );
 
-    // Generate thumbnails in parallel
-    await this.generateThumbnails(photos);
+      // Generate thumbnails in parallel
+      await this.generateThumbnails(photos);
 
-    return {
-      message: 'Photos uploaded successfully',
-      photos,
-    };
+      return {
+        message: 'Photos uploaded successfully',
+        photos,
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          this.logger.warn('Upload failed: Duplicate photo entry');
+          throw new BadRequestException('Duplicate photo entry.');
+        }
+      }
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        this.logger.warn(`Upload failed: ${error.message}`);
+        throw error;
+      }
+
+      this.logger.error(
+        'Failed to upload gym photos',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to upload photos');
+    }
   }
 
   async getGymPhotos(gymId: number) {
@@ -363,21 +390,44 @@ export class UploadsService {
     });
 
     // Create photo records
-    const photos = await this.createPhotos(
-      'CLASS',
-      +classId,
-      filePaths,
-      coverIndex,
-      orders,
-    );
+    try {
+      const photos = await this.createPhotos(
+        'CLASS',
+        +classId,
+        filePaths,
+        coverIndex,
+        orders,
+      );
 
-    // Generate thumbnails in parallel
-    await this.generateThumbnails(photos);
+      // Generate thumbnails in parallel
+      await this.generateThumbnails(photos);
 
-    return {
-      message: 'Photos uploaded successfully',
-      photos,
-    };
+      return {
+        message: 'Photos uploaded successfully',
+        photos,
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          this.logger.warn('Upload failed: Duplicate photo entry');
+          throw new BadRequestException('Duplicate photo entry.');
+        }
+      }
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        this.logger.warn(`Upload failed: ${error.message}`);
+        throw error;
+      }
+
+      this.logger.error(
+        'Failed to upload class photos',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to upload photos');
+    }
   }
 
   async getClassPhotos(classId: number) {
@@ -644,28 +694,49 @@ export class UploadsService {
     );
 
     // Update orders in a transaction
-    await this.db.$transaction(async (tx) => {
-      for (const { photoId, order } of photoOrders) {
-        // Verify photo belongs to this gym
-        const photo = await tx.photo.findUnique({
-          where: { id: photoId },
-          select: { entityType: true, entityId: true },
-        });
+    try {
+      await this.db.$transaction(async (tx) => {
+        for (const { photoId, order } of photoOrders) {
+          // Verify photo belongs to this gym
+          const photo = await tx.photo.findUnique({
+            where: { id: photoId },
+            select: { entityType: true, entityId: true },
+          });
 
-        if (!photo || photo.entityType !== 'GYM' || photo.entityId !== gymId) {
-          throw new NotFoundException(
-            `Photo ${photoId} not found for this gym`,
-          );
+          if (
+            !photo ||
+            photo.entityType !== 'GYM' ||
+            photo.entityId !== gymId
+          ) {
+            throw new NotFoundException(
+              `Photo ${photoId} not found for this gym`,
+            );
+          }
+
+          await tx.photo.update({
+            where: { id: photoId },
+            data: { order },
+          });
         }
+      });
 
-        await tx.photo.update({
-          where: { id: photoId },
-          data: { order },
-        });
+      return { message: 'Photo orders updated successfully' };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        this.logger.warn(`Update photo orders failed: ${error.message}`);
+        throw error;
       }
-    });
 
-    return { message: 'Photo orders updated successfully' };
+      this.logger.error(
+        'Failed to update gym photo orders',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to update photo orders');
+    }
   }
 
   async updateClassPhotoOrders(
@@ -697,31 +768,48 @@ export class UploadsService {
     );
 
     // Update orders in a transaction
-    await this.db.$transaction(async (tx) => {
-      for (const { photoId, order } of photoOrders) {
-        // Verify photo belongs to this class
-        const photo = await tx.photo.findUnique({
-          where: { id: photoId },
-          select: { entityType: true, entityId: true },
-        });
+    try {
+      await this.db.$transaction(async (tx) => {
+        for (const { photoId, order } of photoOrders) {
+          // Verify photo belongs to this class
+          const photo = await tx.photo.findUnique({
+            where: { id: photoId },
+            select: { entityType: true, entityId: true },
+          });
 
-        if (
-          !photo ||
-          photo.entityType !== 'CLASS' ||
-          photo.entityId !== classId
-        ) {
-          throw new NotFoundException(
-            `Photo ${photoId} not found for this class`,
-          );
+          if (
+            !photo ||
+            photo.entityType !== 'CLASS' ||
+            photo.entityId !== classId
+          ) {
+            throw new NotFoundException(
+              `Photo ${photoId} not found for this class`,
+            );
+          }
+
+          await tx.photo.update({
+            where: { id: photoId },
+            data: { order },
+          });
         }
+      });
 
-        await tx.photo.update({
-          where: { id: photoId },
-          data: { order },
-        });
+      return { message: 'Photo orders updated successfully' };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        this.logger.warn(`Update photo orders failed: ${error.message}`);
+        throw error;
       }
-    });
 
-    return { message: 'Photo orders updated successfully' };
+      this.logger.error(
+        'Failed to update class photo orders',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Failed to update photo orders');
+    }
   }
 }

@@ -33,6 +33,15 @@ export class CreateGymsDto {
   workingHours?: string;
 
   @ApiPropertyOptional({
+    description: 'Timezone of the gym (IANA format)',
+    example: 'Africa/Addis_Ababa',
+    default: 'UTC',
+  })
+  @IsOptional()
+  @IsString()
+  timezone?: string;
+
+  @ApiPropertyOptional({
     description: 'Whether the gym is verified by admin',
     example: false,
     default: false,

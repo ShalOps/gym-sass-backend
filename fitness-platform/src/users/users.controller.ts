@@ -14,7 +14,6 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { Prisma } from '@prisma/client';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
 import {
   ApiTags,
