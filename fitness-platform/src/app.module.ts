@@ -10,6 +10,7 @@ import { ServicesModule } from './services/services.module';
 import { ServiceOptionModule } from './service-option/service-option.module';
 import { GymClassesModule } from './gym-classes/gym-classes.module';
 import { ServiceOptionAssignmentModule } from './service-option-assignment/service-option-assignment.module';
+import { googleOauthConfig } from './config/google-oauth.config';
 import { UploadsModule } from './uploads/uploads.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { MulterModule } from '@nestjs/platform-express';
@@ -30,7 +31,10 @@ import { APP_GUARD } from '@nestjs/core';
     AuthModule,
     UsersModule,
     GymsModule,
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+    isGlobal: true,
+    load:[googleOauthConfig]
+    }),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -63,3 +67,5 @@ import { APP_GUARD } from '@nestjs/core';
   ],
 })
 export class AppModule {}
+
+

@@ -143,6 +143,9 @@ model User {
   location              String
   goal                  Goal?
   role                  Role                     @default(CUSTOMER)
+  isGoogleUser          Boolean                  @default(false)
+  isProfileComplete     Boolean                  @default(false)
+  googleId              String?                  @unique
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]

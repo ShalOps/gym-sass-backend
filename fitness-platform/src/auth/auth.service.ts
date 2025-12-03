@@ -18,6 +18,7 @@ export class AuthService {
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
   ) {}
+  private googleTempStore = new Map<string, any>();
 
   async register(dto: RegisterDto) {
     if (!dto.password.length || dto.password.length < 8) {
@@ -126,28 +127,125 @@ export class AuthService {
     return { accessToken };
   }
   async getProfile(userId: number) {
-    const user = await this.db.user.findUnique({
-      where: { userId: userId },
-      select: {
-        userId: true,
-        email: true,
-        phoneNo: true,
-        firstName: true,
-        lastName: true,
-        userName: true,
-        birthDate: true,
-        location: true,
-        bio: true,
-        profilePic: true,
-        role: true,
-        gender: true,
-        goal: true,
-      },
-    });
+      const user = await this.db.user.findUnique({
+        where: { userId: userId },
+        select: {
+          userId: true,
+          email: true,
+          phoneNo: true,
+          firstName: true,
+          lastName: true,
+          userName: true,
+          birthDate: true,
+          location: true,
+          bio: true,
+          profilePic: true,
+          role: true,
+          gender: true,
+          goal: true,
+        },
+      });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    return user;
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      return user;
   }
+
+  async validateGoogleUser(profile: any) {
+      const { id: googleId, emails, displayName } = profile;
+      const email = emails?.[0]?.value;
+
+      // Phase 1: Check if already linked
+      const googleLinkedUser = await this.db.user.findUnique({
+        where: { googleId },
+      });
+      if (googleLinkedUser) return googleLinkedUser;
+
+      // Phase 2: Check if email matches existing account
+      if (email) {
+        const existingByEmail = await this.db.user.findUnique({
+          where: { email },
+        });
+        if (existingByEmail) {
+          // Link Google account
+          return await this.db.user.update({
+            where: { email },
+            data: {
+              googleId,
+              isGoogleUser: true,
+            },
+          });
+        }
+      }
+
+      // Phase 3: No email match — frontend must ask for phone number
+      return {
+        requiresPhone: true,
+        googleData: { googleId, email, name: displayName },
+      };
+  }
+
+  async registerOrLinkGoogleUser(dto: {phoneNo: string; gender: Gender; goal: Goal; googleData: any; role: Role; birthDate: Date, location?: string; bio?: string; profilePic?: string; userName?: string;}) {
+      const existingByPhone = await this.db.user.findUnique({
+        where: { phoneNo: dto.phoneNo },
+      });
+      // User with this phone already exists -> Link Google account
+      if (existingByPhone) {
+        return await this.db.user.update({
+          where: { phoneNo: dto.phoneNo },
+          data: {
+            googleId: dto.googleData.googleId,
+            // Only update email if it doesn't exist
+            email: existingByPhone.email ?? dto.googleData.email, 
+            isGoogleUser: true,
+          },
+        });
+      }
+
+      // No user with this phone -> Create a new user
+      return await this.db.user.create({
+        data: {
+          phoneNo: dto.phoneNo,
+          email: dto.googleData.email,
+          firstName: dto.googleData.name.split(" ")[0] || '',
+          lastName: dto.googleData.name.split(" ")[1] || '',
+          userName: dto.googleData.name?.givenName || 'GoogleUser',
+          location: dto.location || '',
+          bio: dto.bio || '',
+          profilePic: dto.googleData.photos?.[0]?.value || '',
+          birthDate: new Date(dto.birthDate),
+          gender: dto.gender,
+          goal: dto.goal,
+          googleId: dto.googleData.googleId,
+          isGoogleUser: true,
+          role: dto.role || 'CUSTOMER',
+        },
+      });
+  }
+  async generateJwt(user: any) {
+      const payload = { 
+        sub: user.userId, 
+        email: user.email, 
+        phoneNo: user.phoneNo,
+        role: user.role 
+      };
+    return this.jwtService.sign(payload);
+}
+
+createTempSession(googleData: any): string {
+    const sessionId = crypto.randomUUID();
+    this.googleTempStore.set(sessionId, googleData);
+    setTimeout(() => this.googleTempStore.delete(sessionId), 5 * 60 * 1000); 
+    return sessionId;
+}
+
+getTempSession(sessionId: string): any {
+    return this.googleTempStore.get(sessionId);
+}
+
+clearTempSession(sessionId: string) {
+    this.googleTempStore.delete(sessionId);
+}
+
 }
