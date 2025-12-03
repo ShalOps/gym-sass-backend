@@ -67,7 +67,6 @@ enum PaymentType {
 }
 
 enum NotificationType {
-   
   NEW_CLASS_BOOKING
   NEW_SERVICE_BOOKING
   CLASS_BOOKING_CANCELLED
@@ -75,7 +74,6 @@ enum NotificationType {
   CLASS_BOOKING_CONFIRMED
   SERVICE_BOOKING_CONFIRMED
   NEW_GYM_CREATED
-
 }
 
 enum NotificationStatus {
@@ -376,13 +374,16 @@ model PaymentLog {
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
+}
+
 model Notification {
-  notificationId      Int                   @id @default(autoincrement())
-  userId              Int
-  user                User                  @relation(fields: [userId], references: [userId])
-  type                NotificationType
-  message             String
-  status              NotificationStatus    @default(UNREAD)
-  createdAt           DateTime              @default(now())
+  notificationId Int                @id @default(autoincrement())
+  userId         Int
+  user           User               @relation(fields: [userId], references: [userId])
+  type           NotificationType
+  message        String
+  status         NotificationStatus @default(UNREAD)
+  createdAt      DateTime           @default(now())
+
   @@index([userId])
 }
