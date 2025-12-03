@@ -10,6 +10,8 @@ import { PaginationDto } from './dto/pagination.dto';
 import { CreateGymsDto } from './dto/create-gyms.dto';
 import { UpdateGymsDto } from './dto/update-gyms.dto';
 import { DateUtil } from '../common/utils/date.util';
+import { NotificationType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class GymsService {
@@ -43,9 +45,31 @@ export class GymsService {
         `Invalid timezone: ${createGymsDto.timezone}`,
       );
     }
+    return await this.databaseservice.$transaction( async (tx) => {
+       
+      const newGym = await tx.gym.create({
+        data: { ...createGymsDto, gymOwnerId: currentUserId },
+      });
 
-    return this.databaseservice.gym.create({
-      data: { ...createGymsDto, gymOwnerId: currentUserId },
+      const adminIdList = await tx.user.findMany({
+        where: {
+          role: Role.ADMIN
+        },
+        select: {
+          userId: true
+        }
+      })
+      for (const adminId of adminIdList){
+        await tx.notification.create({
+          data:
+          {
+            userId: adminId.userId,
+            type: NotificationType.NEW_GYM_CREATED,
+            message: `Gym with gym name ${newGym.gymName} was created by a user check credentials and update verification`,
+          }
+        })
+      }
+  
     });
   }
 

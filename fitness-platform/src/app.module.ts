@@ -50,6 +50,7 @@ import { APP_GUARD } from '@nestjs/core';
     NotificationsModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [

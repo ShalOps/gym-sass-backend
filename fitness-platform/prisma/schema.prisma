@@ -66,6 +66,23 @@ enum PaymentType {
   OTHER
 }
 
+enum NotificationType {
+   
+  NEW_CLASS_BOOKING
+  NEW_SERVICE_BOOKING
+  CLASS_BOOKING_CANCELLED
+  SERVICE_BOOKING_CANCELLED
+  CLASS_BOOKING_CONFIRMED
+  SERVICE_BOOKING_CONFIRMED
+  NEW_GYM_CREATED
+
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -136,6 +153,7 @@ model User {
   ownerClassResponses   GymClassReviewResponse[] @relation("OwnerResponses")
   trainerClassResponses GymClassReviewResponse[] @relation("TrainerResponses")
   payments              Payment[]                @relation("UserPayments")
+  notifications         Notification[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -358,4 +376,13 @@ model PaymentLog {
   payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@index([paymentId])
+model Notification {
+  notificationId      Int                   @id @default(autoincrement())
+  userId              Int
+  user                User                  @relation(fields: [userId], references: [userId])
+  type                NotificationType
+  message             String
+  status              NotificationStatus    @default(UNREAD)
+  createdAt           DateTime              @default(now())
+  @@index([userId])
 }

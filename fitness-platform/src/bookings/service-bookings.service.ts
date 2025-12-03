@@ -15,6 +15,8 @@ import { BookingsService } from './bookings.service';
 import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Action } from  './bookings.service'
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
@@ -203,16 +205,30 @@ export class ServiceBookingsService extends BookingsService {
     }
 
     // Update the booking
-    return this.databaseService.serviceBooking.update({
-      where: { serviceBookingId: id },
-      data: updateData,
-      include: {
-        service: {
+    return this.databaseService.$transaction(async (tx) => {
+
+      const updateBooking = await tx.serviceBooking.update({
+          where: { serviceBookingId: id },
+          data: updateData,
           include: {
-            gym: true,
+            service: {
+              include: {
+                gym: true,
+              },
+            },
+            user: {
+              select: {
+                userName: true,
+              }
+            }
           },
-        },
-      },
+        });
+
+      if (updateData.status == BookingStatus.CONFIRMED){
+        await this.createBookingNotifications(updateBooking, NotificationType.SERVICE_BOOKING_CONFIRMED, Action.CONFIRMED, tx);
+      }
+
+      return updateBooking;
     });
   }
 
@@ -245,21 +261,31 @@ export class ServiceBookingsService extends BookingsService {
     }
 
     // Update status to cancelled
-    const cancelledBooking = await this.databaseService.serviceBooking.update({
-      where: { serviceBookingId: id },
-      data: { status: BookingStatus.CANCELLED },
-      include: {
-        service: {
-          include: {
-            gym: {
-              include: {
-                gymOwner: true,
+    const cancelledBooking = await this.databaseService.$transaction(async (tx) => {
+      const booking = await tx.serviceBooking.update({
+        where: { serviceBookingId: id },
+        data: { status: BookingStatus.CANCELLED },
+        include: {
+          service: {
+            include: {
+              gym: {
+                include: {
+                  gymOwner: true,
+                },
               },
             },
           },
+          user: true,
         },
-        user: true,
-      },
+      });
+
+      await this.createBookingNotifications(
+        booking,
+        NotificationType.SERVICE_BOOKING_CANCELLED,
+        Action.CANCELLED,
+        tx,
+      );
+      return booking;
     });
 
     // Notify Gym Owner
@@ -560,6 +586,13 @@ export class ServiceBookingsService extends BookingsService {
       },
     });
 
+    await this.createBookingNotifications(
+      booking,
+      NotificationType.SERVICE_BOOKING_CONFIRMED,
+      Action.CONFIRMED,
+      db,
+    );
+
     // // Send confirmation email with localized time
     // if (booking.user?.email && booking.startTime) {
     //   this.notificationsService
@@ -657,10 +690,35 @@ export class ServiceBookingsService extends BookingsService {
         },
       });
 
-    if (conflictingBooking) {
+   if (conflictingBooking) {
       throw new BadRequestException(
         `Time conflict with existing booking for "${conflictingBooking.service.name}"`,
       );
     }
+  }
+
+    async createBookingNotifications(
+    booking: {
+      user: { userName: string };
+      service: {
+        name: string;
+        gym: { gymOwnerId: number };
+      };
+    }, 
+    notificationType: NotificationType,
+    action: Action,
+    tx?: Prisma.TransactionClient
+  ) {
+    const client = tx || this.databaseService;
+
+    await Promise.all([
+      client.notification.create({
+        data: {
+          userId: booking.service.gym.gymOwnerId,
+          type: notificationType,
+          message: `User with username ${booking.user.userName} ${action} your service ${booking.service.name}`
+        }
+      }),
+    ]);
   }
 }
