@@ -9,6 +9,9 @@ import {
   HttpCode,
   UseGuards,
   Req,
+  Param,
+  ParseIntPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { PaginationSchema, PaginationDto } from './dto/pagination.dto';
@@ -26,11 +29,26 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
+import { DateRangeDto } from './dto/date-range.dto';
+import { Role } from 'generated/prisma';
 
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+  private checkOwnershipAndGetUserId(req: RequestWithUser, queryGymId?: number): { userId: number, isAdmin: boolean } {
+    const user = req.user;
+    const isAdmin = user.role === Role.ADMIN;
+    
+    if (!isAdmin && user.role !== Role.GYMOWNER) {
+       throw new ForbiddenException('Only Admins and Gym Owners can access analytics.');
+    }
+    
+    return { 
+      userId: user.userId, 
+      isAdmin: isAdmin 
+    };
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -223,5 +241,40 @@ export class UsersController {
   @HttpCode(204)
   async remove(@Req() req: RequestWithUser) {
     await this.usersService.remove(req.user.userId);
+  }
+  @Get('activity')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.GYMOWNER) 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get user activity leaderboard and statistics' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns a list of users sorted by activity level.',
+    schema: {
+      example: [
+        {
+          "userId": 101,
+          "userName": "mike_lifter",
+          "totalBookings": 15,
+          "activeDays": 8,
+          "cancelled": 1,
+          "completed": 12
+        },
+        {
+          "userId": 102,
+          "userName": "emma_yoga",
+          "totalBookings": 5,
+          "activeDays": 3,
+          "cancelled": 0,
+          "completed": 5
+        }
+      ]
+    }
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden. Only Admins or Gym Owners can view this.' })
+  getUserActivity(@Query() query: DateRangeDto, @Req() req: RequestWithUser) {
+    const { userId, isAdmin } = this.checkOwnershipAndGetUserId(req, query.gymId);
+    return this.usersService.getUserActivity(query, userId, isAdmin);
   }
 }
