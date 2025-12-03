@@ -1,47 +1,123 @@
-import { IsEmail, IsNotEmpty, IsString, IsEnum, IsOptional, IsIn, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  IsOptional,
+  MinLength,
+} from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
-  @ApiProperty({ description: 'User first name' })
-  @IsNotEmpty() @IsString() firstName: string;
+  @ApiProperty({
+    description: 'User first name',
+    example: 'John',
+  })
+  @IsNotEmpty()
+  @IsString()
+  firstName: string;
 
-  @ApiProperty({ description: 'User last name' })
-  @IsNotEmpty() @IsString() lastName: string;
+  @ApiProperty({
+    description: 'User last name',
+    example: 'Doe',
+  })
+  @IsNotEmpty()
+  @IsString()
+  lastName: string;
 
-  @ApiProperty({ description: 'Unique username' })
-  @IsNotEmpty() @IsString() userName: string;
+  @ApiProperty({
+    description: 'Unique username',
+    example: 'johndoe123',
+  })
+  @IsNotEmpty()
+  @IsString()
+  userName: string;
 
-  @ApiProperty({ description: 'Email address', required: false })
-  @IsEmail() email: string;
+  @ApiProperty({
+    description: 'Email address',
+    example: 'johndoe@example.com',
+    format: 'email',
+  })
+  @IsNotEmpty({ message: 'Email is required' })
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  email: string;
 
-  @ApiProperty({ description: 'Password (min 8 characters)' })
-  @IsNotEmpty() @IsString() @MinLength(8) password: string;
+  @ApiProperty({
+    description: 'Password (will be hashed)',
+    example: 'SecurePass123!',
+    minLength: 8,
+  })
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8)
+  password: string;
 
-  @ApiProperty({ description: 'Birth date' })
-  @IsNotEmpty() birthDate: Date | string;
+  @ApiProperty({
+    description: 'Birth date in ISO format (YYYY-MM-DD)',
+    example: '1990-05-15',
+  })
+  @IsNotEmpty()
+  birthDate: Date | string;
 
-  @ApiProperty({ description: 'User gender', enum: Gender })
-  @IsNotEmpty() @IsEnum(Gender) gender: Gender;
+  @ApiProperty({
+    description: 'User gender',
+    enum: Gender,
+    example: Gender.MALE,
+  })
+  @IsNotEmpty()
+  @IsEnum(Gender)
+  gender: Gender;
 
-  @ApiProperty({ description: 'User location' })
-  @IsNotEmpty() @IsString() location: string;
+  @ApiProperty({
+    description: 'User location at the given time ',
+    example: 'GPS Coordinates',
+  })
+  @IsNotEmpty()
+  @IsString()
+  location: string;
 
-  @ApiProperty({ description: 'Phone number' })
-  @IsNotEmpty() @IsString() phoneNo: string;
+  @ApiPropertyOptional({
+    description: 'Phone number',
+    example: '+1234567890',
+  })
+  @IsOptional()
+  @IsString()
+  phoneNo: string;
 
-  @ApiProperty({ description: 'User role', enum: Role, required: false })
+  @ApiPropertyOptional({
+    description: 'User role (defaults to CUSTOMER)',
+    enum: Role,
+    example: Role.CUSTOMER,
+    default: Role.CUSTOMER,
+  })
   @IsOptional()
   @IsEnum(Role)
-  @IsIn([Role.TRAINER, Role.CUSTOMER, Role.GYMOWNER])
+  @IsEnum(Role)
   role?: Role;
 
-  @ApiProperty({ description: 'Fitness goal', enum: Goal, required: false })
-  @IsOptional() @IsEnum(Goal) goal?: Goal;
+  @ApiPropertyOptional({
+    description: 'Fitness goal',
+    enum: Goal,
+    example: Goal.WEIGHTLOSS,
+  })
+  @IsOptional()
+  @IsEnum(Goal)
+  goal?: Goal;
 
-  @ApiProperty({ description: 'Profile picture URL', required: false })
-  @IsOptional() @IsString() profilePic?: string;
+  @ApiPropertyOptional({
+    description: 'URL to profile picture',
+    example: '/profiles/john.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  profilePic?: string;
 
-  @ApiProperty({ description: 'User bio', required: false })
-  @IsOptional() @IsString() bio?: string;
+  @ApiPropertyOptional({
+    description: 'Short bio or description',
+    example: 'Fitness enthusiast ',
+  })
+  @IsOptional()
+  @IsString()
+  bio?: string;
 }

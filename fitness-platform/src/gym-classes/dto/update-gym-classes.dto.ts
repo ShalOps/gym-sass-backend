@@ -1,4 +1,4 @@
-import { CreateGymClassesDto } from "./create-gym-classes.dto";
-import { PartialType } from "@nestjs/mapped-types";
+import { CreateGymClassesDto } from './create-gym-classes.dto';
+import { PartialType } from '@nestjs/swagger';
 
-export class UpdateGymClassesDto extends PartialType(CreateGymClassesDto){}
+export class UpdateGymClassesDto extends PartialType(CreateGymClassesDto) {}

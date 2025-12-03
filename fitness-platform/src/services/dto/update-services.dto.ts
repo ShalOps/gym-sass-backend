@@ -1,8 +1,4 @@
-import { CreateServiceDto } from "./create-services.dto";
-import { PartialType } from "@nestjs/mapped-types";
+import { CreateServiceDto } from './create-services.dto';
+import { PartialType } from '@nestjs/swagger';
 
-export class UpdateServiceDto extends PartialType(CreateServiceDto){}
-
-
-
-
+export class UpdateServiceDto extends PartialType(CreateServiceDto) {}

@@ -1,36 +1,76 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { DatabaseService } from 'src/database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { CreateGymsDto } from './dto/create-gyms.dto';
 import { UpdateGymsDto } from './dto/update-gyms.dto';
+import { DateRangeDto } from './dto/date-range.dto';
+import { DateUtil } from '../common/utils/date.util';
+import { NotificationType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class GymsService {
   constructor(private readonly databaseservice: DatabaseService) {}
 
-  async create(createGymsDto: CreateGymsDto) {
-
+  async create(createGymsDto: CreateGymsDto, currentUserId: number) {
     const gymOwner = await this.databaseservice.user.findUnique({
-          where: { 
-            userId: createGymsDto.gymOwnerId
-           },
-          select:
-           {
-             userId: true, 
-             role: true 
-            },
-        });
-    
-        if (!gymOwner) {
-          throw new NotFoundException(`User with ID ${createGymsDto.gymOwnerId} not found`);
+      where: {
+        userId: currentUserId,
+      },
+      select: {
+        userId: true,
+        role: true,
+      },
+    });
+
+    if (!gymOwner) {
+      throw new NotFoundException(`User with ID ${currentUserId} not found`);
+    }
+    if (gymOwner.role !== 'GYMOWNER') {
+      throw new ForbiddenException(
+        `User with ID ${currentUserId} is not a Gym owner`,
+      );
+    }
+
+    if (
+      createGymsDto.timezone &&
+      !DateUtil.isValidTimezone(createGymsDto.timezone)
+    ) {
+      throw new BadRequestException(
+        `Invalid timezone: ${createGymsDto.timezone}`,
+      );
+    }
+    return await this.databaseservice.$transaction( async (tx) => {
+
+      const newGym = await tx.gym.create({
+        data: { ...createGymsDto, gymOwnerId: currentUserId },
+      });
+
+      const adminIdList = await tx.user.findMany({
+        where: {
+          role: Role.ADMIN
+        },
+        select: {
+          userId: true
         }
-        if (gymOwner.role !== 'GYMOWNER') {
-          throw new ForbiddenException(`User with ID ${createGymsDto.gymOwnerId} is not a Gym owner`);
-        }
-    
-    return this.databaseservice.gym.create({
-      data: createGymsDto,
+      })
+      for (const adminId of adminIdList){
+        await tx.notification.create({
+          data:
+          {
+            userId: adminId.userId,
+            type: NotificationType.NEW_GYM_CREATED,
+            message: `Gym with gym name ${newGym.gymName} was created by a user check credentials and update verification`,
+          }
+        })
+      }
+
     });
   }
 
@@ -69,11 +109,24 @@ export class GymsService {
         where,
         skip,
         take: limit,
+        include: {
+          coverPhoto: {
+            select: {
+              thumbnailUrl: true,
+            },
+          },
+        },
       }),
       this.databaseservice.gym.count({ where }),
     ]);
+
+    const transformedData = data.map((gym) => ({
+      ...gym,
+      coverPhotoUrl: gym.coverPhoto?.thumbnailUrl || null,
+    }));
+
     return {
-      data,
+      data: transformedData,
       total,
       page,
       limit,
@@ -82,61 +135,82 @@ export class GymsService {
   }
 
   async findOne(id: number) {
-    
-    const gym= await this.databaseservice.gym.findUnique({
-          where: {
-            gymId: id
-          },
-          select: {
-            gymId: true,
-          },
-        })
-    
-        if (!gym){
-          throw new NotFoundException(`Gym with ID ${id} not found`)
-        }
-
-    return this.databaseservice.gym.findUnique({
+    const gym = await this.databaseservice.gym.findUnique({
       where: {
         gymId: id,
       },
+      include: {
+        coverPhoto: {
+          select: {
+            thumbnailUrl: true,
+          },
+        },
+      },
     });
+
+    if (!gym) {
+      throw new NotFoundException(`Gym with ID ${id} not found`);
+    }
+
+    return {
+      ...gym,
+      coverPhotoUrl: gym.coverPhoto?.thumbnailUrl || null,
+    };
   }
 
-  async update(id: number, updateGymsDto: UpdateGymsDto) {
+  async update(
+    id: number,
+    updateGymsDto: UpdateGymsDto,
+    currentUserId: number,
+  ) {
+    const gym = await this.databaseservice.gym.findUnique({
+      where: {
+        gymId: id,
+      },
+      select: {
+        gymId: true,
+        gymOwnerId: true,
+      },
+    });
 
-     const gym= await this.databaseservice.gym.findUnique({
-          where: {
-            gymId: id
-          },
-          select: {
-            gymId: true,
-          },
-        })
-    
-        if (!gym){
-          throw new NotFoundException(`Gym with ID ${id} not found`)
-        }
+    if (!gym) {
+      throw new NotFoundException(`Gym with ID ${id} not found`);
+    }
 
-      if (updateGymsDto.gymOwnerId){
-      const gymOwner = await this.databaseservice.user.findUnique({
-          where: { 
-            userId: updateGymsDto.gymOwnerId
-           },
-          select:
-           {
-             userId: true, 
-             role: true 
-            },
-        });
-    
-        if (!gymOwner) {
-          throw new NotFoundException(`User with ID ${updateGymsDto.gymOwnerId} not found`);
-        }
-        if (gymOwner.role !== 'GYMOWNER') {
-          throw new ForbiddenException(`User with ID ${updateGymsDto.gymOwnerId} is not a Gym owner`);
-        }
+    const ownerOrAdmin = await this.databaseservice.user.findUnique({
+           where: {
+        userId: currentUserId,
+      },
+      select: {
+        userId: true,
+        role: true,
+      },
+    });
+
+    if (!ownerOrAdmin) {
+      throw new NotFoundException(`User with ID ${currentUserId} not found`);
+    }
+
+    if (ownerOrAdmin.role !== 'ADMIN') {
+      if (gym?.gymOwnerId !== currentUserId) {
+        throw new ForbiddenException('Cannot update gym you do not own');
       }
+
+      if (ownerOrAdmin.role !== 'GYMOWNER') {
+        throw new ForbiddenException(
+          `User with ID ${currentUserId} is not a Gym owner`,
+        );
+      }
+    }
+
+    if (
+      updateGymsDto.timezone &&
+      !DateUtil.isValidTimezone(updateGymsDto.timezone)
+    ) {
+      throw new BadRequestException(
+        `Invalid timezone: ${updateGymsDto.timezone}`,
+      );
+    }
 
     return this.databaseservice.gym.update({
       where: {
@@ -146,25 +220,204 @@ export class GymsService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, currentUserId: number) {
+    const gym = await this.databaseservice.gym.findUnique({
+      where: {
+        gymId: id,
+      },
+      select: {
+        gymId: true,
+        gymOwnerId: true,
+      },
+    });
 
-    const gym= await this.databaseservice.gym.findUnique({
-          where: {
-            gymId: id
-          },
-          select: {
-            gymId: true,
-          },
-        })
-    
-        if (!gym){
-          throw new NotFoundException(`Gym with ID ${id} not found`)
-        }
+    if (!gym) {
+      throw new NotFoundException(`Gym with ID ${id} not found`);
+    }
+
+    const adminRole = await this.databaseservice.user.findUnique({
+      where: {
+        userId: currentUserId,
+      },
+      select: {
+        userId: true,
+        role: true,
+      },
+    });
+
+    if (adminRole?.role !== 'ADMIN') {
+      if (gym?.gymOwnerId !== currentUserId) {
+        throw new ForbiddenException('Cannot delete gym you do not own');
+      }
+    }
 
     await this.databaseservice.gym.delete({
       where: {
         gymId: id,
       },
     });
+  }
+
+async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+    const { gymId, startDate, endDate } = query;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    const ownerFilter = isAdmin
+      ? Prisma.sql``
+      : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
+
+    try {
+      const result = await this.databaseservice.$queryRaw<{ total: number }[]>`
+      WITH "AllBookings" AS (
+        SELECT cb."bookedAt", gc."gymId"
+        FROM "ClassBooking" cb
+        INNER JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+
+        UNION ALL
+
+        SELECT sb."bookedAt", s."gymId"
+        FROM "ServiceBooking" sb
+        INNER JOIN "Service" s ON s."serviceId" = sb."serviceId"
+      )
+
+        SELECT
+          COUNT(*)::int AS total
+        FROM "AllBookings" b
+
+        INNER JOIN "Gym" g
+            ON g."gymId" = b."gymId" ${ownerFilter}
+
+        WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+          AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+          AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
+    `;
+
+    return (result && result.length > 0) ? result[0] : { total: 0 };
+
+    } catch (error) {
+      console.log('Error fetching total bookings:', error);
+      throw new Error('Could not fetch total bookings');
+    }
+  }
+
+  async getMonthlyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+    const { gymId, startDate, endDate } = query;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    const ownerFilter = isAdmin
+      ? Prisma.sql``
+      : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
+
+    try {
+
+      const result = await this.databaseservice.$queryRaw`
+      SELECT TO_CHAR(b."bookedAt", 'YYYY-MM') AS period,
+             COUNT(*)::int AS total
+      FROM (
+        SELECT cb."bookedAt", gc."gymId"
+        FROM "ClassBooking" cb
+        JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+
+        UNION ALL
+
+        SELECT sb."bookedAt", s."gymId"
+        FROM "ServiceBooking" sb
+        JOIN "Service" s ON s."serviceId" = sb."serviceId"
+      ) b
+      INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
+
+      WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+      AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+      AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
+      GROUP BY period
+      ORDER BY period ASC;
+    `;
+    return result;
+    } catch (error) {
+      console.log('Error fetching monthly bookings:', error);
+      throw new Error('Could not fetch monthly bookings');
+    }
+  }
+
+  async getWeeklyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+    const { gymId, startDate, endDate } = query;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    const ownerFilter = isAdmin
+      ? Prisma.sql``
+      : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
+
+    try {
+      const result = await this.databaseservice.$queryRaw`
+        SELECT TO_CHAR(DATE_TRUNC('week', b."bookedAt"), 'YYYY-MM-DD') AS weekStart,
+              COUNT(*)::int AS total
+        FROM (
+          SELECT cb."bookedAt", gc."gymId"
+          FROM "ClassBooking" cb
+          JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+
+          UNION ALL
+
+          SELECT sb."bookedAt", s."gymId"
+          FROM "ServiceBooking" sb
+          JOIN "Service" s ON s."serviceId" = sb."serviceId"
+        ) b
+        INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
+
+        WHERE (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+        AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+        AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end})
+        GROUP BY weekStart
+        ORDER BY weekStart ASC;
+    `;
+    return result;
+
+    } catch (error) {
+      console.log('Error fetching weekly bookings:', error);
+      throw new Error('Could not fetch weekly bookings');
+    }
+  }
+
+  async getRevenueStats(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+    const { gymId, startDate, endDate } = query;
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    const ownerFilter = isAdmin
+      ? Prisma.sql``
+      : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
+    try {
+      const result = await this.databaseservice
+      .$queryRaw<{ totalRevenue: number }[]>`
+        SELECT
+          COALESCE(SUM(b.price), 0)::float AS totalRevenue
+        FROM (
+          SELECT gc.price, cb."bookedAt", gc."gymId", cb."paymentStatus"
+          FROM "ClassBooking" cb
+          JOIN "GymClasses" gc ON gc."classId" = cb."classId"
+
+          UNION ALL
+
+          SELECT s.price, sb."bookedAt", s."gymId", sb."paymentStatus"
+          FROM "ServiceBooking" sb
+          JOIN "Service" s ON s."serviceId" = sb."serviceId"
+        ) b
+
+        INNER JOIN "Gym" g ON g."gymId" = b."gymId" ${ownerFilter}
+
+        WHERE b."paymentStatus" = 'PROCESSED'
+        AND (${gymId}::int IS NULL OR b."gymId" = ${gymId})
+        AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
+        AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
+    `;
+    return result[0] || { totalRevenue: 0 };
+
+    } catch (error) {
+      console.log('Error fetching revenue stats:', error);
+      throw new Error('Could not fetch revenue stats');
+    }
   }
 }

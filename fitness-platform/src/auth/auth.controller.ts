@@ -3,8 +3,14 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { GoogleAuthGuard } from './guards/google-auth/google-auth.guard';
+import type { Request } from 'express';
+
+interface User {
+  userId: number;
+  role: string;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -13,6 +19,7 @@ export class AuthController {
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
+  @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'Conflict, user already exists' })
@@ -22,6 +29,7 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({
     status: 200,
     description: 'Login successful, returns JWT token',
@@ -36,8 +44,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  me(@Req() req: any) {
-    const userId = req.user.userId; 
+  me(@Req() req: Request) {
+    const userId = (req.user as User).userId;
     return this.auth.getProfile(userId);
   }
 
