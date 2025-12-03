@@ -21,6 +21,7 @@ import { GymClassReviewModule } from './gym-class-review/gym-class-review.module
 import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -50,6 +51,7 @@ import { APP_GUARD } from '@nestjs/core';
     NotificationsModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
+    NotificationsModule,
     NotificationModule,
   ],
   controllers: [AppController],
