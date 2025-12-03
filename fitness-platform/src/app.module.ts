@@ -19,7 +19,10 @@ import { TasksService } from './tasks/tasks.service';
 import { ReviewsModule } from './gym-reviews/gym-reviews.module';
 import { GymClassReviewModule } from './gym-class-review/gym-class-review.module';
 import { AdminAnalyticsModule } from './admin-analytics/admin-analytics.module';
-import { NotificationModule } from './notification/notification.module';
+import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -28,6 +31,12 @@ import { NotificationModule } from './notification/notification.module';
     UsersModule,
     GymsModule,
     ConfigModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
     ServicesModule,
     ServiceOptionModule,
     GymClassesModule,
@@ -35,15 +44,22 @@ import { NotificationModule } from './notification/notification.module';
     UploadsModule,
     BookingsModule,
     AdminAnalyticsModule,
-    ReviewsModule, 
+    ReviewsModule,
     GymClassReviewModule,
+    PaymentsModule,
+    NotificationsModule,
     MulterModule.register({ dest: UPLOADS_DIR_ABSOLUTE }),
     ScheduleModule.forRoot(),
     NotificationModule,
   ],
   controllers: [AppController],
-  providers: [AppService, TasksService],
+  providers: [
+    AppService,
+    TasksService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
-
-

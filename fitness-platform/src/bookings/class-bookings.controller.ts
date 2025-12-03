@@ -122,6 +122,7 @@ export class ClassBookingsController {
         ? new Date(createClassBookingDto.endTime)
         : undefined,
       createClassBookingDto.notes,
+      createClassBookingDto.returnUrl,
     );
   }
 

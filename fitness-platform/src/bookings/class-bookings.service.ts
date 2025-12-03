@@ -3,17 +3,31 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
+  Inject,
+  forwardRef,
+  Logger,
+  ConflictException,
+  GatewayTimeoutException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { BookingsService } from './bookings.service';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { PaymentService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
 import { Action } from './bookings.service'
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
-  constructor(protected readonly databaseService: DatabaseService) {
+  private readonly logger = new Logger(ClassBookingsService.name);
+
+  constructor(
+    protected readonly databaseService: DatabaseService,
+    @Inject(forwardRef(() => PaymentService))
+    private readonly paymentService: PaymentService,
+    private readonly notificationsService: NotificationsService,
+  ) {
     super(databaseService);
   }
 
@@ -195,7 +209,8 @@ export class ClassBookingsService extends BookingsService {
     updateData: {
       status?: BookingStatus;
       notes?: string;
-      paymentStatus?: PaymentStatus;
+      startTime?: Date;
+      endTime?: Date;
     },
     userId: number,
   ) {
@@ -207,6 +222,28 @@ export class ClassBookingsService extends BookingsService {
       throw new BadRequestException(
         'Cannot update status of a completed booking',
       );
+    }
+
+    // Handle Rescheduling (Time Change)
+    if (updateData.startTime || updateData.endTime) {
+      // 1. Validate Time Logic
+      const newStartTime = updateData.startTime || booking.startTime;
+      const newEndTime = updateData.endTime || booking.endTime;
+
+      if (newStartTime && newEndTime && newStartTime >= newEndTime) {
+        throw new BadRequestException('Start time must be before end time');
+      }
+
+      // 2. Check for Conflicts
+      if (newStartTime && newEndTime) {
+        await this.checkUserTimeConflict(userId, newStartTime, newEndTime, id);
+        await this.checkTrainerAvailability(
+          booking.class.trainerId,
+          newStartTime,
+          newEndTime,
+          booking.classId,
+        );
+      }
     }
 
     // Check capacity if status is being changed to CONFIRMED
@@ -269,30 +306,65 @@ export class ClassBookingsService extends BookingsService {
       );
     }
 
-    // Update status to cancelled
-    return await this.databaseService.$transaction(async (tx) => {
-    const cancelBooking = await tx.classBooking.update({
-      where: { classBookingId: id },
-      data: { status: BookingStatus.CANCELLED },
-      include: {
-        class: {
-          include: {
-            gym: true,
-            trainer: true,
-          },
-        },
-        user: {
-          select: {
-            userName: true,
-          }
-        }
+    // Check for successful payments
+    const successfulPayment = await this.databaseService.payment.findFirst({
+      where: {
+        classBookingId: id,
+        status: PaymentStatus.PROCESSED,
       },
     });
 
-    await this.createBookingNotifications(cancelBooking, NotificationType.CLASS_BOOKING_CANCELLED, Action.CANCELLED, tx);
+    if (successfulPayment) {
+      throw new BadRequestException(
+        'This booking is paid. Please request a refund to cancel.',
+      );
+    }
 
-    return cancelBooking;
-  });
+    // Update status to cancelled
+    const cancelledBooking = await this.databaseService.$transaction(async (tx) => {
+      const booking = await tx.classBooking.update({
+        where: { classBookingId: id },
+        data: { status: BookingStatus.CANCELLED },
+        include: {
+          class: {
+            include: {
+              gym: true,
+              trainer: true,
+            },
+          },
+          user: true,
+        },
+      });
+
+      await this.createBookingNotifications(
+        booking,
+        NotificationType.CLASS_BOOKING_CANCELLED,
+        Action.CANCELLED,
+        tx,
+      );
+      return booking;
+    });
+
+    // Notify Trainer
+    if (cancelledBooking.class.trainer?.email) {
+      const trainerEmail = cancelledBooking.class.trainer.email;
+      const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
+      const className = cancelledBooking.class.className;
+      const startTime = cancelledBooking.startTime
+        ? cancelledBooking.startTime.toLocaleString()
+        : 'N/A';
+
+      this.notificationsService
+        .notifyStaff(
+          trainerEmail,
+          `Booking cancelled by ${userName} for ${className} at ${startTime}`,
+        )
+        .catch((err) =>
+          this.logger.error('Failed to notify trainer of cancellation', err),
+        );
+    }
+
+    return cancelledBooking;
   }
 
   async markNoShow(id: number, currentUserId: number) {
@@ -355,12 +427,40 @@ export class ClassBookingsService extends BookingsService {
     });
   }
 
+  async getPaymentDetails(bookingId: number, userId: number) {
+    const booking = await this.findOne(bookingId, userId);
+
+    // Check if already paid
+    if (booking.status === BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Booking is already paid or confirmed');
+    }
+
+    const amount = Number(booking.class.price);
+    if (amount <= 0) {
+      throw new BadRequestException('Booking is free, no payment needed');
+    }
+
+    return {
+      amount,
+      currency: 'ETB',
+      email: booking.user?.email,
+      firstName: booking.user?.firstName,
+      lastName: booking.user?.lastName,
+      description: `Payment for ${booking.class.className}`,
+      metadata: {
+        classBookingId: booking.classBookingId,
+        gymId: booking.class.gymId,
+      },
+    };
+  }
+
   async create(
     userId: number,
     classId: number,
     startTime?: Date,
     endTime?: Date,
     notes?: string,
+    returnUrl?: string,
   ) {
     // Check if class exists and get capacity
     const gymClass = await this.databaseService.gymClasses.findUnique({
@@ -395,44 +495,15 @@ export class ClassBookingsService extends BookingsService {
 
     // Check for time conflicts if startTime and endTime are provided
     if (startTime && endTime) {
-      const conflictingBooking =
-        await this.databaseService.classBooking.findFirst({
-          where: {
-            userId,
-            status: {
-              not: BookingStatus.CANCELLED,
-            },
-            OR: [
-              {
-                AND: [
-                  { startTime: { lte: startTime } },
-                  { endTime: { gt: startTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { lt: endTime } },
-                  { endTime: { gte: endTime } },
-                ],
-              },
-              {
-                AND: [
-                  { startTime: { gte: startTime } },
-                  { endTime: { lte: endTime } },
-                ],
-              },
-            ],
-          },
-          include: {
-            class: true,
-          },
-        });
+      await this.checkUserTimeConflict(userId, startTime, endTime);
 
-      if (conflictingBooking) {
-        throw new BadRequestException(
-          `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
-        );
-      }
+      // Verify Trainer Availability
+      await this.checkTrainerAvailability(
+        gymClass.trainerId,
+        startTime,
+        endTime,
+        classId,
+      );
     }
 
     // Check capacity: count current confirmed bookings for this class at this time
@@ -448,37 +519,328 @@ export class ClassBookingsService extends BookingsService {
       throw new BadRequestException('Class is at full capacity');
     }
 
-    // Create the booking
-    return await this.databaseService.$transaction( async (tx) => {
-      const createdBooking = await tx.classBooking.create({
-      data: {
-        userId,
-        classId,
-        startTime,
-        endTime,
-        notes,
-      },
+    // Validate returnUrl for paid classes BEFORE creating the booking
+    if (Number(gymClass.price) > 0 && !returnUrl) {
+      throw new BadRequestException(
+        'returnUrl is required for paid class bookings',
+      );
+    }
+
+    const transactionStartTime = Date.now();
+
+    try {
+      return await this.databaseService.$transaction(
+        async (tx) => {
+          // Create the booking
+          const booking = await tx.classBooking.create({
+            data: {
+              userId,
+              classId,
+              startTime,
+              endTime,
+              notes,
+              status: BookingStatus.PENDING, // Default to PENDING until paid
+            },
+            include: {
+              class: {
+                include: {
+                  gym: true,
+                  trainer: true,
+                },
+              },
+            },
+          });
+
+          // Initiate Payment if price > 0
+          let paymentResponse;
+          if (Number(gymClass.price) > 0) {
+            // Get user role for payment service
+            const user = await this.databaseService.user.findUnique({
+              where: { userId },
+              select: {
+                role: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            });
+
+            if (user) {
+              // If payment initialization fails, the error propagates and triggers transaction rollback
+              paymentResponse = await this.paymentService.initializePayment(
+                { userId, role: user.role },
+                {
+                  amount: Number(gymClass.price),
+                  currency: 'ETB',
+                  email: user.email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  returnUrl: returnUrl!,
+                  metadata: {
+                    classBookingId: booking.classBookingId,
+                  },
+                  classBookingId: booking.classBookingId,
+                },
+                tx,
+              );
+            }
+          }
+
+          return {
+            booking,
+            payment: paymentResponse as Record<string, unknown> | undefined,
+          };
+        },
+        { timeout: 20000 },
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          this.logger.warn(
+            'Booking failed: Duplicate booking or payment reference',
+          );
+          throw new BadRequestException(
+            'Duplicate booking or payment reference.',
+          );
+        }
+      }
+
+      // Handle transaction timeout specifically
+      if (
+        error instanceof Error &&
+        (error.message.includes('Transaction already closed') ||
+          error.message.includes('Timed out'))
+      ) {
+        const elapsed = Date.now() - transactionStartTime;
+        const seconds = (elapsed / 1000).toFixed(1);
+        throw new GatewayTimeoutException(
+          `Payment provider is taking too long to respond (${seconds}s). Please try again.`,
+        );
+      }
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        this.logger.warn(`Booking failed: ${error.message}`);
+        throw error;
+      }
+
+      this.logger.error(
+        'Booking transaction failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException('Booking transaction failed');
+    }
+  }
+
+  async validateBookingForPayment(
+    bookingId: number,
+    userId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    const booking = await db.classBooking.findUnique({
+      where: { classBookingId: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Class Booking #${bookingId} not found`);
+    }
+
+    if (booking.userId !== userId) {
+      throw new BadRequestException(
+        `Class Booking #${bookingId} does not belong to User #${userId}`,
+      );
+    }
+
+    if (booking.status === BookingStatus.CONFIRMED) {
+      throw new ConflictException(
+        `Class Booking #${bookingId} is already confirmed/paid`,
+      );
+    }
+
+    return booking;
+  }
+
+  async confirmBookingPayment(
+    bookingId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    const booking = await db.classBooking.update({
+      where: { classBookingId: bookingId },
+      data: { status: BookingStatus.CONFIRMED },
       include: {
         class: {
           include: {
             gym: true,
-            trainer: true,
           },
         },
-        user: {
-          select: { 
-            userName: true,
-          }
-        }
+        user: true,
       },
   
     });
 
-    await this.createBookingNotifications(createdBooking, NotificationType.NEW_CLASS_BOOKING, Action.BOOKED, tx);
+    // // Send confirmation email with localized time
+    // if (booking.user?.email && booking.startTime) {
+    //   // We don't await this to avoid blocking the transaction/response
+    //   this.notificationsService
+    //     .sendBookingConfirmation(booking.user.email, {
+    //       BookingName: booking.class.className,
+    //       startTime: booking.startTime,
+    //       gymName: booking.class.gym.gymName,
+    //       timezone: booking.class.gym.timezone,
+    //     })
+    //     .catch((err) =>
+    //       this.logger.error(
+    //         `Failed to send booking confirmation for ${bookingId}`,
+    //         err,
+    //       ),
+    //     );
+    // }
+      
+    await this.createBookingNotifications(
+      booking,
+      NotificationType.CLASS_BOOKING_CONFIRMED,
+      Action.CONFIRMED,
+      db,
+    );
+      
+    return booking;
+  }
 
-    return createdBooking;
-  });
-}
+  async processRefundCancellation(
+    bookingId: number,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    const booking = await db.classBooking.findUnique({
+      where: { classBookingId: bookingId },
+    });
+
+    if (!booking) {
+      this.logger.warn(
+        `Attempted to cancel non-existent class booking #${bookingId} after refund`,
+      );
+      return;
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      return; // Already cancelled
+    }
+
+    await db.classBooking.update({
+      where: { classBookingId: bookingId },
+      data: {
+        status: BookingStatus.CANCELLED,
+        notes: booking.notes
+          ? `${booking.notes}\n[System] Cancelled due to payment refund`
+          : '[System] Cancelled due to payment refund',
+      },
+    });
+
+    this.logger.log(
+      `Cancelled class booking #${bookingId} due to payment refund`,
+    );
+  }
+
+  private async checkUserTimeConflict(
+    userId: number,
+    startTime: Date,
+    endTime: Date,
+    excludeBookingId?: number,
+  ) {
+    const conflictingBooking =
+      await this.databaseService.classBooking.findFirst({
+        where: {
+          userId,
+          ...(excludeBookingId
+            ? { classBookingId: { not: excludeBookingId } }
+            : {}),
+          status: {
+            not: BookingStatus.CANCELLED,
+          },
+          OR: [
+            {
+              AND: [
+                { startTime: { lte: startTime } },
+                { endTime: { gt: startTime } },
+              ],
+            },
+            {
+              AND: [
+                { startTime: { lt: endTime } },
+                { endTime: { gte: endTime } },
+              ],
+            },
+            {
+              AND: [
+                { startTime: { gte: startTime } },
+                { endTime: { lte: endTime } },
+              ],
+            },
+          ],
+        },
+        include: {
+          class: true,
+        },
+      });
+
+    if (conflictingBooking) {
+      throw new BadRequestException(
+        `Time conflict with existing booking for "${conflictingBooking.class.className}"`,
+      );
+    }
+  }
+
+  private async checkTrainerAvailability(
+    trainerId: number,
+    startTime: Date,
+    endTime: Date,
+    excludeClassId?: number,
+  ) {
+    const trainerConflict = await this.databaseService.classBooking.findFirst({
+      where: {
+        status: {
+          not: BookingStatus.CANCELLED,
+        },
+        class: {
+          trainerId: trainerId,
+        },
+        ...(excludeClassId ? { classId: { not: excludeClassId } } : {}),
+        OR: [
+          {
+            AND: [
+              { startTime: { lte: startTime } },
+              { endTime: { gt: startTime } },
+            ],
+          },
+          {
+            AND: [
+              { startTime: { lt: endTime } },
+              { endTime: { gte: endTime } },
+            ],
+          },
+          {
+            AND: [
+              { startTime: { gte: startTime } },
+              { endTime: { lte: endTime } },
+            ],
+          },
+        ],
+      },
+      include: {
+        class: true,
+      },
+    });
+
+    if (trainerConflict) {
+      throw new ConflictException(
+        `Trainer is unavailable. They are teaching "${trainerConflict.class.className}" during this time slot.`,
+      );
+    }
+  }
 
   async createBookingNotifications(
     booking: {

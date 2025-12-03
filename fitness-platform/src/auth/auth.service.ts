@@ -109,17 +109,17 @@ export class AuthService {
     }
 
     await this.db.user.update({
-        where: {
-           userId: user!.userId 
-          },
-        data: { 
-          lastLogin: new Date() 
-        },
+      where: {
+        userId: user!.userId,
+      },
+      data: {
+        lastLogin: new Date(),
+      },
     });
 
-    const payload = { 
-      sub: user!.userId, 
-      role: user!.role 
+    const payload = {
+      sub: user!.userId,
+      role: user!.role,
     };
     const accessToken = this.jwtService.sign(payload);
 

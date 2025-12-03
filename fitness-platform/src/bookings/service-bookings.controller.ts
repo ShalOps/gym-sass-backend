@@ -126,6 +126,7 @@ export class ServiceBookingsController {
         ? new Date(createServiceBookingDto.endTime)
         : undefined,
       createServiceBookingDto.notes,
+      createServiceBookingDto.returnUrl,
     );
   }
 

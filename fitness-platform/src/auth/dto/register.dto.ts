@@ -34,12 +34,13 @@ export class RegisterDto {
   @IsString()
   userName: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Email address',
     example: 'johndoe@example.com',
     format: 'email',
   })
-  @IsEmail()
+  @IsNotEmpty({ message: 'Email is required' })
+  @IsEmail({}, { message: 'Please provide a valid email address' })
   email: string;
 
   @ApiProperty({
