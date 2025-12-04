@@ -30,7 +30,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { DateRangeDto } from './dto/date-range.dto';
-import { Role } from 'generated/prisma';
+import { Role } from '@prisma/client';
 
 @ApiTags('users')
 @Controller('users')

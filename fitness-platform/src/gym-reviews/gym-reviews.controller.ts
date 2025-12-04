@@ -25,7 +25,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CreateReviewDto } from './dto/create-gym-review.dto';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Role } from 'generated/prisma';
+import { Role } from '@prisma/client';
 import { Roles } from 'src/auth/roles.decorator';
 import { UpdateReviewDto } from './dto/update-gym-review.dto';
 import { CreateResponseDto } from './dto/create-response.dto';

@@ -31,7 +31,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { DateRangeDto } from './dto/date-range.dto';
-import { Role } from 'generated/prisma';
+import { Role } from '@prisma/client';
 
 @ApiTags('gyms')
 @Controller('gyms')
