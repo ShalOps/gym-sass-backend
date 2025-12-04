@@ -6,7 +6,6 @@ export class DateRangeDto {
   @IsInt()
   gymId?: number;
 
-  
   @IsOptional()
   @IsISO8601()
   startDate?: string;

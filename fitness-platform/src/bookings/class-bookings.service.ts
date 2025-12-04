@@ -16,7 +16,7 @@ import { BookingStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
-import { Action } from './bookings.service'
+import { Action } from './bookings.service';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -264,8 +264,7 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Update the booking
-    return this.databaseService.$transaction( async (tx) => {
-
+    return this.databaseService.$transaction(async (tx) => {
       const updateBooking = await tx.classBooking.update({
         where: { classBookingId: id },
         data: updateData,
@@ -279,13 +278,18 @@ export class ClassBookingsService extends BookingsService {
           user: {
             select: {
               userName: true,
-            }
-          }
+            },
+          },
         },
       });
-      
-      if (updateData.status == BookingStatus.CONFIRMED){
-        await this.createBookingNotifications(updateBooking, NotificationType.CLASS_BOOKING_CONFIRMED, Action.CONFIRMED, tx);
+
+      if (updateData.status == BookingStatus.CONFIRMED) {
+        await this.createBookingNotifications(
+          updateBooking,
+          NotificationType.CLASS_BOOKING_CONFIRMED,
+          Action.CONFIRMED,
+          tx,
+        );
       }
 
       return updateBooking;
@@ -321,29 +325,31 @@ export class ClassBookingsService extends BookingsService {
     }
 
     // Update status to cancelled
-    const cancelledBooking = await this.databaseService.$transaction(async (tx) => {
-      const booking = await tx.classBooking.update({
-        where: { classBookingId: id },
-        data: { status: BookingStatus.CANCELLED },
-        include: {
-          class: {
-            include: {
-              gym: true,
-              trainer: true,
+    const cancelledBooking = await this.databaseService.$transaction(
+      async (tx) => {
+        const booking = await tx.classBooking.update({
+          where: { classBookingId: id },
+          data: { status: BookingStatus.CANCELLED },
+          include: {
+            class: {
+              include: {
+                gym: true,
+                trainer: true,
+              },
             },
+            user: true,
           },
-          user: true,
-        },
-      });
+        });
 
-      await this.createBookingNotifications(
-        booking,
-        NotificationType.CLASS_BOOKING_CANCELLED,
-        Action.CANCELLED,
-        tx,
-      );
-      return booking;
-    });
+        await this.createBookingNotifications(
+          booking,
+          NotificationType.CLASS_BOOKING_CANCELLED,
+          Action.CANCELLED,
+          tx,
+        );
+        return booking;
+      },
+    );
 
     // Notify Trainer
     if (cancelledBooking.class.trainer?.email) {
@@ -679,7 +685,6 @@ export class ClassBookingsService extends BookingsService {
         },
         user: true,
       },
-  
     });
 
     // // Send confirmation email with localized time
@@ -699,14 +704,14 @@ export class ClassBookingsService extends BookingsService {
     //       ),
     //     );
     // }
-      
+
     await this.createBookingNotifications(
       booking,
       NotificationType.CLASS_BOOKING_CONFIRMED,
       Action.CONFIRMED,
       db,
     );
-      
+
     return booking;
   }
 
@@ -851,9 +856,10 @@ export class ClassBookingsService extends BookingsService {
         trainerId: number;
       };
     },
-    notificationType: NotificationType, 
-    action: Action, tx?: Prisma.TransactionClient) {
-
+    notificationType: NotificationType,
+    action: Action,
+    tx?: Prisma.TransactionClient,
+  ) {
     const client = tx || this.databaseService;
 
     await Promise.all([
@@ -861,8 +867,8 @@ export class ClassBookingsService extends BookingsService {
         data: {
           userId: booking.class.gym.gymOwnerId,
           type: notificationType,
-          message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`
-        }
+          message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+        },
       }),
 
       booking.class.trainerId !== booking.class.gym.gymOwnerId
@@ -870,11 +876,10 @@ export class ClassBookingsService extends BookingsService {
             data: {
               userId: booking.class.trainerId,
               type: notificationType,
-              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`
-            }
-        })
-        :Promise.resolve(),
-    ])
-
+              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+            },
+          })
+        : Promise.resolve(),
+    ]);
   }
 }

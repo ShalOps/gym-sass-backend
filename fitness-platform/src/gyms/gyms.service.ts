@@ -46,31 +46,28 @@ export class GymsService {
         `Invalid timezone: ${createGymsDto.timezone}`,
       );
     }
-    return await this.databaseservice.$transaction( async (tx) => {
-
+    return await this.databaseservice.$transaction(async (tx) => {
       const newGym = await tx.gym.create({
         data: { ...createGymsDto, gymOwnerId: currentUserId },
       });
 
       const adminIdList = await tx.user.findMany({
         where: {
-          role: Role.ADMIN
+          role: Role.ADMIN,
         },
         select: {
-          userId: true
-        }
-      })
-      for (const adminId of adminIdList){
+          userId: true,
+        },
+      });
+      for (const adminId of adminIdList) {
         await tx.notification.create({
-          data:
-          {
+          data: {
             userId: adminId.userId,
             type: NotificationType.NEW_GYM_CREATED,
             message: `Gym with gym name ${newGym.gymName} was created by a user check credentials and update verification`,
-          }
-        })
+          },
+        });
       }
-
     });
   }
 
@@ -178,7 +175,7 @@ export class GymsService {
     }
 
     const ownerOrAdmin = await this.databaseservice.user.findUnique({
-           where: {
+      where: {
         userId: currentUserId,
       },
       select: {
@@ -258,7 +255,11 @@ export class GymsService {
     });
   }
 
-async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+  async getTotalBookings(
+    query: DateRangeDto,
+    actingUserId: number,
+    isAdmin: boolean,
+  ) {
     const { gymId, startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
@@ -293,15 +294,18 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
           AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
     `;
 
-    return (result && result.length > 0) ? result[0] : { total: 0 };
-
+      return result && result.length > 0 ? result[0] : { total: 0 };
     } catch (error) {
       console.log('Error fetching total bookings:', error);
       throw new Error('Could not fetch total bookings');
     }
   }
 
-  async getMonthlyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+  async getMonthlyBookings(
+    query: DateRangeDto,
+    actingUserId: number,
+    isAdmin: boolean,
+  ) {
     const { gymId, startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
@@ -311,7 +315,6 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
 
     try {
-
       const result = await this.databaseservice.$queryRaw`
       SELECT TO_CHAR(b."bookedAt", 'YYYY-MM') AS period,
              COUNT(*)::int AS total
@@ -334,14 +337,18 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       GROUP BY period
       ORDER BY period ASC;
     `;
-    return result;
+      return result;
     } catch (error) {
       console.log('Error fetching monthly bookings:', error);
       throw new Error('Could not fetch monthly bookings');
     }
   }
 
-  async getWeeklyBookings(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+  async getWeeklyBookings(
+    query: DateRangeDto,
+    actingUserId: number,
+    isAdmin: boolean,
+  ) {
     const { gymId, startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
@@ -373,15 +380,18 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         GROUP BY weekStart
         ORDER BY weekStart ASC;
     `;
-    return result;
-
+      return result;
     } catch (error) {
       console.log('Error fetching weekly bookings:', error);
       throw new Error('Could not fetch weekly bookings');
     }
   }
 
-  async getRevenueStats(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+  async getRevenueStats(
+    query: DateRangeDto,
+    actingUserId: number,
+    isAdmin: boolean,
+  ) {
     const { gymId, startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
@@ -390,8 +400,9 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
       ? Prisma.sql``
       : Prisma.sql`AND g."gymOwnerId" = ${actingUserId}`;
     try {
-      const result = await this.databaseservice
-      .$queryRaw<{ totalRevenue: number }[]>`
+      const result = await this.databaseservice.$queryRaw<
+        { totalRevenue: number }[]
+      >`
         SELECT
           COALESCE(SUM(b.price), 0)::float AS totalRevenue
         FROM (
@@ -413,8 +424,7 @@ async getTotalBookings(query: DateRangeDto, actingUserId: number, isAdmin: boole
         AND (${start}::timestamp IS NULL OR b."bookedAt" >= ${start})
         AND (${end}::timestamp IS NULL OR b."bookedAt" <= ${end});
     `;
-    return result[0] || { totalRevenue: 0 };
-
+      return result[0] || { totalRevenue: 0 };
     } catch (error) {
       console.log('Error fetching revenue stats:', error);
       throw new Error('Could not fetch revenue stats');

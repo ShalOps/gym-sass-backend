@@ -125,19 +125,22 @@ export class UsersService {
     });
   }
 
-async getUserActivity(query: DateRangeDto, actingUserId: number, isAdmin: boolean) {
+  async getUserActivity(
+    query: DateRangeDto,
+    actingUserId: number,
+    isAdmin: boolean,
+  ) {
     const { startDate, endDate } = query;
     const start = startDate ? new Date(startDate) : null;
     const end = endDate ? new Date(endDate) : null;
     if (end) end.setHours(23, 59, 59, 999);
 
-    const customerFilter = isAdmin 
-        ? Prisma.sql`` 
-        : Prisma.sql`
+    const customerFilter = isAdmin
+      ? Prisma.sql``
+      : Prisma.sql`
             INNER JOIN "OwnerCustomers" oc ON u."userId" = oc."userId"
         `;
     try {
-      
       const result = await this.databaseservice.$queryRaw`
       WITH "RelevantBookings" AS (
           SELECT b."userId", b."bookedAt", b."status", g."gymOwnerId"
@@ -182,11 +185,10 @@ async getUserActivity(query: DateRangeDto, actingUserId: number, isAdmin: boolea
       ORDER BY totalBookings DESC;
     `;
 
-    return result;
-
+      return result;
     } catch (error) {
       console.log('Error fetching user activity:', error);
       throw new Error('Failed to fetch user activity');
     }
-}
+  }
 }
