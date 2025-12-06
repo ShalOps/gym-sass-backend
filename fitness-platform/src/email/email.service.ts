@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { sendEmailDto } from './dto/email.dto';
 
 @Injectable()
 export class EmailService {
@@ -16,5 +17,23 @@ export class EmailService {
             }
         })
         return transporter;
+    }
+
+    async sendEmail(dto:sendEmailDto){
+        const  {recipients,subject,html} = dto;
+        const transport = this.emailTransport();
+
+        const options: nodemailer.SendMailOptions = {
+            from: this.configService.get<string>('EMAIL_USER'),
+            to: recipients,
+            subject:subject,
+            html:html,
+        };
+        try {
+            await transport.sendMail(options);
+            console.log('email sent successfully');
+        } catch (error) {
+            console.log('error sending email:', error);
+        }
     }
 }
