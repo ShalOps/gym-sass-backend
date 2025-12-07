@@ -687,23 +687,24 @@ export class ClassBookingsService extends BookingsService {
       },
     });
 
-    // // Send confirmation email with localized time
-    // if (booking.user?.email && booking.startTime) {
-    //   // We don't await this to avoid blocking the transaction/response
-    //   this.notificationsService
-    //     .sendBookingConfirmation(booking.user.email, {
-    //       BookingName: booking.class.className,
-    //       startTime: booking.startTime,
-    //       gymName: booking.class.gym.gymName,
-    //       timezone: booking.class.gym.timezone,
-    //     })
-    //     .catch((err) =>
-    //       this.logger.error(
-    //         `Failed to send booking confirmation for ${bookingId}`,
-    //         err,
-    //       ),
-    //     );
-    // }
+    // Send confirmation email with localized time
+    if (booking.user?.email && booking.startTime) {
+      // We don't await this to avoid blocking the transaction/response
+      this.notificationsService
+        .sendBookingConfirmation(booking.user.email, {
+          BookingName: booking.class.className,
+          startTime: booking.startTime,
+          userName: booking.user.userName,
+          gymName: booking.class.gym.gymName,
+          timezone: booking.class.gym.timezone,
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send booking confirmation for ${bookingId}`,
+            err,
+          ),
+        );
+    }
 
     await this.createBookingNotifications(
       booking,

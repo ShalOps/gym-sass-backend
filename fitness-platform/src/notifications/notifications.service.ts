@@ -9,10 +9,27 @@ export class NotificationsService {
   constructor(private readonly emailService:EmailService){}
 
   async sendEmailReceipt(email: string, amount: number, txRef: string) {
-    // TODO: Integrate Nodemailer/SMS
-    this.logger.log(
-      `[MOCK EMAIL] Sending receipt to ${email} for ${amount} ETB (Ref: ${txRef})`,
-    );
+
+    const html = `
+      <h1>Payment Receipt</h1>
+      <p>Thank you for your payment of <b>${amount} ETB</b>.</p>
+      <p>Your transaction reference is: <b>${txRef}</b></p>
+      <p>We appreciate your business! 😊</p>
+    `;
+
+    const subject = `Payment Successful! 💳`;
+    try {
+
+      await this .emailService.sendEmail({
+        recipients: [email],
+        subject: subject,
+        html: html,
+      });
+
+    } catch (error) {
+      this.logger.error(`Failed to send payment receipt email to ${email}: ${error.message}`);
+      throw error;
+    }
   }
 
   async sendBookingConfirmation(
@@ -21,7 +38,7 @@ export class NotificationsService {
       BookingName: string;
       startTime: Date;
       gymName: string;
-      userId: number;
+      userName: string;
       timezone: string;
     },
   ) {
@@ -33,7 +50,7 @@ export class NotificationsService {
 
         // wanted to mention user name
     const html = `
-      <h1>🎉 Congratulations, ${bookingDetails.userId}!</h1>
+      <h1>🎉 Congratulations, ${bookingDetails.userName}!</h1>
       <p>
         You have successfully booked <b>${bookingDetails.BookingName}</b> at
         <b>${formattedTime}</b> in <b>${bookingDetails.gymName} Gym</b>.
