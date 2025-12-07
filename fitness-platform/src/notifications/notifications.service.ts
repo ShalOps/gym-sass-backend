@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DateUtil } from '../common/utils/date.util';
 import { EmailService } from 'src/email/email.service';
 import { emoji } from 'zod/mini';
+import { Decimal } from 'generated/prisma/runtime/library';
 
 @Injectable()
 export class NotificationsService {

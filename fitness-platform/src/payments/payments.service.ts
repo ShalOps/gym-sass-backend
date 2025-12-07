@@ -701,6 +701,29 @@ export class PaymentService {
         );
       }
 
+      // 3. Notify User (Fire-and-forget)
+      if (payment.userId) {
+        const user = await tx.user.findUnique({
+          where: { userId: payment.userId },
+          select: { email: true },
+      });
+
+        if (user?.email) {
+          this.notificationsService
+            .sendEmailReceipt(
+              user.email,
+              Number(payment.amount),
+              payment.txRef,
+            )
+            .catch((err) =>
+              this.logger.error(
+                `Failed to notify user ${payment.userId} of success`,
+                err instanceof Error ? err.stack : String(err),
+              ),
+            );
+          }
+      }
+
       return true;
     });
   }
