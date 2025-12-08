@@ -66,7 +66,7 @@ export class NotificationsService {
     }
   }
 
-async sendBookingConfirmation(
+async notifyUserBookingConfirmation(
     email: string,
     bookingDetails: {
       BookingName: string;
@@ -105,6 +105,64 @@ async sendBookingConfirmation(
       this.logger.error(`Failed to send booking confirmation email to ${email}: ${error.message}`);
       throw error;
     }
+  }
+
+  async notifyStaffBookingConfirmation(
+    email: string[],
+    bookingDetails: {
+      BookingName: string;
+      startTime: Date;
+      gymName: string;
+      userName: string;
+      timezone: string;
+    }
+  ) {
+
+    const formattedTime = DateUtil.formatInTimezone(
+      bookingDetails.startTime,
+      bookingDetails.timezone,
+    );
+
+    const htmlTrainer = `
+      <h1>New Booking Alert!</h1>
+      <p>The following booking has been made:</p>
+      <ul>
+        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+        <li><b>User Name:</b> ${bookingDetails.userName}</li>
+        <li><b>Start Time:</b> ${formattedTime}</li>
+        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+      </ul>
+      <p>Please prepare accordingly.</p>
+    `;
+    const htmlOwner = `
+      <h1>New Booking Alert!</h1>
+      <p>The following booking has been made:</p>
+      <ul>
+        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+        <li><b>User Name:</b> ${bookingDetails.userName}</li>
+        <li><b>Start Time:</b> ${formattedTime}</li>
+        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+      </ul>
+      <p>Please ensure that your staff are informed and prepared accordingly.</p>
+    `;
+    const subject = `New Booking Alert for ${bookingDetails.gymName} Gym! 📢`;
+
+    try {
+      this.emailService.sendEmail({
+        recipients: [email[0]],
+        subject: subject,
+        html: htmlTrainer,
+      })
+      this.emailService.sendEmail({
+        recipients: [email[1]],
+        subject: subject,
+        html: htmlOwner,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send booking confirmation email to staff at ${email}: ${error.message}`);
+      throw new Error(`Failed to send booking confirmation email to staff at ${email}`);
+    }
+
   }
 
   async notifyUserBookingCancellation(
