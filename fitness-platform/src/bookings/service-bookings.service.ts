@@ -304,13 +304,20 @@ export class ServiceBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaff(
+        .notifyStaffServiceBookingCancellation(
           ownerEmail,
-          `Service Booking cancelled by ${userName} for ${serviceName} at ${startTime}`,
+          {
+            BookingName: serviceName,
+            startTime: startTime,
+            userName: userName,
+            serviceName: serviceName,
+            timezone: cancelledBooking.service.gym.timezone
+          }
         )
-        .catch((err) =>
-          this.logger.error('Failed to notify gym owner of cancellation', err),
-        );
+        .catch((err) => {
+          this.logger.error('Failed to notify owner of cancellation', err);
+          throw new InternalServerErrorException('Failed to notify owner of cancellation');
+        });
     }
 
     return cancelledBooking;

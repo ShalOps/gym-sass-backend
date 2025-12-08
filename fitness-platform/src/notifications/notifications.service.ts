@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DateUtil } from '../common/utils/date.util';
 import { EmailService } from 'src/email/email.service';
-import { emoji } from 'zod/mini';
-import { Decimal } from 'generated/prisma/runtime/library';
-import { User } from '@prisma/client';
+
 
 @Injectable()
 export class NotificationsService {
@@ -165,6 +163,7 @@ async notifyUserBookingConfirmation(
 
   }
 
+
   async notifyUserBookingCancellation(
     email: string,
     bookingDetails: {
@@ -201,7 +200,9 @@ async notifyUserBookingConfirmation(
       throw error;
     }
   }
-  async notifyStaffBookingCancellation(
+
+
+  async notifyStaffClassBookingCancellation(
     email: string[],
     bookingDetails: {
       BookingName: string;
@@ -258,6 +259,50 @@ async notifyUserBookingConfirmation(
 
 
   }
+
+  async notifyStaffServiceBookingCancellation(
+    email: string,
+    bookingDetails: {
+      BookingName: string;
+      userName: string;
+      startTime: string;
+      serviceName: string;
+      timezone: string;
+    }
+  ) {
+    const formattedTime = DateUtil.formatInTimezone(
+      new Date(bookingDetails.startTime),
+      bookingDetails.timezone,
+    );
+
+    const html = `
+      <h1>Booking Cancellation Alert</h1>
+      <p>The following booking has been cancelled:</p>
+      <ul>
+        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+        <li><b>User Name:</b> ${bookingDetails.userName}</li>
+        <li><b>Start Time:</b> ${formattedTime}</li>
+        <li><b>Service Name:</b> ${bookingDetails.serviceName}</li>
+      </ul>
+      <p>Please ensure that your staff are informed and schedules are updated accordingly.</p>
+    `;
+    const subject = `Booking Cancellation Alert for ${bookingDetails.serviceName} Service⚠️`;
+    try {
+
+      this.emailService.sendEmail({
+        recipients: [email[1]],
+        subject: subject,
+        html: html,
+      });
+
+    } catch (error) {
+      this.logger.error(`Failed to send booking cancellation email to staff at ${email}: ${error.message}`);
+      throw new Error(`Failed to send booking cancellation email to staff at ${email}`);
+    }
+
+
+  }
+
 
   async notifyUser(userId: number, message: string) {
     // TODO: Integrate SMS/Telegram/In-app notification

@@ -364,7 +364,7 @@ export class ClassBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaffBookingCancellation(
+        .notifyStaffClassBookingCancellation(
           [trainerEmail,ownerEmail],
           {
             BookingName: className,
