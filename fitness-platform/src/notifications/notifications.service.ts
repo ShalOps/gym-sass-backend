@@ -3,6 +3,7 @@ import { DateUtil } from '../common/utils/date.util';
 import { EmailService } from 'src/email/email.service';
 import { emoji } from 'zod/mini';
 import { Decimal } from 'generated/prisma/runtime/library';
+import { User } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -81,7 +82,6 @@ async sendBookingConfirmation(
       bookingDetails.timezone,
     );
 
-        // wanted to mention user name
     const html = `
       <h1>🎉 Congratulations, ${bookingDetails.userName}!</h1>
       <p>
@@ -106,7 +106,44 @@ async sendBookingConfirmation(
       throw error;
     }
   }
-  
+
+  async sendBookingCancellation(
+    email: string,
+    bookingDetails: {
+      BookingName: string;
+      userName: string;
+      startTime: string;
+      gymName: string;
+      timezone: string;
+  }) {
+    const formattedTime = DateUtil.formatInTimezone(
+      new Date(bookingDetails.startTime),
+      bookingDetails.timezone,
+    );
+
+    const html = `
+      <h1>Booking Cancellation Notice</h1>
+      <p>Dear ${bookingDetails.userName},</p>
+      <p>You have successfully canceled booking for <b>${bookingDetails.BookingName}</b> at <b>${formattedTime}</b> in <b>${bookingDetails.gymName} Gym</b> has been cancelled.</p>
+      <p>If you have any questions or need further assistance, please contact us.</p>
+      <p>You can rebook or explore other classes on our platform.</p>
+    `;
+    const subject = `Booking Cancellation Notice for ${bookingDetails.gymName} Gym😞`;
+
+    try {
+
+      await this.emailService.sendEmail({
+        recipients: [email],
+        subject: subject,
+        html: html,
+      });
+
+    } catch (error) {
+      this.logger.error(`Failed to send booking cancellation email to ${email}: ${error.message}`);
+      throw error;
+    }
+  }
+
   async notifyUser(userId: number, message: string) {
     // TODO: Integrate SMS/Telegram/In-app notification
     this.logger.log(`[MOCK NOTIFICATION] User ${userId}: ${message}`);

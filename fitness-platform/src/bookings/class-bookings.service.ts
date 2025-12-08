@@ -370,6 +370,27 @@ export class ClassBookingsService extends BookingsService {
         );
     }
 
+    // notify the user that they have successfully cancelled the booking
+    if(cancelledBooking.user?.email){
+      const userEmail = cancelledBooking.user.email;
+      const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
+      const className = cancelledBooking.class.className;
+      const startTime = cancelledBooking.startTime
+        ? cancelledBooking.startTime.toLocaleString()
+        : 'N/A';
+      this.notificationsService.sendBookingCancellation(
+        userEmail,
+        {
+          BookingName: className,
+          startTime: startTime,
+          userName: userName,
+          gymName: cancelledBooking.class.gym.gymName,
+          timezone: cancelledBooking.class.gym.timezone
+        }
+      ).catch((err)=>
+        this.logger.error('Failed to notify user of booking cancellation', err));
+    }
+
     return cancelledBooking;
   }
 
