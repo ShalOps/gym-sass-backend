@@ -281,6 +281,7 @@ export class ClassBookingsService extends BookingsService {
             select: {
               userName: true,
               userId: true,
+              telegramChatId: true,
             },
           },
         },
@@ -854,7 +855,9 @@ export class ClassBookingsService extends BookingsService {
     booking: {
       user: { 
         userName: string
-        userId: number;};
+        userId: number;
+        telegramChatId?: bigint | null;
+      };
       class: {
         className: string;
         gym: { gymOwnerId: number };
@@ -867,36 +870,36 @@ export class ClassBookingsService extends BookingsService {
   ) {
     const client = tx || this.databaseService;
 
-    await Promise.all([
-      client.notification.create({
-        data: {
-          userId: booking.class.gym.gymOwnerId,
-          type: notificationType,
-          message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-        },
-      }),
+    try {
+      await Promise.all([
+        client.notification.create({
+          data: {
+            userId: booking.class.gym.gymOwnerId,
+            type: notificationType,
+            message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+          },
+        }),
 
-      booking.class.trainerId !== booking.class.gym.gymOwnerId
-        ? client.notification.create({
-            data: {
-              userId: booking.class.trainerId,
-              type: notificationType,
-              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-            },
-          })
-        : Promise.resolve(),
-    ]);
-
-  const user = await this.databaseService.user.findUnique({
-      where: { userId: booking.user.userId },
-    select: { telegramChatId: true },
-  });
-
-  if (user?.telegramChatId) {
+        booking.class.trainerId !== booking.class.gym.gymOwnerId
+          ? client.notification.create({
+              data: {
+                userId: booking.class.trainerId,
+                type: notificationType,
+                message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+              },
+            })
+          : Promise.resolve(),
+      ]);
+  } catch(error) {
+        console.error('Transaction failed, rolling back notifications:', error);
+        throw error;
+    }
+  
+  if (booking.user.telegramChatId) {
     const textToSend =  `Your booking for class "${booking.class.className}" has been ${action}.`;
 
     await this.telegramService
-      .sendMessage(user.telegramChatId, `🔔 ${textToSend}`)
+      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`)
       .catch((err) => {
         console.error('Telegram send failed:', err);
       }); 
