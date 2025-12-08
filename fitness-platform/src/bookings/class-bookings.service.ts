@@ -353,6 +353,9 @@ export class ClassBookingsService extends BookingsService {
 
     // Notify Trainer
     if (cancelledBooking.class.trainer?.email) {
+      const ownerEmail = await this.databaseService.user.findUnique({
+        where: { userId: cancelledBooking.class.gym.gymOwnerId },
+      }).then((user) => user?.email || '');
       const trainerEmail = cancelledBooking.class.trainer.email;
       const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
       const className = cancelledBooking.class.className;
@@ -361,13 +364,20 @@ export class ClassBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaff(
-          trainerEmail,
-          `Booking cancelled by ${userName} for ${className} at ${startTime}`,
+        .notifyStaffBookingCancellation(
+          [trainerEmail,ownerEmail],
+          {
+            BookingName: className,
+            startTime: startTime,
+            userName: userName,
+            gymName: cancelledBooking.class.gym.gymName,
+            timezone: cancelledBooking.class.gym.timezone
+          }
         )
-        .catch((err) =>
-          this.logger.error('Failed to notify trainer of cancellation', err),
-        );
+        .catch((err) => {
+          this.logger.error('Failed to notify trainer/owner of cancellation', err);
+          throw new InternalServerErrorException('Failed to notify trainer/owner of cancellation');
+        });
     }
 
     // notify the user that they have successfully cancelled the booking
@@ -378,7 +388,7 @@ export class ClassBookingsService extends BookingsService {
       const startTime = cancelledBooking.startTime
         ? cancelledBooking.startTime.toLocaleString()
         : 'N/A';
-      this.notificationsService.sendBookingCancellation(
+      this.notificationsService.notifyUserBookingCancellation(
         userEmail,
         {
           BookingName: className,
@@ -389,6 +399,7 @@ export class ClassBookingsService extends BookingsService {
         }
       ).catch((err)=>
         this.logger.error('Failed to notify user of booking cancellation', err));
+        throw new InternalServerErrorException('Failed to notify user of booking cancellation');
     }
 
     return cancelledBooking;
