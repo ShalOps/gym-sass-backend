@@ -17,6 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
 import { Action } from './bookings.service';
+import { TelegramService } from 'src/telegram/telegram.service'; 
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -27,6 +28,7 @@ export class ClassBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
+    private readonly telegramService: TelegramService
   ) {
     super(databaseService);
   }
@@ -278,6 +280,7 @@ export class ClassBookingsService extends BookingsService {
           user: {
             select: {
               userName: true,
+              userId: true,
             },
           },
         },
@@ -849,7 +852,9 @@ export class ClassBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { userName: string };
+      user: { 
+        userName: string
+        userId: number;};
       class: {
         className: string;
         gym: { gymOwnerId: number };
@@ -881,5 +886,20 @@ export class ClassBookingsService extends BookingsService {
           })
         : Promise.resolve(),
     ]);
+
+  const user = await this.databaseService.user.findUnique({
+      where: { userId: booking.user.userId },
+    select: { telegramChatId: true },
+  });
+
+  if (user?.telegramChatId) {
+    const textToSend =  `Your booking for class "${booking.class.className}" has been ${action}.`;
+
+    await this.telegramService
+      .sendMessage(user.telegramChatId, `🔔 ${textToSend}`)
+      .catch((err) => {
+        console.error('Telegram send failed:', err);
+      }); 
+  }
   }
 }

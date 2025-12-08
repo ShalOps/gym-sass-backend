@@ -17,6 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Action } from './bookings.service';
 import { NotificationType } from '@prisma/client';
+import { TelegramService } from 'src/telegram/telegram.service'; 
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
@@ -27,6 +28,8 @@ export class ServiceBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
+    private readonly telegramService: TelegramService
+    
   ) {
     super(databaseService);
   }
@@ -218,6 +221,7 @@ export class ServiceBookingsService extends BookingsService {
           user: {
             select: {
               userName: true,
+              userId: true,
             },
           },
         },
@@ -228,6 +232,15 @@ export class ServiceBookingsService extends BookingsService {
           updateBooking,
           NotificationType.SERVICE_BOOKING_CONFIRMED,
           Action.CONFIRMED,
+          tx,
+        );
+      }
+
+      if (updateData.status == BookingStatus.CANCELLED) {
+        await this.createBookingNotifications(
+          updateBooking,
+          NotificationType.SERVICE_BOOKING_CANCELLED,
+          Action.CANCELLED,
           tx,
         );
       }
@@ -705,7 +718,10 @@ export class ServiceBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { userName: string };
+      user: { 
+        userName: string 
+        userId: number;
+      };
       service: {
         name: string;
         gym: { gymOwnerId: number };
@@ -726,5 +742,21 @@ export class ServiceBookingsService extends BookingsService {
         },
       }),
     ]);
+
+      const user = await this.databaseService.user.findUnique({
+      where: { userId: booking.user.userId },
+    select: { telegramChatId: true },
+  });
+
+  if (user?.telegramChatId) {
+    const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
+
+    await this.telegramService
+      .sendMessage(user.telegramChatId, `🔔 ${textToSend}`)
+      .catch((err) => {
+        console.error('Telegram send failed:', err);
+      }); 
+  }
+  this.logger.warn('user?.telegramChatId:', user?.telegramChatId);
   }
 }
