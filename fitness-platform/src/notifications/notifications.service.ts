@@ -381,26 +381,55 @@ async notifyUserBookingConfirmation(
 
   }
 
-
-  async notifyUser(userId: number, message: string) {
-    // TODO: Integrate SMS/Telegram/In-app notification
-    this.logger.log(`[MOCK NOTIFICATION] User ${userId}: ${message}`);
-  }
-
-
-  async notifyAdmin(message: string) {
-    // TODO: Integrate Slack/Telegram for admin alerts
-    this.logger.log(`[MOCK ADMIN ALERT] ${message}`);
+  async notifyAdmin(
+    email: string,
+    gymDetail:{
+      gymId: number;
+      gymName: string;
+      ownerName: string;
+      ownerEmail: string
+    })
+    {
+      const html = `
+      <h1>New Gym Created</h1>
+      <p>A new gym has been created with the following details:</p>
+      <ul>
+        <li><b>Gym Name:</b> ${gymDetail.gymName}</li>
+        <li><b>Owner Name:</b> ${gymDetail.ownerName}</li>
+        <li><b>Owner Email:</b> ${gymDetail.ownerEmail}</li>
+      </ul>
+      <p>Please review the new gym details in the admin panel.</p>
+    `;
+    const subject = `New Gym Created: ${gymDetail.gymName} 🏋️‍♂️`;
+    await this.emailService.sendEmail({
+      recipients: [email],
+      subject: subject,
+      html: html,
+    });
   }
 
   async sendBookingReminder(
     email: string,
     details: { bookingName: string; startTime: Date },
   ) {
-    // TODO: Integrate Email/SMS
-    this.logger.log(
-      `[MOCK REMINDER] Sending reminder to ${email} for "${details.bookingName}" at ${details.startTime.toISOString()}`,
-    );
-    return Promise.resolve();
+    const formatted = details.startTime.toISOString();
+
+    const html = `
+      <h1>Reminder: Upcoming Booking</h1>
+      <p>You have an upcoming booking:</p>
+      <ul>
+        <li><b>Booking Name:</b> ${details.bookingName}</li>
+        <li><b>Start Time:</b> ${formatted}</li>
+      </ul>
+      <p>See you soon!</p>
+    `;
+    const subject = `Reminder: Upcoming Booking for ${details.bookingName} ⏰`;
+
+    await this.emailService.sendEmail({
+      recipients: [email],
+      subject,
+      html,
+    });
   }
+
 }
