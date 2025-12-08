@@ -891,17 +891,20 @@ export class PaymentService {
       // Notify User (Fire-and-forget)
       if (payment.user?.email) {
         this.notificationsService
-          .notifyUser(
-            payment.user.userId,
-            `Payment Refunded: ${refundAmount} ETB has been refunded to your account.`,
+          .sendRefundPayment(
+            payment.user.email,
+            refundAmount,
+            payment.txRef,
+            dto.reason || "Refund processed"
           )
           .catch((err) =>
             this.logger.error(
-              `Failed to notify user ${payment.user?.userId} of refund`,
+              `Failed to send refund email to user ${payment.user?.userId}`,
               err instanceof Error ? err.stack : String(err),
             ),
           );
       }
+
 
       return {
         status: 'success',

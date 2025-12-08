@@ -33,7 +33,39 @@ export class NotificationsService {
     }
   }
 
-  async sendBookingConfirmation(
+  async sendRefundPayment(email: string,refundAmount: number,txRef: string,reason: string,) {
+
+    const subject = `Refund Processed Successfully 💸`;
+    const html = `
+      <h2>Your Refund is Completed</h2>
+      <p>Hello,</p>
+      <p>We have successfully processed your refund.</p>
+
+      <p><strong>Refund Amount:</strong> ${refundAmount} ETB</p>
+      <p><strong>Transaction Reference:</strong> ${txRef}</p>
+
+      <p><strong>Reason:</strong> ${reason}</p>
+
+      <p>If you have any questions, feel free to contact us.</p>
+
+      <br/>
+      <p>Thank you,</p>
+      <p><strong>Fitness Platform Team</strong></p>
+    `;
+
+      try{
+        return this.emailService.sendEmail({
+        recipients: [email],
+        subject,
+        html,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send payment receipt email to ${email}: ${error.message}`);
+      throw error;
+    }
+  }
+
+async sendBookingConfirmation(
     email: string,
     bookingDetails: {
       BookingName: string;
@@ -74,7 +106,7 @@ export class NotificationsService {
       throw error;
     }
   }
-
+  
   async notifyUser(userId: number, message: string) {
     // TODO: Integrate SMS/Telegram/In-app notification
     this.logger.log(`[MOCK NOTIFICATION] User ${userId}: ${message}`);
