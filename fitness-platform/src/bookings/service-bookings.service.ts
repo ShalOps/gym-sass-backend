@@ -625,6 +625,32 @@ export class ServiceBookingsService extends BookingsService {
         });
     }
 
+    if (booking.service?.gym.gymOwnerId && booking.startTime) {
+      const owner = await this.databaseService.user.findUnique({
+        where: { userId: booking.service.gym.gymOwnerId },
+      });
+
+      if (owner?.email) {
+        this.notificationsService
+          .notifyStaffServiceBookingConfirmation(
+            owner.email,
+            {
+            BookingName: booking.service.name,
+            serviceName: booking.service.name,
+            duration: Number(booking.service.duration),
+            userName: booking.user.firstName,
+            startTime: booking.startTime,
+            timezone: booking.service.gym.timezone,
+          })
+          .catch((err) => {
+            this.logger.error(
+              `Failed to send booking confirmation for ${bookingId}`,
+              err,
+            );
+          });
+      }
+    }
+
     return booking;
   }
 

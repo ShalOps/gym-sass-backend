@@ -299,6 +299,45 @@ async notifyUserBookingConfirmation(
 
   }
 
+  async notifyStaffServiceBookingConfirmation(
+    email: string,
+    bookingDetails: {
+      BookingName: string;
+      startTime: Date;
+      serviceName: string;
+      duration: number;
+      userName: string;
+      timezone: string;
+    }
+  ){
+    const formattedTime = DateUtil.formatInTimezone(
+      bookingDetails.startTime,
+      bookingDetails.timezone,
+    );
+
+    const html = `
+      <h1>🎉 Congratulations, ${bookingDetails.userName}!</h1>
+      <p>
+        You have successfully booked <b>${bookingDetails.BookingName}</b> for <b>${bookingDetails.serviceName}</b> service at
+        <b>${formattedTime}</b>. The duration of the service is <b>${bookingDetails.duration} minutes</b>.
+      </p>
+      <p>We are excited to serve you! 💪</p>
+    `;
+
+    const subject = `Successfully Booked ${bookingDetails.serviceName} Service, congratulations! 🎉`;
+    try {
+      await this.emailService.sendEmail({
+        recipients: [email],
+        subject: subject,
+        html: html,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to send service booking confirmation email to ${email}: ${error.message}`);
+      throw new Error(`Failed to send service booking confirmation email to ${email}`);
+    }
+
+  }
+
   async notifyStaffServiceBookingCancellation(
     email: string,
     bookingDetails: {
