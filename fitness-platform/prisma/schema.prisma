@@ -141,6 +141,7 @@ model User {
   location              String
   goal                  Goal?
   role                  Role                     @default(CUSTOMER)
+  telegramChatId        BigInt?
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]
