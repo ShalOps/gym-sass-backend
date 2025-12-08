@@ -606,22 +606,24 @@ export class ServiceBookingsService extends BookingsService {
       db,
     );
 
-    // // Send confirmation email with localized time
-    // if (booking.user?.email && booking.startTime) {
-    //   this.notificationsService
-    //     .sendBookingConfirmation(booking.user.email, {
-    //       BookingName: booking.service.name,
-    //       startTime: booking.startTime,
-    //       gymName: booking.service.gym.gymName,
-    //       timezone: booking.service.gym.timezone,
-    //     })
-    //     .catch((err) =>
-    //       this.logger.error(
-    //         `Failed to send booking confirmation for ${bookingId}`,
-    //         err,
-    //       ),
-    //     );
-    // }
+    // Send confirmation email with localized time
+    if (booking.user?.email && booking.startTime) {
+      this.notificationsService
+        .notifyUserServiceBookingConfirmation(
+          booking.user.email,
+          {
+          BookingName: booking.service.name,
+          serviceName: booking.service.name,
+          duration: Number(booking.service.duration),
+          userName: booking.user.firstName,
+          startTime: booking.startTime,
+          timezone: booking.service.gym.timezone,
+        })
+        .catch((err) => {
+          this.logger.error(`Failed to send booking confirmation for ${bookingId}`, err);
+          throw new InternalServerErrorException('Failed to send booking confirmation');
+        });
+    }
 
     return booking;
   }
