@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, UnauthorizedException, Headers } from '@nestjs/common';
 import { TelegramService } from './telegram.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
@@ -21,7 +21,12 @@ export class TelegramController {
   }
 
   @Post('webhook')
-  async webhook(@Body() body: any) {
+  async webhook(@Body() body: any, @Headers('x-telegram-bot-api-secret-token') secretToken: string | undefined) {
+    
+    if (secretToken !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+    throw new UnauthorizedException('Invalid webhook secret');
+  }
+
     const message = body.message;
     if (!message?.text?.startsWith('/start ')) return { ok: true };
 

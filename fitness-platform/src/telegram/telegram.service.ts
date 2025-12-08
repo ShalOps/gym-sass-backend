@@ -52,12 +52,21 @@ export class TelegramService {
 
   async setWebhook(url: string) {
     if (!this.botToken) return;
+    const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+    if (!secretToken) {
+      this.logger.error('TELEGRAM_WEBHOOK_SECRET is not set in .env');
+      throw new Error('Missing webhook secret token');
+    }
 
     try {
       await firstValueFrom(
         this.httpService.post(
           `https://api.telegram.org/bot${this.botToken}/setWebhook`,
-          { url },
+          { 
+            url,
+            secret_token: secretToken
+          },
         ),
       );
       this.logger.log(`Webhook successfully set to ${url}`);
