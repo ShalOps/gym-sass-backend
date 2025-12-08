@@ -38,7 +38,7 @@ export class TelegramService {
           },
         ),
       );
-      this.logger.verbose(`Telegram message sent to chat ${chatId}`);
+      this.logger.verbose(`Telegram message sent to chat`);
     } catch (error: any) {
       
       this.logger.error('Failed to send Telegram message', error.response?.data || error.message);

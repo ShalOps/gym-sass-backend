@@ -222,6 +222,7 @@ export class ServiceBookingsService extends BookingsService {
             select: {
               userName: true,
               userId: true,
+              telegramChatId: true
             },
           },
         },
@@ -721,6 +722,7 @@ export class ServiceBookingsService extends BookingsService {
       user: { 
         userName: string 
         userId: number;
+        telegramChatId?: bigint | null;
       };
       service: {
         name: string;
@@ -733,30 +735,34 @@ export class ServiceBookingsService extends BookingsService {
   ) {
     const client = tx || this.databaseService;
 
-    await Promise.all([
-      client.notification.create({
-        data: {
-          userId: booking.service.gym.gymOwnerId,
-          type: notificationType,
-          message: `User with username ${booking.user.userName} ${action} your service ${booking.service.name}`,
-        },
-      }),
-    ]);
+    try {
+      
+      await Promise.all([
+        client.notification.create({
+          data: {
+            userId: booking.service.gym.gymOwnerId,
+            type: notificationType,
+            message: `User with username ${booking.user.userName} ${action} your service ${booking.service.name}`,
+          },
+        }),
+      ]);
+    } catch(error){
+      console.error('Transaction failed, rolling back notifications:', error);
+      throw error;
+    }
 
-      const user = await this.databaseService.user.findUnique({
-      where: { userId: booking.user.userId },
-    select: { telegramChatId: true },
-  });
 
-  if (user?.telegramChatId) {
+  if (booking.user.telegramChatId) {
     const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
 
     await this.telegramService
-      .sendMessage(user.telegramChatId, `🔔 ${textToSend}`)
+      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`)
       .catch((err) => {
         console.error('Telegram send failed:', err);
       }); 
   }
-  this.logger.warn('user?.telegramChatId:', user?.telegramChatId);
+  else {
+    this.logger.debug(`User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`);
+  }
   }
 }
