@@ -5,9 +5,10 @@ import { sendEmailDto } from './dto/email.dto';
 
 @Injectable()
 export class EmailService {
-    constructor(private readonly configService:ConfigService){}
-    emailTransport(){
-        const transporter = nodemailer.createTransport({
+    private transporter: nodemailer.Transporter;
+    constructor(private readonly configService:ConfigService){
+
+        this.transporter = nodemailer.createTransport({
             host: this.configService.get<string>('EMAIL_HOST'),
             port: this.configService.get<number>('EMAIL_PORT'),
             secure: false,
@@ -15,14 +16,11 @@ export class EmailService {
                 user: this.configService.get<string>('EMAIL_USER'),
                 pass: this.configService.get<string>('EMAIL_PASSWORD'),
             }
-        })
-        return transporter;
+        });
     }
 
     async sendEmail(dto:sendEmailDto){
         const  {recipients,subject,html} = dto;
-        const transport = this.emailTransport();
-
         const options: nodemailer.SendMailOptions = {
             from: this.configService.get<string>('EMAIL_USER'),
             to: recipients,
@@ -30,10 +28,11 @@ export class EmailService {
             html:html,
         };
         try {
-            await transport.sendMail(options);
+            await this.transporter.sendMail(options);
             console.log('email sent successfully');
         } catch (error) {
             console.log('error sending email:', error);
+            throw error;
         }
     }
 }

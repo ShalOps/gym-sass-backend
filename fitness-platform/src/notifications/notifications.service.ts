@@ -1,70 +1,69 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { DateUtil } from '../common/utils/date.util';
-import { EmailService } from 'src/email/email.service';
-
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  constructor(private readonly emailService:EmailService){}
+
+  constructor(
+    @InjectQueue('email-queue') private readonly emailQueue: Queue
+  ) {}
+
+  private async queueEmail(recipients: string[], subject: string, html: string) {
+    try {
+      await this.emailQueue.add(
+        'send-email',
+        {
+          recipients,
+          subject,
+          html,
+        },
+        {
+          attempts: 3,
+          backoff: 5000,
+          removeOnComplete: true,
+        },
+      );
+      this.logger.log(`Queued email to: ${recipients.join(', ')}`);
+    } catch (error) {
+      this.logger.error(`Failed to queue email to ${recipients}: ${error.message}`);
+      throw error;
+    }
+  }
 
   async sendEmailReceipt(email: string, amount: number, txRef: string) {
-
     const html = `
       <h1>Payment Receipt</h1>
       <p>Thank you for your payment of <b>${amount} ETB</b>.</p>
       <p>Your transaction reference is: <b>${txRef}</b></p>
       <p>We appreciate your business! 😊</p>
     `;
-
     const subject = `Payment Successful! 💳`;
-    try {
 
-      await this .emailService.sendEmail({
-        recipients: [email],
-        subject: subject,
-        html: html,
-      });
-
-    } catch (error) {
-      this.logger.error(`Failed to send payment receipt email to ${email}: ${error.message}`);
-      throw error;
-    }
+    await this.queueEmail([email], subject, html);
   }
 
-  async sendRefundPayment(email: string,refundAmount: number,txRef: string,reason: string,) {
-
+  async sendRefundPayment(email: string, refundAmount: number, txRef: string, reason: string) {
     const subject = `Refund Processed Successfully 💸`;
     const html = `
       <h2>Your Refund is Completed</h2>
       <p>Hello,</p>
       <p>We have successfully processed your refund.</p>
-
       <p><strong>Refund Amount:</strong> ${refundAmount} ETB</p>
       <p><strong>Transaction Reference:</strong> ${txRef}</p>
-
       <p><strong>Reason:</strong> ${reason}</p>
-
       <p>If you have any questions, feel free to contact us.</p>
-
       <br/>
       <p>Thank you,</p>
       <p><strong>Fitness Platform Team</strong></p>
     `;
 
-      try{
-        return this.emailService.sendEmail({
-        recipients: [email],
-        subject,
-        html,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send payment receipt email to ${email}: ${error.message}`);
-      throw error;
-    }
+    await this.queueEmail([email], subject, html);
   }
 
-async notifyUserBookingConfirmation(
+  async notifyUserBookingConfirmation(
     email: string,
     bookingDetails: {
       BookingName: string;
@@ -74,7 +73,6 @@ async notifyUserBookingConfirmation(
       timezone: string;
     },
   ) {
-
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
       bookingDetails.timezone,
@@ -91,78 +89,8 @@ async notifyUserBookingConfirmation(
 
     const subject = `Successfully Booked to ${bookingDetails.gymName} Gym, congratulations! 🎉`;
 
-    try {
-
-      await this.emailService.sendEmail({
-        recipients: [email],
-        subject: subject,
-        html: html,
-      });
-
-    } catch (error) {
-      this.logger.error(`Failed to send booking confirmation email to ${email}: ${error.message}`);
-      throw error;
-    }
+    await this.queueEmail([email], subject, html);
   }
-
-  async notifyStaffBookingConfirmation(
-    email: string[],
-    bookingDetails: {
-      BookingName: string;
-      startTime: Date;
-      gymName: string;
-      userName: string;
-      timezone: string;
-    }
-  ) {
-
-    const formattedTime = DateUtil.formatInTimezone(
-      bookingDetails.startTime,
-      bookingDetails.timezone,
-    );
-
-    const htmlTrainer = `
-      <h1>New Booking Alert!</h1>
-      <p>The following booking has been made:</p>
-      <ul>
-        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
-        <li><b>User Name:</b> ${bookingDetails.userName}</li>
-        <li><b>Start Time:</b> ${formattedTime}</li>
-        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
-      </ul>
-      <p>Please prepare accordingly.</p>
-    `;
-    const htmlOwner = `
-      <h1>New Booking Alert!</h1>
-      <p>The following booking has been made:</p>
-      <ul>
-        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
-        <li><b>User Name:</b> ${bookingDetails.userName}</li>
-        <li><b>Start Time:</b> ${formattedTime}</li>
-        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
-      </ul>
-      <p>Please ensure that your staff are informed and prepared accordingly.</p>
-    `;
-    const subject = `New Booking Alert for ${bookingDetails.gymName} Gym! 📢`;
-
-    try {
-      this.emailService.sendEmail({
-        recipients: [email[0]],
-        subject: subject,
-        html: htmlTrainer,
-      })
-      this.emailService.sendEmail({
-        recipients: [email[1]],
-        subject: subject,
-        html: htmlOwner,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send booking confirmation email to staff at ${email}: ${error.message}`);
-      throw new Error(`Failed to send booking confirmation email to staff at ${email}`);
-    }
-
-  }
-
 
   async notifyUserBookingCancellation(
     email: string,
@@ -172,7 +100,8 @@ async notifyUserBookingConfirmation(
       startTime: string;
       gymName: string;
       timezone: string;
-  }) {
+    },
+  ) {
     const formattedTime = DateUtil.formatInTimezone(
       new Date(bookingDetails.startTime),
       bookingDetails.timezone,
@@ -187,77 +116,56 @@ async notifyUserBookingConfirmation(
     `;
     const subject = `Booking Cancellation Notice for ${bookingDetails.gymName} Gym😞`;
 
-    try {
-
-      await this.emailService.sendEmail({
-        recipients: [email],
-        subject: subject,
-        html: html,
-      });
-
-    } catch (error) {
-      this.logger.error(`Failed to send booking cancellation email to ${email}: ${error.message}`);
-      throw error;
-    }
+    await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffClassBookingCancellation(
-    email: string[],
+    emails: string[],
     bookingDetails: {
       BookingName: string;
       userName: string;
       startTime: string;
       gymName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       new Date(bookingDetails.startTime),
       bookingDetails.timezone,
     );
 
-    const htmlTrainer = `
-      <h1>Booking Cancellation Alert</h1>
-      <p>The following booking has been cancelled:</p>
-      <ul>
-        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
-        <li><b>User Name:</b> ${bookingDetails.userName}</li>
-        <li><b>Start Time:</b> ${formattedTime}</li>
-        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
-      </ul>
-      <p>Please update your schedules accordingly.</p>
-    `;
-    const htmlOwner = `
-      <h1>Booking Cancellation Alert</h1>
-      <p>The following booking has been cancelled:</p>
-      <ul>
-        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
-        <li><b>User Name:</b> ${bookingDetails.userName}</li>
-        <li><b>Start Time:</b> ${formattedTime}</li>
-        <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
-      </ul>
-      <p>Please ensure that your staff are informed and schedules are updated accordingly.</p>
-    `;
     const subject = `Booking Cancellation Alert for ${bookingDetails.gymName} Gym⚠️`;
 
-    try {
-      this.emailService.sendEmail({
-        recipients: [email[0]],
-        subject: subject,
-        html: htmlTrainer,
-      })
-      this.emailService.sendEmail({
-        recipients: [email[1]],
-        subject: subject,
-        html: htmlOwner,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send booking cancellation email to staff at ${email}: ${error.message}`);
-      throw new Error(`Failed to send booking cancellation email to staff at ${email}`);
+
+    if (emails[0]) {
+      const htmlTrainer = `
+        <h1>Booking Cancellation Alert</h1>
+        <p>The following booking has been cancelled:</p>
+        <ul>
+          <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+          <li><b>User Name:</b> ${bookingDetails.userName}</li>
+          <li><b>Start Time:</b> ${formattedTime}</li>
+          <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+        </ul>
+        <p>Please update your schedules accordingly.</p>
+      `;
+      await this.queueEmail([emails[0]], subject, htmlTrainer);
     }
 
-
+    if (emails[1]) {
+      const htmlOwner = `
+        <h1>Booking Cancellation Alert</h1>
+        <p>The following booking has been cancelled:</p>
+        <ul>
+          <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+          <li><b>User Name:</b> ${bookingDetails.userName}</li>
+          <li><b>Start Time:</b> ${formattedTime}</li>
+          <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+        </ul>
+        <p>Please ensure that your staff are informed and schedules are updated accordingly.</p>
+      `;
+      await this.queueEmail([emails[1]], subject, htmlOwner);
+    }
   }
 
   async notifyUserServiceBookingConfirmation(
@@ -270,7 +178,7 @@ async notifyUserBookingConfirmation(
       userName: string;
       timezone: string;
     }
-  ){
+  ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
       bookingDetails.timezone,
@@ -286,17 +194,8 @@ async notifyUserBookingConfirmation(
     `;
 
     const subject = `Successfully Booked ${bookingDetails.serviceName} Service, congratulations! 🎉`;
-    try {
-      await this.emailService.sendEmail({
-        recipients: [email],
-        subject: subject,
-        html: html,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send service booking confirmation email to ${email}: ${error.message}`);
-      throw new Error(`Failed to send service booking confirmation email to ${email}`);
-    }
 
+    await this.queueEmail([email], subject, html);
   }
 
   async notifyStaffServiceBookingConfirmation(
@@ -309,7 +208,7 @@ async notifyUserBookingConfirmation(
       userName: string;
       timezone: string;
     }
-  ){
+  ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
       bookingDetails.timezone,
@@ -325,17 +224,8 @@ async notifyUserBookingConfirmation(
     `;
 
     const subject = `Successfully Booked ${bookingDetails.serviceName} Service, congratulations! 🎉`;
-    try {
-      await this.emailService.sendEmail({
-        recipients: [email],
-        subject: subject,
-        html: html,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to send service booking confirmation email to ${email}: ${error.message}`);
-      throw new Error(`Failed to send service booking confirmation email to ${email}`);
-    }
 
+    await this.queueEmail([email], subject, html);
   }
 
   async notifyStaffServiceBookingCancellation(
@@ -365,32 +255,20 @@ async notifyUserBookingConfirmation(
       <p>Please ensure that your staff are informed and schedules are updated accordingly.</p>
     `;
     const subject = `Booking Cancellation Alert for ${bookingDetails.serviceName} Service⚠️`;
-    try {
 
-      this.emailService.sendEmail({
-        recipients: [email[1]],
-        subject: subject,
-        html: html,
-      });
-
-    } catch (error) {
-      this.logger.error(`Failed to send booking cancellation email to staff at ${email}: ${error.message}`);
-      throw new Error(`Failed to send booking cancellation email to staff at ${email}`);
-    }
-
-
+    await this.queueEmail([email], subject, html);
   }
 
   async notifyAdmin(
     email: string,
-    gymDetail:{
+    gymDetail: {
       gymId: number;
       gymName: string;
       ownerName: string;
       ownerEmail: string
-    })
-    {
-      const html = `
+    }
+  ) {
+    const html = `
       <h1>New Gym Created</h1>
       <p>A new gym has been created with the following details:</p>
       <ul>
@@ -401,18 +279,15 @@ async notifyUserBookingConfirmation(
       <p>Please review the new gym details in the admin panel.</p>
     `;
     const subject = `New Gym Created: ${gymDetail.gymName} 🏋️‍♂️`;
-    await this.emailService.sendEmail({
-      recipients: [email],
-      subject: subject,
-      html: html,
-    });
+
+    await this.queueEmail([email], subject, html);
   }
 
   async sendBookingReminder(
     email: string,
     details: { bookingName: string; startTime: Date },
   ) {
-    const formatted = details.startTime.toISOString();
+    const formatted = details.startTime.toISOString(); 
 
     const html = `
       <h1>Reminder: Upcoming Booking</h1>
@@ -425,11 +300,6 @@ async notifyUserBookingConfirmation(
     `;
     const subject = `Reminder: Upcoming Booking for ${details.bookingName} ⏰`;
 
-    await this.emailService.sendEmail({
-      recipients: [email],
-      subject,
-      html,
-    });
+    await this.queueEmail([email], subject, html);
   }
-
 }
