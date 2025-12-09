@@ -17,7 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
 import { Action } from './bookings.service';
-import { TelegramService } from 'src/telegram/telegram.service'; 
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -28,7 +28,7 @@ export class ClassBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
-    private readonly telegramService: TelegramService
+    private readonly telegramService: TelegramService,
   ) {
     super(databaseService);
   }
@@ -853,8 +853,8 @@ export class ClassBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { 
-        userName: string
+      user: {
+        userName: string;
         userId: number;
         telegramChatId?: bigint | null;
       };
@@ -870,39 +870,43 @@ export class ClassBookingsService extends BookingsService {
   ) {
     const client = tx || this.databaseService;
 
-      try {
-        await Promise.all([
-          client.notification.create({
-            data: {
-              userId: booking.class.gym.gymOwnerId,
-              type: notificationType,
-              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-            },
-          }),
+    try {
+      await Promise.all([
+        client.notification.create({
+          data: {
+            userId: booking.class.gym.gymOwnerId,
+            type: notificationType,
+            message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+          },
+        }),
 
-          booking.class.trainerId !== booking.class.gym.gymOwnerId
-            ? client.notification.create({
-                data: {
-                  userId: booking.class.trainerId,
-                  type: notificationType,
-                  message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-                },
-              })
-            : Promise.resolve(),
-        ]);
-      } catch(error) {
-          console.error('Transaction failed, rolling back notifications:', error);
-          throw error;
-      }
-  
-      if (booking.user.telegramChatId) {
-        const textToSend =  `Your booking for class "${booking.class.className}" has been ${action}.`;
-          
-            await this.telegramService
-            .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
-            .catch((err) => {
-                console.error('Telegram send failed:', err);
-            }); 
-        }
-        }
+        booking.class.trainerId !== booking.class.gym.gymOwnerId
+          ? client.notification.create({
+              data: {
+                userId: booking.class.trainerId,
+                type: notificationType,
+                message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+              },
+            })
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      console.error('Transaction failed, rolling back notifications:', error);
+      throw error;
+    }
+
+    if (booking.user.telegramChatId) {
+      const textToSend = `Your booking for class "${booking.class.className}" has been ${action}.`;
+
+      await this.telegramService
+        .sendMessage(
+          booking.user.telegramChatId,
+          `🔔 ${textToSend}`,
+          booking.user.userId,
+        )
+        .catch((err) => {
+          console.error('Telegram send failed:', err);
+        });
+    }
+  }
 }
