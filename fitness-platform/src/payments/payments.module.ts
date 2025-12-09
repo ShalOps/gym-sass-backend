@@ -17,7 +17,8 @@ import { BookingsModule } from '../bookings/bookings.module';
     forwardRef(() => BookingsModule),
     ChapaModule.registerAsync({
       useFactory: () => ({
-        secretKey: process.env.CHAPA_TEST_SECRET_KEY!, // subject to change for production
+        secretKey: process.env.CHAPA_TEST_SECRET_KEY!, // #changeInProduction
+        // secretKey: process.env.CHAPA_SECRET_KEY!, // #changeInProduction
         webhookSecret: process.env.CHAPA_WEBHOOK_SECRET,
       }),
     }),
