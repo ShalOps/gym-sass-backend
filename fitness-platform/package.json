@@ -5,6 +5,7 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -38,6 +39,7 @@
     "chapa-nestjs": "github:ShalOps/chapa-nestjs#main",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "crypto-js": "^4.2.0",
     "helmet": "^8.1.0",
     "json2csv": "^6.0.0-alpha.2",
     "multer": "^2.0.2",
@@ -49,6 +51,7 @@
     "sharp": "^0.34.4",
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -59,6 +62,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/cron": "^2.0.1",
+    "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/json2csv": "^5.0.7",
@@ -67,6 +71,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/pdfkit": "^0.17.3",
     "@types/supertest": "^6.0.2",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
