@@ -29,6 +29,7 @@ import { DeliveryReceiptDto } from './dto/delivery-receipt.dto';
 import { WsThrottlerGuard } from './guards/ws-throttler.guard';
 import { Throttle } from '@nestjs/throttler';
 import { Message } from '@prisma/client';
+import { getWebSocketCorsConfig } from '../config/cors.config';
 import type {
   AuthenticatedSocket,
   AuthenticatedUser,
@@ -36,9 +37,7 @@ import type {
 
 @WebSocketGateway({
   namespace: 'chat',
-  cors: {
-    origin: '*', // #ChangeInProduction
-  },
+  cors: getWebSocketCorsConfig(),
 })
 @UseFilters(new WsExceptionFilter())
 @UseGuards(WsThrottlerGuard)

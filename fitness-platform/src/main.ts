@@ -6,6 +6,7 @@ import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
+import { getHttpCorsConfig } from './config/cors.config';
 import helmet from 'helmet';
 import { Request, Response } from 'express';
 
@@ -22,19 +23,10 @@ async function bootstrap() {
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
-
-  app.enableCors({
-    // Enable CORS for all origins in development environment.
-    // #changeInProduction
-    origin: true, // Reflect request origin
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
-
+  app.enableCors(getHttpCorsConfig());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
-
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Security: Block public access to chat uploads
@@ -42,7 +34,6 @@ async function bootstrap() {
   app.use('/uploads/chat', (req: Request, res: Response) => {
     res.status(403).send('Forbidden');
   });
-
   // Serve static files from uploads directory
   app.useStaticAssets(UPLOADS_DIR_ABSOLUTE, {
     prefix: '/uploads/',
