@@ -25,16 +25,11 @@ export class WsJwtGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    console.log('!!! DEBUG: WsJwtGuard.canActivate triggered');
     try {
       const client = context.switchToWs().getClient<MaybeAuthenticatedSocket>();
 
       // If the user has already been authenticated, for example by handleConnection, proceed without further verification.
       if (client.data?.user?.email) {
-        console.log(
-          '!!! DEBUG: WsJwtGuard passed (existing user)',
-          client.data.user.userId,
-        );
         return true;
       }
 
@@ -79,11 +74,9 @@ export class WsJwtGuard implements CanActivate {
 
       client.data.user = user;
 
-      console.log('!!! DEBUG: WsJwtGuard passed for user', userId);
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.log('!!! DEBUG: WsJwtGuard failed', message);
       this.logger.warn(`Authentication failed: ${message}`);
       throw new WsException('Unauthorized: Invalid token');
     }

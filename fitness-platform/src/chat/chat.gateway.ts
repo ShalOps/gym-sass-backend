@@ -57,11 +57,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
-    console.log('!!! DEBUG: handleConnection triggered for client', client.id);
     try {
       const token = this.extractToken(client);
       if (!token) {
-        console.log('!!! DEBUG: No token found for client', client.id);
         this.logger.warn(`Client ${client.id} has no token. Disconnecting...`);
         client.disconnect();
         return;
@@ -95,7 +93,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       client.data.user = user;
-      console.log('!!! DEBUG: Connection successful for user', user.userId);
       this.logger.log(`Client connected: ${client.id} (User: ${user.userId})`);
 
       const wasOnline = this.onlineUsers.has(user.userId);
@@ -161,7 +158,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: Record<string, any>,
   ) {
-    console.log('!!! DEBUG: handleJoinRoom triggered', data);
     const conversationId = data?.conversationId as number;
     this.logger.log(
       `Client ${client.id} request to join room. Data: ${JSON.stringify(data)}`,
@@ -176,7 +172,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const roomName = `conversation_${conversationId}`;
     await client.join(roomName);
-    console.log('!!! DEBUG: Joined room', roomName);
     this.logger.log(`Client ${client.id} joined room: ${roomName}`);
     return { event: 'joinedRoom', data: { conversationId } };
   }

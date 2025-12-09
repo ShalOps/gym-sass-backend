@@ -13,7 +13,6 @@ import { ThrottlerException } from '@nestjs/throttler';
 @Catch()
 export class WsExceptionFilter extends BaseWsExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
-    console.log('!!! DEBUG: WsExceptionFilter caught exception', exception);
     const client = host.switchToWs().getClient<Socket>();
 
     let errorPayload = {
