@@ -8,17 +8,20 @@ export class TelegramBootstrapService implements OnModuleInit {
 
   constructor(
     private readonly telegramService: TelegramService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService<{
+      TELEGRAM_BOT_TOKEN: string;
+      APP_URL: string;
+    }>,
   ) {}
 
   async onModuleInit() {
-    const token = this.configService.get('TELEGRAM_BOT_TOKEN');
+    const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
     if (!token) {
       this.logger.warn('TELEGRAM_BOT_TOKEN not set → skipping webhook setup');
       return;
     }
 
-    const appUrl = this.configService.get('APP_URL');
+    const appUrl = this.configService.get<string>('APP_URL');
     if (!appUrl) {
       this.logger.error('APP_URL is not set! Cannot set Telegram webhook.');
       return;
