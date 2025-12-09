@@ -19,6 +19,7 @@ import {
   Message,
   ReportStatus,
   Role,
+  Prisma,
 } from '@prisma/client';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -70,8 +71,15 @@ export class ChatService {
       return error;
     }
 
-    // Handle specific Prisma errors if needed (e.g. Unique constraint)
-    // if (errorMessage.includes('Unique constraint failed')) ...
+    // Handle specific Prisma errors (e.g., unique constraint violations)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        this.logger.warn('Chat operation failed: Duplicate entry');
+        return new BadRequestException(
+          'This operation would create a duplicate entry.',
+        );
+      }
+    }
 
     // Default safe error message - hide internal details
     return new InternalServerErrorException(
