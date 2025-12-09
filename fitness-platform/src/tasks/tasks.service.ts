@@ -3,6 +3,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UPLOADS_DIR_ABSOLUTE } from '../config/paths.config';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 
 @Injectable()
 export class TasksService {
@@ -164,6 +167,52 @@ export class TasksService {
     }
   }
 
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async cleanupOrphanedChatAttachments() {
+    this.logger.log('Starting cleanup of orphaned chat attachments...');
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const orphanedAttachments =
+      await this.databaseService.messageAttachment.findMany({
+        where: {
+          messageId: null,
+          createdAt: {
+            lt: twentyFourHoursAgo,
+          },
+        },
+      });
+
+    this.logger.log(
+      `Found ${orphanedAttachments.length} orphaned attachments.`,
+    );
+
+    for (const attachment of orphanedAttachments) {
+      try {
+        const filePath = join(UPLOADS_DIR_ABSOLUTE, 'chat', attachment.url);
+        await unlink(filePath);
+        this.logger.log(`Deleted orphaned file: ${filePath}`);
+      } catch (error) {
+        const err = error as { code?: string };
+        if (err.code !== 'ENOENT') {
+          this.logger.error(
+            `Failed to delete file for attachment ${attachment.id}`,
+            error,
+          );
+        }
+      }
+    }
+
+    if (orphanedAttachments.length > 0) {
+      await this.databaseService.messageAttachment.deleteMany({
+        where: {
+          id: { in: orphanedAttachments.map((a) => a.id) },
+        },
+      });
+      this.logger.log(
+        `Deleted ${orphanedAttachments.length} orphaned attachment records.`,
+      );
+    }
+  }
   /**
    * Runs daily at 1 AM to clean up orphaned uploaded files
    * Prevents storage bloat by removing files not referenced in database
