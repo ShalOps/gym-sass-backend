@@ -4,6 +4,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import {  ApiBearerAuth } from '@nestjs/swagger';
 import { DatabaseService } from 'src/database/database.service';
+import { TelegramUpdateDto } from './dto/telegram.dto';
 
 
 
@@ -21,7 +22,7 @@ export class TelegramController {
   }
 
   @Post('webhook')
-  async webhook(@Body() body: any, @Headers('x-telegram-bot-api-secret-token') secretToken: string | undefined) {
+  async webhook(@Body() body: TelegramUpdateDto, @Headers('x-telegram-bot-api-secret-token') secretToken: string | undefined) {
     
     if (secretToken !== process.env.TELEGRAM_WEBHOOK_SECRET) {
     throw new UnauthorizedException('Invalid webhook secret');
