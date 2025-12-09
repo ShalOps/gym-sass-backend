@@ -2,6 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { DatabaseService } from '../database/database.service';
+import { Channel } from '@prisma/client'
 
 @Injectable()
 export class TelegramService {
@@ -12,6 +14,7 @@ export class TelegramService {
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    protected readonly databaseService: DatabaseService
   ) {
     this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
     this.botUsername = this.configService.get<string>('BOT_NAME');
@@ -21,29 +24,48 @@ export class TelegramService {
     }
   }
 
-  async sendMessage(chatId: bigint, text: string) {
+  async sendMessage(chatId: bigint, text: string, userId: number){
     
     if (!this.botToken) {
       this.logger.debug('Telegram bot token missing - skipping send');
-      return;
-    }
-
-    try {
-      await firstValueFrom(
-        this.httpService.post(
-          `https://api.telegram.org/bot${this.botToken}/sendMessage`,
-          {
-            chat_id: chatId,
-            text,
-          },
-        ),
-      );
-      this.logger.verbose(`Telegram message sent to chat`);
-    } catch (error: any) {
       
-      this.logger.error('Failed to send Telegram message', error.response?.data || error.message);
     }
+    for (let attempt = 1; attempt <= 3; attempt++) {
+
+        try {
+          const response = await firstValueFrom(
+            this.httpService.post(
+              `https://api.telegram.org/bot${this.botToken}/sendMessage`,
+              {
+                chat_id: chatId,
+                text,
+              },
+            ),
+          );
+          if (response && response.data.ok === false) {
+            throw new Error(response.data.description || 'Telegram API indicated failure.');
+          }
+          this.logger.verbose(`Telegram message sent to chat`);
+          break;
+        } 
+        catch (error: any) {
+            if (attempt === 3) {
+                await this.databaseService.failedNotification.create({
+                  data: {
+                    userId: userId,
+                    channel: Channel.TELEGRAM,
+                    payload: `${text}`,
+                  }
+              });
+
+              this.logger.error('Failed to send Telegram message', error.response?.data || error.message);
+            }
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+
   }
+  }
+
 
   generateStartLink(userId: number): string {
     const payload = Buffer.from(userId.toString()).toString('base64url'); 

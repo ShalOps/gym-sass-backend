@@ -42,7 +42,7 @@ export class TelegramController {
       data: { telegramChatId: chatId },
     });
 
-    await this.telegramService.sendMessage(chatId, '✅ Connected!\nYou will now receive all your notifications here.');
+    await this.telegramService.sendMessage(chatId, '✅ Connected!\nYou will now receive all your notifications here.', userId);
 
     return { ok: true };
   }

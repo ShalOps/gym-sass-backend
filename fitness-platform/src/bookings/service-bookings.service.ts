@@ -756,7 +756,7 @@ export class ServiceBookingsService extends BookingsService {
     const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
 
     await this.telegramService
-      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`)
+      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
       .catch((err) => {
         console.error('Telegram send failed:', err);
       }); 
