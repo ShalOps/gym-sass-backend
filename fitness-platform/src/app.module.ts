@@ -24,6 +24,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ChatModule } from './chat/chat.module';
+import { UtilsModule } from './utils/utils.module';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { APP_GUARD } from '@nestjs/core';
     UsersModule,
     GymsModule,
     ConfigModule.forRoot(),
+    UtilsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -53,6 +56,7 @@ import { APP_GUARD } from '@nestjs/core';
     ScheduleModule.forRoot(),
     NotificationsModule,
     NotificationModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
