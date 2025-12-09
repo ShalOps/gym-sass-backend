@@ -110,6 +110,69 @@ export class ChatService {
     return sanitized;
   }
 
+  /**
+   * Validates file MIME type against allowed types and determines attachment type
+   * @param mimeType The MIME type of the uploaded file
+   * @returns The determined AttachmentType
+   * @throws BadRequestException if MIME type is not allowed
+   */
+  private validateAndDetermineAttachmentType(mimeType: string): AttachmentType {
+    const allowedTypes = {
+      [AttachmentType.IMAGE]: [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+      ],
+      [AttachmentType.VIDEO]: [
+        'video/mp4',
+        'video/webm',
+        'video/avi',
+        'video/quicktime', // .mov files
+        'video/x-matroska', // .mkv files
+      ],
+      [AttachmentType.AUDIO]: [
+        'audio/mpeg', // .mp3
+        'audio/wav',
+        'audio/ogg',
+        'audio/mp4', // .m4a
+        'audio/aac',
+      ],
+      [AttachmentType.FILE]: [
+        'application/pdf',
+        'application/msword', // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'text/plain',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-powerpoint', // .ppt
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+      ],
+    };
+
+    // Check if the MIME type is in any of the allowed categories
+    for (const [attachmentType, mimeTypes] of Object.entries(allowedTypes)) {
+      if (mimeTypes.includes(mimeType)) {
+        return attachmentType as AttachmentType;
+      }
+    }
+
+    // If MIME type is not allowed, throw an error
+    throw new BadRequestException(
+      `File type not allowed. Supported formats: Images (jpg, png, gif, webp), Videos (mp4, webm, avi, mov, mkv), Audio (mp3, wav, ogg, m4a, aac), Documents (pdf, doc, docx, txt, xls, xlsx, ppt, pptx, zip)`,
+    );
+  }
+
+  /**
+   * Processes an incoming message by attempting to decrypt, decode, and decompress it.
+   * If any step fails, returns the original content (useful for legacy or plain text messages).
+   *
+   * @param content - The message content to process, which may be encrypted and compressed.
+   * @returns The processed message as a string, or `null` if the input is empty or invalid.
+   */
   private processIncomingMessage(
     content: string | null | undefined,
   ): string | null {
@@ -592,11 +655,8 @@ export class ChatService {
   }
 
   async createAttachment(file: Express.Multer.File) {
-    // Determine type
-    let type: AttachmentType = AttachmentType.FILE;
-    if (file.mimetype.startsWith('image/')) type = AttachmentType.IMAGE;
-    else if (file.mimetype.startsWith('video/')) type = AttachmentType.VIDEO;
-    else if (file.mimetype.startsWith('audio/')) type = AttachmentType.AUDIO;
+    // Validate and determine attachment type with specific MIME type checking
+    const type = this.validateAndDetermineAttachmentType(file.mimetype);
 
     // Store filename for secure proxy resolution (/chat/attachments/:filename)
     const attachment = await this.db.messageAttachment.create({
