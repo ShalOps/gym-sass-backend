@@ -388,3 +388,16 @@ model Notification {
 
   @@index([userId])
 }
+
+model FailedNotification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  channel     Channel
+  payload     String
+  attemptedAt DateTime @default(now())
+}
+
+enum Channel {
+  TELEGRAM
+  EMAIL
+}
