@@ -41,6 +41,13 @@ export class ChatService {
     private readonly compressionService: CompressionService,
   ) {}
 
+  /**
+   * Sanitizes and logs chat-related errors, ensuring sensitive details are not exposed to clients.
+   * Converts unknown errors into a safe `InternalServerErrorException` unless the error is already an `HttpException`.
+   * Logs warnings for anticipated HTTP exceptions and errors for unexpected failures.
+   * @param error The error object thrown during chat operations
+   * @returns An `HttpException` suitable for returning to the client
+   */
   private sanitizeChatError(error: unknown): HttpException {
     const errorMessage =
       error &&
@@ -72,6 +79,11 @@ export class ChatService {
     );
   }
 
+  /**
+   * Sanitizes a search query string to prevent security vulnerabilities and ensure safe processing.
+   * @param query - The search query string to sanitize.
+   * @returns The sanitized query string, or `null` if the input is invalid or empty after sanitization.
+   */
   private sanitizeSearchQuery(query: string): string | null {
     if (!query || typeof query !== 'string') {
       return null;
@@ -190,6 +202,13 @@ export class ChatService {
     }
   }
 
+  /**
+   * Processes an outgoing message by compressing, encoding, and encrypting its content.
+   * Returns the encrypted string, or the original content if processing fails.
+   *
+   * @param content - The message content to process.
+   * @returns The processed (encrypted) message, or the original content if an error occurs.
+   */
   private processOutgoingMessage(
     content: string | null | undefined,
   ): string | null {
