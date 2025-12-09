@@ -8,6 +8,7 @@ import { ChapaModule } from 'chapa-nestjs';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingsModule } from '../bookings/bookings.module';
+import { getChapaModuleConfig } from '../config/payments.config';
 
 @Module({
   imports: [
@@ -16,11 +17,7 @@ import { BookingsModule } from '../bookings/bookings.module';
     NotificationsModule,
     forwardRef(() => BookingsModule),
     ChapaModule.registerAsync({
-      useFactory: () => ({
-        secretKey: process.env.CHAPA_TEST_SECRET_KEY!, // #changeInProduction
-        // secretKey: process.env.CHAPA_SECRET_KEY!, // #changeInProduction
-        webhookSecret: process.env.CHAPA_WEBHOOK_SECRET,
-      }),
+      useFactory: getChapaModuleConfig,
     }),
   ],
   controllers: [PaymentController],
