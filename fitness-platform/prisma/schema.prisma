@@ -104,6 +104,13 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum BroadcastStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -178,6 +185,7 @@ model User {
   conversations         ConversationParticipant[]
   messagesSent          Message[]
   chatReports           ChatReport[]
+  broadcasts            BroadcastMessage[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -497,4 +505,20 @@ model ChatReport {
 
   reporter   User @relation(fields: [reporterId], references: [userId])
   reporterId Int
+}
+
+model BroadcastMessage {
+  id          String          @id @default(cuid())
+  content     String
+  targetRole  Role
+  senderId    Int
+  status      BroadcastStatus @default(PENDING)
+  scheduledAt DateTime
+  sentAt      DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  sender User @relation(fields: [senderId], references: [userId])
+
+  @@map("broadcast_messages")
 }
