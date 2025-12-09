@@ -72,16 +72,42 @@ export class ChatService {
     );
   }
 
-  private processOutgoingMessage(
-    content: string | null | undefined,
-  ): string | undefined {
-    if (!content) return undefined;
-    // Compress
-    const compressed = this.compressionService.compress(content);
-    // Encode to Base64 to be encryptable
-    const compressedBase64 = compressed.toString('base64');
-    // Encrypt
-    return this.encryptionService.encrypt(compressedBase64);
+  private sanitizeSearchQuery(query: string): string | null {
+    if (!query || typeof query !== 'string') {
+      return null;
+    }
+
+    let sanitized = query.trim();
+
+    if (sanitized.length < 1) {
+      return null;
+    }
+
+    // Check maximum length (prevent DoS with extremely long queries)
+    const MAX_SEARCH_LENGTH = 100;
+    if (sanitized.length > MAX_SEARCH_LENGTH) {
+      sanitized = sanitized.substring(0, MAX_SEARCH_LENGTH);
+    }
+
+    // Remove potentially dangerous characters (null bytes, control chars)
+    sanitized = sanitized.replace(/\0/g, '').replace(/[\r\n\t]/g, ' ');
+
+    sanitized = sanitized.replace(/\s+/g, ' ');
+
+    // Basic XSS prevention (remove script tags and common XSS vectors)
+    sanitized = sanitized
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/javascript:/gi, '') // Remove javascript: protocol
+      .replace(/on\w+\s*=/gi, '');
+
+    sanitized = sanitized.trim();
+
+    if (sanitized.length < 1) {
+      return null;
+    }
+
+    return sanitized;
   }
 
   private processIncomingMessage(
@@ -97,6 +123,23 @@ export class ChatService {
       return this.compressionService.decompress(compressed);
     } catch {
       // Return original if processing fails (e.g. old unencrypted messages or plain text)
+      return content;
+    }
+  }
+
+  private processOutgoingMessage(
+    content: string | null | undefined,
+  ): string | null {
+    if (!content) return null;
+    try {
+      // Compress
+      const compressed = this.compressionService.compress(content);
+      // Encode to Base64 to be encryptable
+      const compressedBase64 = compressed.toString('base64');
+      // Encrypt
+      return this.encryptionService.encrypt(compressedBase64);
+    } catch {
+      // Return original if processing fails
       return content;
     }
   }
@@ -364,6 +407,12 @@ export class ChatService {
 
   async searchMessages(userId: number, query: string) {
     try {
+      // Sanitize and validate search query
+      const sanitizedQuery = this.sanitizeSearchQuery(query);
+      if (!sanitizedQuery) {
+        return []; // Return empty results for invalid/empty queries
+      }
+
       // Get user's conversations
       const userConversations = await this.db.conversationParticipant.findMany({
         where: { userId },
@@ -400,15 +449,19 @@ export class ChatService {
         take: 200, // Limit to last 200 messages to prevent performance issues
       });
 
-      // Decrypt and Filter
+      // Decrypt and Filter with sanitized query
       const results = messages
         .map((msg) => {
           const decrypted = this.processIncomingMessage(msg.content);
           return { ...msg, content: decrypted };
         })
-        .filter((msg) =>
-          msg.content?.toLowerCase().includes(query.toLowerCase()),
-        );
+        .filter((msg) => {
+          if (!msg.content) return false;
+          // Use sanitized query for case-insensitive search
+          const content = msg.content.toLowerCase();
+          const searchTerm = sanitizedQuery.toLowerCase();
+          return content.includes(searchTerm);
+        });
 
       return results;
     } catch (error) {
