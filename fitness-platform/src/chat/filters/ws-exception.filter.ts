@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { BaseWsExceptionFilter, WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
@@ -12,6 +13,7 @@ import { ThrottlerException } from '@nestjs/throttler';
 
 @Catch()
 export class WsExceptionFilter extends BaseWsExceptionFilter {
+  private readonly logger = new Logger(WsExceptionFilter.name);
   catch(exception: unknown, host: ArgumentsHost) {
     const client = host.switchToWs().getClient<Socket>();
 
@@ -66,7 +68,10 @@ export class WsExceptionFilter extends BaseWsExceptionFilter {
         code: 'WS_INTERNAL_ERROR',
         message: 'Internal server error', // Mask internal errors in production
       };
-      // console.error(exception); // Log internally
+      this.logger.error(
+        `WebSocket internal error: ${exception.message}`,
+        exception.stack,
+      );
     }
 
     client.emit('exception', errorPayload);
