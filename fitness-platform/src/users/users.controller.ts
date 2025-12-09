@@ -9,8 +9,6 @@ import {
   HttpCode,
   UseGuards,
   Req,
-  Param,
-  ParseIntPipe,
   ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
