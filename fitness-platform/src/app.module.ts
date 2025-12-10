@@ -25,6 +25,7 @@ import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { EmailModule } from './email/email.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { EmailModule } from './email/email.module';
     NotificationsModule,
     NotificationModule,
     EmailModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [

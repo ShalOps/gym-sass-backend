@@ -8,6 +8,7 @@ import { mkdir } from 'fs/promises';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
 import helmet from 'helmet';
 
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
 async function bootstrap() {
   // Ensure uploads directory exists
   await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
