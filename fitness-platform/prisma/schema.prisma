@@ -111,6 +111,11 @@ enum BroadcastStatus {
   FAILED
 }
 
+enum Channel {
+  TELEGRAM
+  EMAIL
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -120,12 +125,12 @@ model Payment {
   customerEmail     String?       @map("customer_email")
   customerFirstName String?       @map("customer_first_name")
   customerLastName  String?       @map("customer_last_name")
-  checkoutUrl       String?       @map("checkout_url") // The Chapa payment page URL (useful for redirecting or debugging)
+  checkoutUrl       String?       @map("checkout_url")
   callbackUrl       String?       @map("callback_url")
   returnUrl         String?       @map("return_url")
   status            PaymentStatus @default(PENDING)
   type              PaymentType
-  method            String? // e.g. "telebirr", "card" (populated after verification)
+  method            String? // e.g. "telebirr", "card" (populated after business verification)
 
   metadata      Json? // Custom metadata sent to Chapa
   chapaResponse Json? @map("chapa_response") // Full JSON response from Chapa (init or verify) for audit
@@ -171,6 +176,7 @@ model User {
   location              String
   goal                  Goal?
   role                  Role                      @default(CUSTOMER)
+  telegramChatId        BigInt?
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]
@@ -521,4 +527,10 @@ model BroadcastMessage {
   sender User @relation(fields: [senderId], references: [userId])
 
   @@map("broadcast_messages")
+model FailedNotification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  channel     Channel
+  payload     String
+  attemptedAt DateTime @default(now())
 }

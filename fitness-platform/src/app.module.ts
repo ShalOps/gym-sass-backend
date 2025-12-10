@@ -26,6 +26,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ChatModule } from './chat/chat.module';
 import { UtilsModule } from './utils/utils.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { UtilsModule } from './utils/utils.module';
     NotificationsModule,
     NotificationModule,
     ChatModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [
