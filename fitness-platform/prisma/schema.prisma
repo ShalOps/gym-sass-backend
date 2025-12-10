@@ -141,6 +141,7 @@ model User {
   location              String
   goal                  Goal?
   role                  Role                     @default(CUSTOMER)
+  telegramChatId        BigInt?
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]
@@ -386,4 +387,17 @@ model Notification {
   createdAt      DateTime           @default(now())
 
   @@index([userId])
+}
+
+model FailedNotification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  channel     Channel
+  payload     String
+  attemptedAt DateTime @default(now())
+}
+
+enum Channel {
+  TELEGRAM
+  EMAIL
 }

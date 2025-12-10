@@ -17,6 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Action } from './bookings.service';
 import { NotificationType } from '@prisma/client';
+import { TelegramService } from 'src/telegram/telegram.service'; 
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
@@ -27,6 +28,8 @@ export class ServiceBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
+    private readonly telegramService: TelegramService
+    
   ) {
     super(databaseService);
   }
@@ -218,6 +221,8 @@ export class ServiceBookingsService extends BookingsService {
           user: {
             select: {
               userName: true,
+              userId: true,
+              telegramChatId: true
             },
           },
         },
@@ -228,6 +233,15 @@ export class ServiceBookingsService extends BookingsService {
           updateBooking,
           NotificationType.SERVICE_BOOKING_CONFIRMED,
           Action.CONFIRMED,
+          tx,
+        );
+      }
+
+      if (updateData.status == BookingStatus.CANCELLED) {
+        await this.createBookingNotifications(
+          updateBooking,
+          NotificationType.SERVICE_BOOKING_CANCELLED,
+          Action.CANCELLED,
           tx,
         );
       }
@@ -705,7 +719,11 @@ export class ServiceBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { userName: string };
+      user: { 
+        userName: string 
+        userId: number;
+        telegramChatId?: bigint | null;
+      };
       service: {
         name: string;
         gym: { gymOwnerId: number };
@@ -717,14 +735,34 @@ export class ServiceBookingsService extends BookingsService {
   ) {
     const client = tx || this.databaseService;
 
-    await Promise.all([
-      client.notification.create({
-        data: {
-          userId: booking.service.gym.gymOwnerId,
-          type: notificationType,
-          message: `User with username ${booking.user.userName} ${action} your service ${booking.service.name}`,
-        },
-      }),
-    ]);
+    try {
+      
+      await Promise.all([
+        client.notification.create({
+          data: {
+            userId: booking.service.gym.gymOwnerId,
+            type: notificationType,
+            message: `User with username ${booking.user.userName} ${action} your service ${booking.service.name}`,
+          },
+        }),
+      ]);
+    } catch(error){
+      console.error('Transaction failed, rolling back notifications:', error);
+      throw error;
+    }
+
+
+  if (booking.user.telegramChatId) {
+    const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
+
+    await this.telegramService
+      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
+      .catch((err) => {
+        console.error('Telegram send failed:', err);
+      }); 
+  }
+  else {
+    this.logger.debug(`User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`);
+  }
   }
 }

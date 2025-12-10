@@ -24,6 +24,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { APP_GUARD } from '@nestjs/core';
     ScheduleModule.forRoot(),
     NotificationsModule,
     NotificationModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [
