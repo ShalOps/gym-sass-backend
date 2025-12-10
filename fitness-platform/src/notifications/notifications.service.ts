@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import type { Queue } from 'bull';
 import { DateUtil } from '../common/utils/date.util';
+import { User } from '@prisma/client';
+import { Decimal } from 'generated/prisma/runtime/library';
 
 @Injectable()
 export class NotificationsService {
@@ -33,10 +35,12 @@ export class NotificationsService {
     }
   }
 
-  async sendEmailReceipt(email: string, amount: number, txRef: string) {
+
+  async sendEmailReceipt(email: string, amount: Decimal, txRef: string) {
+    const formattedAmount = amount.toFixed(2);
     const html = `
       <h1>Payment Receipt</h1>
-      <p>Thank you for your payment of <b>${amount} ETB</b>.</p>
+      <p>Thank you for your payment of <b>${formattedAmount} ETB</b>.</p>
       <p>Your transaction reference is: <b>${txRef}</b></p>
       <p>We appreciate your business! 😊</p>
     `;
@@ -62,6 +66,7 @@ export class NotificationsService {
 
     await this.queueEmail([email], subject, html);
   }
+
 
   async notifyUserBookingConfirmation(
     email: string,
@@ -92,6 +97,55 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
+  async notifyStaffClassBookingConfirmation(
+    emails: string[],
+    bookingDetails: {
+      BookingName: string;
+      startTime: Date;
+      gymName: string;
+      userName: string;
+      timezone: string;
+    },
+  ) {
+    const formattedTime = DateUtil.formatInTimezone(
+      bookingDetails.startTime,
+      bookingDetails.timezone,
+    );
+
+    const subject = `New Class Booking for ${bookingDetails.gymName} Gym🏋️‍♂️`;
+
+    if (emails[0]) {
+      const htmlTrainer = `
+        <h1>New Class Booking</h1>
+        <p>The following class has been booked:</p>
+        <ul>
+          <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+          <li><b>User Name:</b> ${bookingDetails.userName}</li>
+          <li><b>Start Time:</b> ${formattedTime}</li>
+          <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+        </ul>
+        <p>Please prepare accordingly.</p>
+      `;
+      await this.queueEmail([emails[0]], subject, htmlTrainer);
+    }
+
+    if (emails[1]) {
+      const htmlOwner = `
+        <h1>New Class Booking</h1>
+        <p>The following class has been booked:</p>
+        <ul>
+          <li><b>
+            Booking Name:</b> ${bookingDetails.BookingName}</li>
+          <li><b>User Name:</b> ${bookingDetails.userName}</li>
+          <li><b>Start Time:</b> ${formattedTime}</li>
+          <li><b>Gym Name:</b> ${bookingDetails.gymName} Gym</li>
+        </ul>
+        <p>Please ensure that your staff are informed and prepared accordingly.</p>
+      `;
+      await this.queueEmail([emails[1]], subject, htmlOwner);
+    }
+  }
+
   async notifyUserBookingCancellation(
     email: string,
     bookingDetails: {
@@ -119,6 +173,7 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
+
   async notifyStaffClassBookingCancellation(
     emails: string[],
     bookingDetails: {
@@ -135,7 +190,6 @@ export class NotificationsService {
     );
 
     const subject = `Booking Cancellation Alert for ${bookingDetails.gymName} Gym⚠️`;
-
 
     if (emails[0]) {
       const htmlTrainer = `
@@ -168,6 +222,7 @@ export class NotificationsService {
     }
   }
 
+
   async notifyUserServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -198,6 +253,7 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
+
   async notifyStaffServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -214,19 +270,23 @@ export class NotificationsService {
       bookingDetails.timezone,
     );
 
-    const html = `
-      <h1>🎉 Congratulations, ${bookingDetails.userName}!</h1>
-      <p>
-        You have successfully booked <b>${bookingDetails.BookingName}</b> for <b>${bookingDetails.serviceName}</b> service at
-        <b>${formattedTime}</b>. The duration of the service is <b>${bookingDetails.duration} minutes</b>.
-      </p>
-      <p>We are excited to serve you! 💪</p>
-    `;
+    const html = `<h1>New Service Booking</h1>
+      <p>The following service has been booked:</p>
+      <ul>
+        <li><b>Booking Name:</b> ${bookingDetails.BookingName}</li>
+        <li><b>User Name:</b> ${bookingDetails.userName}</li>
+        <li><b>Start Time:</b> ${formattedTime}</li>
+        <li><b>Service Name:</b> ${bookingDetails.serviceName}</li>
+        <li><b>Duration:</b> ${bookingDetails.duration} minutes</li>
+      </ul>
+      <p>Please prepare accordingly.</p>
+      `;
 
-    const subject = `Successfully Booked ${bookingDetails.serviceName} Service, congratulations! 🎉`;
+    const subject = `New Service Booking for ${bookingDetails.serviceName} Service🏋️‍♂️`;
 
     await this.queueEmail([email], subject, html);
   }
+
 
   async notifyStaffServiceBookingCancellation(
     email: string,
@@ -283,11 +343,42 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
+  async notifyUserPaymentFailed(
+    user: User,
+    paymentDetails: {
+      amount: number;
+      paymentDate: Date;
+      paymentId: number;
+      txRef: string;
+    }
+
+  ){
+    const formattedDate = DateUtil.formatInTimezone(
+      paymentDetails.paymentDate,
+      'EAT',
+    );
+
+    const html = `
+      <h1>Payment Failed Notification</h1>
+      <p>Dear ${user.firstName},</p>
+      <p>We regret to inform you that your recent payment attempt has failed.</p>
+      <ul>
+        <li><b>Amount:</b> ${paymentDetails.amount} ETB</li>
+        <li><b>Payment Date:</b> ${formattedDate}</li>
+        <li><b>Transaction Reference:</b> ${paymentDetails.txRef}</li>
+      </ul>
+      <p>Please try again or contact support if you need assistance.</p>
+    `;
+    const subject = `Payment Failed Notification 💳`;
+    await this.queueEmail([user.email], subject, html);
+  }
+
+
   async sendBookingReminder(
     email: string,
     details: { bookingName: string; startTime: Date },
   ) {
-    const formatted = details.startTime.toISOString(); 
+    const formatted = details.startTime.toISOString();
 
     const html = `
       <h1>Reminder: Upcoming Booking</h1>

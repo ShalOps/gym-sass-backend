@@ -397,9 +397,10 @@ export class ClassBookingsService extends BookingsService {
           gymName: cancelledBooking.class.gym.gymName,
           timezone: cancelledBooking.class.gym.timezone
         }
-      ).catch((err)=>
-        this.logger.error('Failed to notify user of booking cancellation', err));
-        throw new InternalServerErrorException('Failed to notify user of booking cancellation');
+      ).catch((err)=>{
+        this.logger.error('Failed to notify user of booking cancellation', err);
+        throw new InternalServerErrorException('Failed to notify user of booking cancellation')
+      });
     }
 
     return cancelledBooking;
@@ -749,7 +750,7 @@ export class ClassBookingsService extends BookingsService {
       }).then((user) => user?.email || '');
 
       this.notificationsService
-      .notifyStaffBookingConfirmation(
+      .notifyStaffClassBookingConfirmation(
         [trainerEmail,ownerEmail],
         {
           BookingName: booking.class.className,

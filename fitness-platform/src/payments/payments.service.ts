@@ -590,18 +590,20 @@ export class PaymentService {
 
         // Send Email Receipt (Fire-and-forget)
         if (result.processed && payment.customerEmail) {
+          try{
           this.notificationsService
             .sendEmailReceipt(
               payment.customerEmail,
-              Number(payment.amount),
+              payment.amount,
               txRef,
             )
-            .catch((err) =>
+          }
+            catch(err){
               this.logger.error(
                 `Failed to send email receipt for ${txRef}`,
                 err instanceof Error ? err.stack : String(err),
-              ),
-            );
+              )
+            }
         }
       } catch (error) {
         this.logger.error(
@@ -627,18 +629,30 @@ export class PaymentService {
 
       // Notify User (Fire-and-forget)
       if (payment.userId) {
-        this.notificationsService
-          .notifyUser(
-            payment.userId,
-            `Payment failed for transaction ${txRef}. Please try again.`,
-          )
-          .catch((err) =>
+        const user = await this.databaseService.user.findUnique({
+          where: { userId: payment.userId }
+        });
+        if (user){
+        try{
+          await this.notificationsService
+            .notifyUserPaymentFailed(
+              user,
+              {
+                paymentId: payment.id,
+                paymentDate: payment.createdAt,
+                amount: Number(payment.amount),
+                txRef: payment.txRef,
+              }
+            )
+          }
+          catch(err){
             this.logger.error(
               `Failed to notify user ${payment.userId} of failure`,
               err instanceof Error ? err.stack : String(err),
-            ),
-          );
+            );
+        }
       }
+    }
     } else {
       await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
       this.logger.log(`Webhook: Unhandled event ${payload.event} for ${txRef}`);
@@ -699,29 +713,6 @@ export class PaymentService {
           payment.serviceBookingId,
           tx,
         );
-      }
-
-      // 3. Notify User (Fire-and-forget)
-      if (payment.userId) {
-        const user = await tx.user.findUnique({
-          where: { userId: payment.userId },
-          select: { email: true },
-      });
-
-        if (user?.email) {
-          this.notificationsService
-            .sendEmailReceipt(
-              user.email,
-              Number(payment.amount),
-              payment.txRef,
-            )
-            .catch((err) =>
-              this.logger.error(
-                `Failed to notify user ${payment.userId} of success`,
-                err instanceof Error ? err.stack : String(err),
-              ),
-            );
-          }
       }
 
       return true;

@@ -95,9 +95,8 @@ export class TasksService {
   @Cron(CronExpression.EVERY_HOUR)
   async sendBookingReminders() {
     this.logger.log('Running booking reminders check...');
-    const startWindow = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h from now
-    const endWindow = new Date(startWindow.getTime() + 60 * 60 * 1000); // 24h + 1h from now
-
+    const startWindow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const endWindow = new Date(startWindow.getTime() + 60 * 60 * 1000); 
     try {
       // 1. Find Class Bookings
       const classBookings = await this.databaseService.classBooking.findMany({
