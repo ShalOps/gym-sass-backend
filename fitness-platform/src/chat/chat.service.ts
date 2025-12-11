@@ -234,6 +234,32 @@ export class ChatService {
     }
   }
 
+  /**
+   * Validates that a user has access to a specific conversation
+   * @param userId The user ID to validate
+   * @param conversationId The conversation ID to check access for
+   * @returns The conversation participant record
+   * @throws ForbiddenException if the user is not a participant
+   */
+  async validateConversationAccess(userId: number, conversationId: number) {
+    const participant = await this.db.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!participant) {
+      throw new ForbiddenException(
+        'You are not a participant of this conversation',
+      );
+    }
+
+    return participant;
+  }
+
   async getMessages(
     userId: number,
     conversationId: number,
@@ -243,20 +269,10 @@ export class ChatService {
       const { cursor, limit = 50 } = dto;
 
       // Verify User is Participant & Get visibleFrom
-      const participant = await this.db.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId,
-            userId,
-          },
-        },
-      });
-
-      if (!participant) {
-        throw new ForbiddenException(
-          'You are not a participant of this conversation',
-        );
-      }
+      const participant = await this.validateConversationAccess(
+        userId,
+        conversationId,
+      );
 
       // Fetch Messages
       const messages = await this.db.message.findMany({
@@ -344,20 +360,7 @@ export class ChatService {
       const { conversationId, content, attachmentIds, replyToId, tempId } = dto;
 
       // Verify User is Participant
-      const participant = await this.db.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId,
-            userId,
-          },
-        },
-      });
-
-      if (!participant) {
-        throw new ForbiddenException(
-          'You are not a participant of this conversation',
-        );
-      }
+      await this.validateConversationAccess(userId, conversationId);
 
       // Check Idempotency
       const existingMessage = await this.db.message.findUnique({
@@ -457,20 +460,7 @@ export class ChatService {
 
   async sendTelegramFallback(userId: number, dto: TelegramFallbackDto) {
     try {
-      const participant = await this.db.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId: dto.conversationId,
-            userId,
-          },
-        },
-      });
-
-      if (!participant) {
-        throw new ForbiddenException(
-          'You are not a participant of this conversation',
-        );
-      }
+      await this.validateConversationAccess(userId, dto.conversationId);
 
       const otherParticipants = await this.db.conversationParticipant.findMany({
         where: {
@@ -561,20 +551,7 @@ export class ChatService {
 
   async markAsRead(userId: number, conversationId: number) {
     // Verify User is Participant
-    const participant = await this.db.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
-        },
-      },
-    });
-
-    if (!participant) {
-      throw new ForbiddenException(
-        'You are not a participant of this conversation',
-      );
-    }
+    await this.validateConversationAccess(userId, conversationId);
 
     // Update lastReadAt
     await this.db.conversationParticipant.update({
@@ -973,20 +950,7 @@ export class ChatService {
   }
 
   async clearChat(userId: number, conversationId: number) {
-    const participant = await this.db.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
-        },
-      },
-    });
-
-    if (!participant) {
-      throw new ForbiddenException(
-        'You are not a participant in this conversation',
-      );
-    }
+    await this.validateConversationAccess(userId, conversationId);
 
     return this.db.conversationParticipant.update({
       where: {
@@ -1006,20 +970,7 @@ export class ChatService {
     conversationId: number,
     isMuted: boolean,
   ) {
-    const participant = await this.db.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
-        },
-      },
-    });
-
-    if (!participant) {
-      throw new ForbiddenException(
-        'You are not a participant in this conversation',
-      );
-    }
+    await this.validateConversationAccess(userId, conversationId);
 
     return this.db.conversationParticipant.update({
       where: {
@@ -1055,20 +1006,7 @@ export class ChatService {
       }
 
       // Check if requesting user is a participant
-      const requester = await this.db.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId,
-            userId: requestingUserId,
-          },
-        },
-      });
-
-      if (!requester) {
-        throw new ForbiddenException(
-          'You are not a participant of this conversation',
-        );
-      }
+      await this.validateConversationAccess(requestingUserId, conversationId);
 
       await this.chatPermissionService.validateConversationStart(
         requestingUserId,

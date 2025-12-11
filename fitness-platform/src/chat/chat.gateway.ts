@@ -154,10 +154,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('joinRoom')
   async handleJoinRoom(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: Record<string, any>,
   ) {
     const conversationId = data?.conversationId as number;
+    const userId = client.data.user.userId;
+
     this.logger.log(
       `Client ${client.id} request to join room. Data: ${JSON.stringify(data)}`,
     );
@@ -168,6 +170,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       return;
     }
+
+    // Validate user has access to this conversation
+    await this.chatService.validateConversationAccess(userId, conversationId);
 
     const roomName = `conversation_${conversationId}`;
     await client.join(roomName);
