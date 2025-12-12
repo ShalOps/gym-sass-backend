@@ -8,7 +8,7 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 // Environment-based CORS origins
 export const getCorsOrigins = (): string[] => {
   const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
-    ? process.env.CORS_ALLOWED_ORIGINS.split(',')
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
     : [
         // Development defaults
         'http://localhost:3000',
