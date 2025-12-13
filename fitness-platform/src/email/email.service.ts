@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { sendEmailDto } from './dto/email.dto';
 
 @Injectable()
 export class EmailService {
+    private readonly logger = new Logger(EmailService.name);
+
     private transporter: nodemailer.Transporter;
     constructor(private readonly configService:ConfigService){
 
@@ -29,9 +31,9 @@ export class EmailService {
         };
         try {
             await this.transporter.sendMail(options);
-            console.log('email sent successfully');
+            this.logger.log('email sent successfully');
         } catch (error) {
-            console.log('error sending email:', error);
+            this.logger.error('error sending email:', error);
             throw error;
         }
     }

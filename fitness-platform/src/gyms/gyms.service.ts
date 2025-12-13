@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
@@ -17,6 +18,7 @@ import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class GymsService {
+  private readonly logger = new Logger(GymsService.name);
   constructor(
     private readonly databaseservice: DatabaseService,
     private readonly notificationsService: NotificationsService,
@@ -90,7 +92,7 @@ async create(createGymsDto: CreateGymsDto, currentUserId: number) {
           ownerEmail: owner.email
         })
         .catch((error) => {
-          console.log(
+          this.logger.error(
             'Error sending new gym creation email to admin:',
             error,
           );

@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { DateUtil } from '../common/utils/date.util';
 import { User } from '@prisma/client';
-import { Decimal } from 'generated/prisma/runtime/library';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class NotificationsService {
