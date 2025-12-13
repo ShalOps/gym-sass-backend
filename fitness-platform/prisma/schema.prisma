@@ -18,6 +18,7 @@ enum Role {
   ADMIN
   GYMOWNER
   TRAINER
+  VENDOR
 }
 
 enum Gender {
@@ -81,6 +82,40 @@ enum NotificationStatus {
   READ
 }
 
+enum ConversationContext {
+  GENERAL
+  CLASS_INQUIRY
+  SERVICE_BOOKING
+  PRODUCT_INQUIRY
+  ORDER_SUPPORT
+  ADMIN_ANNOUNCEMENT
+}
+
+enum AttachmentType {
+  IMAGE
+  FILE
+  VIDEO
+  AUDIO
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum BroadcastStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum Channel {
+  TELEGRAM
+  EMAIL
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -90,12 +125,12 @@ model Payment {
   customerEmail     String?       @map("customer_email")
   customerFirstName String?       @map("customer_first_name")
   customerLastName  String?       @map("customer_last_name")
-  checkoutUrl       String?       @map("checkout_url") // The Chapa payment page URL (useful for redirecting or debugging)
+  checkoutUrl       String?       @map("checkout_url")
   callbackUrl       String?       @map("callback_url")
   returnUrl         String?       @map("return_url")
   status            PaymentStatus @default(PENDING)
   type              PaymentType
-  method            String? // e.g. "telebirr", "card" (populated after verification)
+  method            String? // e.g. "telebirr", "card" (populated after business verification)
 
   metadata      Json? // Custom metadata sent to Chapa
   chapaResponse Json? @map("chapa_response") // Full JSON response from Chapa (init or verify) for audit
@@ -127,20 +162,20 @@ model Payment {
 }
 
 model User {
-  userId                Int                      @id @default(autoincrement())
+  userId                Int                       @id @default(autoincrement())
   firstName             String
   lastName              String
-  userName              String                   @unique
+  userName              String                    @unique
   password              String
   birthDate             DateTime
   gender                Gender
-  email                 String                   @unique
-  phoneNo               String?                  @unique
+  email                 String                    @unique
+  phoneNo               String?                   @unique
   profilePic            String?
   bio                   String?
   location              String
   goal                  Goal?
-  role                  Role                     @default(CUSTOMER)
+  role                  Role                      @default(CUSTOMER)
   telegramChatId        BigInt?
   gyms                  Gym[]
   gymclasses            GymClasses[]
@@ -149,10 +184,14 @@ model User {
   reviews               GymReview[]
   reviewResponses       GymReviewResponse[]
   classReviews          GymClassReview[]
-  ownerClassResponses   GymClassReviewResponse[] @relation("OwnerResponses")
-  trainerClassResponses GymClassReviewResponse[] @relation("TrainerResponses")
-  payments              Payment[]                @relation("UserPayments")
+  ownerClassResponses   GymClassReviewResponse[]  @relation("OwnerResponses")
+  trainerClassResponses GymClassReviewResponse[]  @relation("TrainerResponses")
+  payments              Payment[]                 @relation("UserPayments")
   notifications         Notification[]
+  conversations         ConversationParticipant[]
+  messagesSent          Message[]
+  chatReports           ChatReport[]
+  broadcasts            BroadcastMessage[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -389,15 +428,109 @@ model Notification {
   @@index([userId])
 }
 
+model Conversation {
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+
+  isGroup Boolean @default(false)
+  title   String? // Nullable, useful for group chats or ticket subjects
+
+  context   ConversationContext @default(GENERAL)
+  contextId String? // ID of the related entity (BookingID, OrderID, ProductID)
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt(sort: Desc)])
+  @@index([context, contextId])
+}
+
+model ConversationParticipant {
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+  user           User         @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  userId         Int
+
+  joinedAt    DateTime @default(now())
+  lastReadAt  DateTime @default(now())
+  visibleFrom DateTime @default(now()) // Added for "Clear Chat" functionality
+  isMuted     Boolean  @default(false)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id           Int       @id @default(autoincrement())
+  clientSideId String    @unique
+  content      String?   @db.Text // Nullable if only attachment
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  isEdited     Boolean   @default(false)
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+
+  sender   User @relation(fields: [senderId], references: [userId], onDelete: Cascade)
+  senderId Int
+
+  replyToId Int?
+  replyTo   Message?  @relation("ReplyTo", fields: [replyToId], references: [id])
+  replies   Message[] @relation("ReplyTo")
+
+  attachments MessageAttachment[]
+  reports     ChatReport[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+}
+
+model MessageAttachment {
+  id        Int            @id @default(autoincrement())
+  url       String
+  filename  String
+  mimeType  String
+  type      AttachmentType
+  size      Int
+  createdAt DateTime       @default(now())
+
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade) // Nullable for draft uploads
+  messageId Int?
+}
+
+model ChatReport {
+  id        Int          @id @default(autoincrement())
+  reason    String
+  status    ReportStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+
+  message   Message @relation(fields: [messageId], references: [id])
+  messageId Int
+
+  reporter   User @relation(fields: [reporterId], references: [userId])
+  reporterId Int
+}
+
+model BroadcastMessage {
+  id          String          @id @default(cuid())
+  content     String
+  targetRole  Role
+  senderId    Int
+  status      BroadcastStatus @default(PENDING)
+  scheduledAt DateTime
+  sentAt      DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  sender User @relation(fields: [senderId], references: [userId])
+
+  @@map("broadcast_messages")
 model FailedNotification {
   id          Int      @id @default(autoincrement())
   userId      Int
   channel     Channel
   payload     String
   attemptedAt DateTime @default(now())
-}
-
-enum Channel {
-  TELEGRAM
-  EMAIL
 }

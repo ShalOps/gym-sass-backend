@@ -6,11 +6,12 @@ import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
+import { getHttpCorsConfig } from './config/cors.config';
 import helmet from 'helmet';
+import { Request, Response } from 'express';
 
 (BigInt.prototype as any).toJSON = function () { return this.toString(); };
 async function bootstrap() {
-  // Ensure uploads directory exists
   await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -18,21 +19,22 @@ async function bootstrap() {
   });
 
   // Security Headers
-  app.use(helmet());
-
-  // Enable CORS
-  app.enableCors({
-    // Enable CORS for all origins in development environment. Subject to change for production
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
-
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.enableCors(getHttpCorsConfig());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
-
   app.useGlobalFilters(new PrismaExceptionFilter());
 
+  // Security: Block public access to chat uploads
+  // This must be placed BEFORE app.useStaticAssets
+  app.use('/uploads/chat', (req: Request, res: Response) => {
+    res.status(403).send('Forbidden');
+  });
   // Serve static files from uploads directory
   app.useStaticAssets(UPLOADS_DIR_ABSOLUTE, {
     prefix: '/uploads/',

@@ -1,5 +1,6 @@
 // /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 import { PrismaClient, Prisma } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +8,13 @@ async function main() {
   // Wrapped the entire seeding logic inside a transaction for atomicity.
   await prisma.$transaction(async (tx) => {
     // Delete in reverse dependency order
+    await tx.chatReport.deleteMany({});
+    await tx.messageAttachment.deleteMany({});
+    await tx.message.deleteMany({});
+    await tx.conversationParticipant.deleteMany({});
+    await tx.conversation.deleteMany({});
+    await tx.broadcastMessage.deleteMany({});
+    await tx.notification.deleteMany({});
     await tx.paymentLog.deleteMany({});
     await tx.gymClassReviewResponse.deleteMany({});
     await tx.gymClassReview.deleteMany({});
@@ -38,6 +46,11 @@ async function main() {
     await tx.$executeRaw`ALTER SEQUENCE "GymClassReview_id_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "GymClassReviewResponse_responseId_seq" RESTART WITH 1;`;
     await tx.$executeRaw`ALTER SEQUENCE "payments_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "Notification_notificationId_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "Conversation_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "Message_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "MessageAttachment_id_seq" RESTART WITH 1;`;
+    await tx.$executeRaw`ALTER SEQUENCE "ChatReport_id_seq" RESTART WITH 1;`;
 
     // Array to hold created users
     const users: Awaited<ReturnType<typeof tx.user.create>>[] = [];
@@ -94,9 +107,12 @@ async function main() {
         const photo = await tx.photo.create({
           data: {
             url: `https://example.com/gym${gym.gymId}-photo${k}.jpg`,
+            thumbnailUrl: `https://example.com/gym${gym.gymId}-photo${k}-thumb.jpg`,
+            altText: `Photo ${k} for gym ${gym.gymName}`,
             entityType: 'GYM',
             entityId: gym.gymId,
             isCover: k === 1,
+            order: k,
           },
         });
         photos.push(photo);
@@ -189,9 +205,12 @@ async function main() {
         const photo = await tx.photo.create({
           data: {
             url: `https://example.com/class${gymClass.classId}-photo${k}.jpg`,
+            thumbnailUrl: `https://example.com/class${gymClass.classId}-photo${k}-thumb.jpg`,
+            altText: `Photo ${k} for class ${gymClass.className}`,
             entityType: 'CLASS',
             entityId: gymClass.classId,
             isCover: k === 1,
+            order: k,
           },
         });
         photos.push(photo);
@@ -238,6 +257,7 @@ async function main() {
             customerFirstName: customer.firstName,
             customerLastName: customer.lastName,
             method: method,
+            metadata: { seeded: true, bookingType: 'class' },
           },
         });
 
@@ -294,6 +314,7 @@ async function main() {
             customerFirstName: customer.firstName,
             customerLastName: customer.lastName,
             method: method,
+            metadata: { seeded: true, bookingType: 'service' },
           },
         });
 
@@ -359,6 +380,145 @@ async function main() {
           });
         }
       }
+    }
+
+    // Seed Notifications
+    for (let i = 0; i < 5; i++) {
+      const user = users[i];
+      await tx.notification.create({
+        data: {
+          userId: user.userId,
+          type: 'NEW_GYM_CREATED',
+          message: `Welcome to the platform, ${user.firstName}!`,
+          status: i % 2 === 0 ? 'READ' : 'UNREAD',
+        },
+      });
+    }
+
+    // Seed Conversations
+    // 1. Customer <-> Trainer
+    const customer = customers[0];
+    const trainer = trainers[0];
+
+    if (customer && trainer) {
+      const conversation = await tx.conversation.create({
+        data: {
+          context: 'GENERAL',
+          participants: {
+            create: [{ userId: customer.userId }, { userId: trainer.userId }],
+          },
+        },
+      });
+
+      // Messages
+      const msg1 = await tx.message.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: customer.userId,
+          content: 'Hi, I have a question about the class.',
+          clientSideId: uuidv4(),
+        },
+      });
+
+      const msg2 = await tx.message.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: trainer.userId,
+          content: 'Sure, what would you like to know?',
+          clientSideId: uuidv4(),
+          replyToId: msg1.id,
+        },
+      });
+
+      // Attachment
+      await tx.messageAttachment.create({
+        data: {
+          messageId: msg2.id,
+          url: 'https://example.com/schedule.pdf',
+          filename: 'schedule.pdf',
+          mimeType: 'application/pdf',
+          type: 'FILE',
+          size: 1024,
+        },
+      });
+    }
+
+    // 2. Group Chat (Admin Announcement)
+    const adminUser = users.find((u) => u.role === 'ADMIN');
+    if (adminUser) {
+      const groupChat = await tx.conversation.create({
+        data: {
+          isGroup: true,
+          title: 'Gym Announcements',
+          context: 'ADMIN_ANNOUNCEMENT',
+          participants: {
+            create: customers
+              .slice(0, 3)
+              .map((c) => ({ userId: c.userId }))
+              .concat([{ userId: adminUser.userId }]),
+          },
+        },
+      });
+
+      const announcementMsg = await tx.message.create({
+        data: {
+          conversationId: groupChat.id,
+          senderId: adminUser.userId,
+          content: 'Welcome to the new gym platform!',
+          clientSideId: uuidv4(),
+        },
+      });
+
+      // Report a message
+      if (customers.length > 0) {
+        await tx.chatReport.create({
+          data: {
+            messageId: announcementMsg.id,
+            reporterId: customers[0].userId,
+            reason: 'Spam',
+            status: 'PENDING',
+          },
+        });
+      }
+    }
+
+    // Seed Broadcast Messages
+    const adminUser2 = users.find((u) => u.role === 'ADMIN');
+    if (adminUser2) {
+      // Create some sample broadcast messages
+      await tx.broadcastMessage.create({
+        data: {
+          content:
+            'Welcome to our new gym platform! Check out the latest features.',
+          targetRole: 'CUSTOMER',
+          senderId: adminUser2.userId,
+          status: 'SENT',
+          scheduledAt: new Date(),
+          sentAt: new Date(),
+        },
+      });
+
+      await tx.broadcastMessage.create({
+        data: {
+          content:
+            'Important: Server maintenance scheduled for tonight at 2 AM.',
+          targetRole: 'TRAINER',
+          senderId: adminUser2.userId,
+          status: 'PENDING',
+          scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+        },
+      });
+
+      await tx.broadcastMessage.create({
+        data: {
+          content:
+            'New gym owner onboarding session available. Contact support for details.',
+          targetRole: 'GYMOWNER',
+          senderId: adminUser2.userId,
+          status: 'PROCESSING',
+          scheduledAt: new Date(),
+        },
+      });
     }
   }); // end transaction
 
