@@ -69,6 +69,11 @@ export class PaymentService {
   }
 
   private sanitizePaymentError(error: unknown): HttpException {
+    if (error instanceof HttpException) {
+      this.logger.warn(`Payment operation warning: ${error.message}`);
+      return error;
+    }
+
     const errorMessage =
       error &&
       typeof error === 'object' &&

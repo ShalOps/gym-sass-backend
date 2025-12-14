@@ -25,6 +25,8 @@ import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { EmailModule } from './email/email.module';
+import { ChatModule } from './chat/chat.module';
+import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
@@ -34,6 +36,7 @@ import { TelegramModule } from './telegram/telegram.module';
     UsersModule,
     GymsModule,
     ConfigModule.forRoot(),
+    UtilsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -56,6 +59,7 @@ import { TelegramModule } from './telegram/telegram.module';
     NotificationsModule,
     NotificationModule,
     EmailModule,
+    ChatModule,
     TelegramModule,
   ],
   controllers: [AppController],
