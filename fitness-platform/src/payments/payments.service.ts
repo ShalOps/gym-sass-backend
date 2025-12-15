@@ -595,18 +595,20 @@ export class PaymentService {
 
         // Send Email Receipt (Fire-and-forget)
         if (result.processed && payment.customerEmail) {
+          try{
           this.notificationsService
             .sendEmailReceipt(
               payment.customerEmail,
-              Number(payment.amount),
+              payment.amount,
               txRef,
             )
-            .catch((err) =>
+          }
+            catch(err){
               this.logger.error(
                 `Failed to send email receipt for ${txRef}`,
                 err instanceof Error ? err.stack : String(err),
-              ),
-            );
+              )
+            }
         }
       } catch (error) {
         this.logger.error(
@@ -632,18 +634,30 @@ export class PaymentService {
 
       // Notify User (Fire-and-forget)
       if (payment.userId) {
-        this.notificationsService
-          .notifyUser(
-            payment.userId,
-            `Payment failed for transaction ${txRef}. Please try again.`,
-          )
-          .catch((err) =>
+        const user = await this.databaseService.user.findUnique({
+          where: { userId: payment.userId }
+        });
+        if (user){
+        try{
+          await this.notificationsService
+            .notifyUserPaymentFailed(
+              user,
+              {
+                paymentId: payment.id,
+                paymentDate: payment.createdAt,
+                amount: Number(payment.amount),
+                txRef: payment.txRef,
+              }
+            )
+          }
+          catch(err){
             this.logger.error(
               `Failed to notify user ${payment.userId} of failure`,
               err instanceof Error ? err.stack : String(err),
-            ),
-          );
+            );
+        }
       }
+    }
     } else {
       await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
       this.logger.log(`Webhook: Unhandled event ${payload.event} for ${txRef}`);
@@ -873,17 +887,20 @@ export class PaymentService {
       // Notify User (Fire-and-forget)
       if (payment.user?.email) {
         this.notificationsService
-          .notifyUser(
-            payment.user.userId,
-            `Payment Refunded: ${refundAmount} ETB has been refunded to your account.`,
+          .sendRefundPayment(
+            payment.user.email,
+            refundAmount,
+            payment.txRef,
+            dto.reason || "Refund processed"
           )
           .catch((err) =>
             this.logger.error(
-              `Failed to notify user ${payment.user?.userId} of refund`,
+              `Failed to send refund email to user ${payment.user?.userId}`,
               err instanceof Error ? err.stack : String(err),
             ),
           );
       }
+
 
       return {
         status: 'success',

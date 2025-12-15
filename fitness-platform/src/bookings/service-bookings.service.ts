@@ -318,13 +318,20 @@ export class ServiceBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaff(
+        .notifyStaffServiceBookingCancellation(
           ownerEmail,
-          `Service Booking cancelled by ${userName} for ${serviceName} at ${startTime}`,
+          {
+            BookingName: serviceName,
+            startTime: startTime,
+            userName: userName,
+            serviceName: serviceName,
+            timezone: cancelledBooking.service.gym.timezone
+          }
         )
-        .catch((err) =>
-          this.logger.error('Failed to notify gym owner of cancellation', err),
-        );
+        .catch((err) => {
+          this.logger.error('Failed to notify owner of cancellation', err);
+          throw new InternalServerErrorException('Failed to notify owner of cancellation');
+        });
     }
 
     return cancelledBooking;
@@ -613,22 +620,50 @@ export class ServiceBookingsService extends BookingsService {
       db,
     );
 
-    // // Send confirmation email with localized time
-    // if (booking.user?.email && booking.startTime) {
-    //   this.notificationsService
-    //     .sendBookingConfirmation(booking.user.email, {
-    //       BookingName: booking.service.name,
-    //       startTime: booking.startTime,
-    //       gymName: booking.service.gym.gymName,
-    //       timezone: booking.service.gym.timezone,
-    //     })
-    //     .catch((err) =>
-    //       this.logger.error(
-    //         `Failed to send booking confirmation for ${bookingId}`,
-    //         err,
-    //       ),
-    //     );
-    // }
+    // Send confirmation email with localized time
+    if (booking.user?.email && booking.startTime) {
+      this.notificationsService
+        .notifyUserServiceBookingConfirmation(
+          booking.user.email,
+          {
+          BookingName: booking.service.name,
+          serviceName: booking.service.name,
+          duration: Number(booking.service.duration),
+          userName: booking.user.firstName,
+          startTime: booking.startTime,
+          timezone: booking.service.gym.timezone,
+        })
+        .catch((err) => {
+          this.logger.error(`Failed to send booking confirmation for ${bookingId}`, err);
+          throw new InternalServerErrorException('Failed to send booking confirmation');
+        });
+    }
+
+    if (booking.service?.gym.gymOwnerId && booking.startTime) {
+      const owner = await this.databaseService.user.findUnique({
+        where: { userId: booking.service.gym.gymOwnerId },
+      });
+
+      if (owner?.email) {
+        this.notificationsService
+          .notifyStaffServiceBookingConfirmation(
+            owner.email,
+            {
+            BookingName: booking.service.name,
+            serviceName: booking.service.name,
+            duration: Number(booking.service.duration),
+            userName: booking.user.firstName,
+            startTime: booking.startTime,
+            timezone: booking.service.gym.timezone,
+          })
+          .catch((err) => {
+            this.logger.error(
+              `Failed to send booking confirmation for ${bookingId}`,
+              err,
+            );
+          });
+      }
+    }
 
     return booking;
   }

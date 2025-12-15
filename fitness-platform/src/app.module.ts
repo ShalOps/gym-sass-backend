@@ -24,6 +24,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { NotificationModule } from './notification/notification.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { EmailModule } from './email/email.module';
 import { ChatModule } from './chat/chat.module';
 import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
@@ -57,6 +58,7 @@ import { TelegramModule } from './telegram/telegram.module';
     ScheduleModule.forRoot(),
     NotificationsModule,
     NotificationModule,
+    EmailModule,
     ChatModule,
     TelegramModule,
   ],
