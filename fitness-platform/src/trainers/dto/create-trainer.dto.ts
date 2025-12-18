@@ -1,26 +1,39 @@
-import { IsString, IsNumber, IsOptional, IsArray, IsBoolean, IsDate } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, IsBoolean, IsDate, IsDecimal } from 'class-validator';
 
 export class CreateTrainerDto {
-  userId: number;
-  
-  @IsOptional()
-  bio?: string;
+    userId: number;
 
-  @IsOptional()
-  gender?: string;
+    @IsOptional()
+    @IsString()
+    bio?: string;
 
-  @IsOptional()
-  dob?: Date;
+    @IsOptional()
+    @IsString()
+    gender?: string;
 
-  @IsOptional()
-  hourlyRate?: number;
+    @IsOptional()
+    @IsDate()
+    dob?: Date;
 
-  @IsOptional()
-  specializations?: object[];
+    @IsOptional()
+    @IsDecimal({ decimal_digits: '0,2' })
+    hourlyRate: string;
 
-  @IsOptional()
-  yearsOfExperience?: number;
+    @IsOptional()
+    specializations: object[];
 
-  @IsOptional()
-  verified?: boolean;
+    @IsOptional()
+    @IsNumber()
+    yearsOfExperience: number;
+
+    @IsOptional()
+    certificationFiles: object[];
+
+    @IsOptional()
+    profilePicture?: string
+
+
+    @IsOptional()
+    @IsBoolean()
+    verified?: boolean;
 }
