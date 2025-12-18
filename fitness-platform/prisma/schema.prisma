@@ -116,6 +116,12 @@ enum Channel {
   EMAIL
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -549,7 +555,7 @@ model Trainer {
   profilePicture     String?
   certificationFiles Json
   verified           Boolean  @default(false)
-  verificationStatus String   @default("PENDING")
+  verificationStatus VerificationStatus   @default("PENDING")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -559,6 +565,19 @@ model Trainer {
   gyms          TrainerGym[]
   bookings      Booking[]
   reviews       Review[]
+}
+
+model TrainerAvailability {
+  id          Int      @id @default(autoincrement())
+  trainerId   Int
+  dayOfWeek   Int      // 0 = Sunday, 6 = Saturday
+  startTime   DateTime
+  endTime     DateTime
+  isRecurring Boolean  @default(true)
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, dayOfWeek])
 }
 
 
