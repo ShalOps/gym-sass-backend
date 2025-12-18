@@ -524,9 +524,11 @@ model BroadcastMessage {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  sender User @relation(fields: [senderId], references: [userId])
+  sender      User     @relation(fields: [senderId], references: [userId])
 
   @@map("broadcast_messages")
+}
+
 model FailedNotification {
   id          Int      @id @default(autoincrement())
   userId      Int
