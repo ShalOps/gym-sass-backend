@@ -198,6 +198,10 @@ model User {
   messagesSent          Message[]
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
+  trainers              Trainer?
+  TrainerBookings       TrainerBooking[]
+  TrainerReviews        TrainerReview[]
+
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -226,6 +230,7 @@ model Gym {
   coverPhoto              Photo?                    @relation("gymCover", fields: [coverPhotoId], references: [id])
   coverPhotoId            Int?                      @unique
   reviews                 GymReview[]
+  trainersGyms            TrainerGym[]
 
   @@index([location])
   @@index([verified])
@@ -555,16 +560,16 @@ model Trainer {
   profilePicture     String?
   certificationFiles Json
   verified           Boolean  @default(false)
-  verificationStatus VerificationStatus   @default("PENDING")
+  verificationStatus VerificationStatus   @default(PENDING)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   /// Relations
-  user          User                 @relation(fields: [userId], references: [id])
+  user          User                 @relation(fields: [userId], references: [userId])
   availability  TrainerAvailability[]
   gyms          TrainerGym[]
-  bookings      Booking[]
-  reviews       Review[]
+  bookings      TrainerBooking[]
+  reviews       TrainerReview[]
 }
 
 model TrainerAvailability {
@@ -580,6 +585,18 @@ model TrainerAvailability {
   @@index([trainerId, dayOfWeek])
 }
 
+model TrainerGym {
+  id        Int @id @default(autoincrement())
+  trainerId Int
+  gymId     Int
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  gym     Gym     @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+
+  @@unique([trainerId, gymId])
+}
+
+
 model TrainerBooking {
   id               Int      @id @default(autoincrement())
   userId           Int
@@ -593,14 +610,27 @@ model TrainerBooking {
   createdAt        DateTime @default(now())
 
   /// Relations
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   trainer  Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  review   Review?
+  review   TrainerReview?
 
   originalBooking TrainerBooking? @relation("Reschedule", fields: [rescheduledFrom], references: [id])
   reschedules      TrainerBooking[] @relation("Reschedule")
 
   @@index([trainerId, date])
+}
+
+model TrainerReview {
+  id        Int    @id @default(autoincrement())
+  trainerId Int
+  userId    Int
+  bookingId Int   @unique
+  rating    Int
+  comment   String?
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  booking TrainerBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
 
