@@ -580,4 +580,28 @@ model TrainerAvailability {
   @@index([trainerId, dayOfWeek])
 }
 
+model TrainerBooking {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  trainerId        Int
+  date             DateTime
+  startTime        DateTime
+  endTime          DateTime
+  sessionType      String
+  status           BookingStatus @default(PENDING)
+  rescheduledFrom  Int?
+  createdAt        DateTime @default(now())
+
+  /// Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainer  Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  review   Review?
+
+  originalBooking TrainerBooking? @relation("Reschedule", fields: [rescheduledFrom], references: [id])
+  reschedules      TrainerBooking[] @relation("Reschedule")
+
+  @@index([trainerId, date])
+}
+
+
 
