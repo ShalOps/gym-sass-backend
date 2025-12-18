@@ -9,11 +9,13 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(
-    @InjectQueue('email-queue') private readonly emailQueue: Queue
-  ) {}
+  constructor(@InjectQueue('email-queue') private readonly emailQueue: Queue) {}
 
-  private async queueEmail(recipients: string[], subject: string, html: string) {
+  private async queueEmail(
+    recipients: string[],
+    subject: string,
+    html: string,
+  ) {
     try {
       await this.emailQueue.add(
         'send-email',
@@ -29,12 +31,17 @@ export class NotificationsService {
         },
       );
       this.logger.log(`Queued email to: ${recipients.join(', ')}`);
-    } catch (error) {
-      this.logger.error(`Failed to queue email to ${recipients}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to queue email to ${recipients.join(', ')}: ${
+          error && typeof error === 'object' && 'message' in error
+            ? (error as { message?: string }).message
+            : String(error)
+        }`,
+      );
       throw error;
     }
   }
-
 
   async sendEmailReceipt(email: string, amount: Decimal, txRef: string) {
     const formattedAmount = amount.toFixed(2);
@@ -49,7 +56,12 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-  async sendRefundPayment(email: string, refundAmount: number, txRef: string, reason: string) {
+  async sendRefundPayment(
+    email: string,
+    refundAmount: number,
+    txRef: string,
+    reason: string,
+  ) {
     const subject = `Refund Processed Successfully 💸`;
     const html = `
       <h2>Your Refund is Completed</h2>
@@ -66,7 +78,6 @@ export class NotificationsService {
 
     await this.queueEmail([email], subject, html);
   }
-
 
   async notifyUserBookingConfirmation(
     email: string,
@@ -173,7 +184,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffClassBookingCancellation(
     emails: string[],
     bookingDetails: {
@@ -222,7 +232,6 @@ export class NotificationsService {
     }
   }
 
-
   async notifyUserServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -232,7 +241,7 @@ export class NotificationsService {
       duration: number;
       userName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
@@ -253,7 +262,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -263,7 +271,7 @@ export class NotificationsService {
       duration: number;
       userName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
@@ -287,7 +295,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffServiceBookingCancellation(
     email: string,
     bookingDetails: {
@@ -296,7 +303,7 @@ export class NotificationsService {
       startTime: string;
       serviceName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       new Date(bookingDetails.startTime),
@@ -325,8 +332,8 @@ export class NotificationsService {
       gymId: number;
       gymName: string;
       ownerName: string;
-      ownerEmail: string
-    }
+      ownerEmail: string;
+    },
   ) {
     const html = `
       <h1>New Gym Created</h1>
@@ -350,9 +357,8 @@ export class NotificationsService {
       paymentDate: Date;
       paymentId: number;
       txRef: string;
-    }
-
-  ){
+    },
+  ) {
     const formattedDate = DateUtil.formatInTimezone(
       paymentDetails.paymentDate,
       'EAT',
@@ -372,7 +378,6 @@ export class NotificationsService {
     const subject = `Payment Failed Notification 💳`;
     await this.queueEmail([user.email], subject, html);
   }
-
 
   async sendBookingReminder(
     email: string,

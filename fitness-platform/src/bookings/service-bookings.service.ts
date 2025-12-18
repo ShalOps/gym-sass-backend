@@ -17,7 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Action } from './bookings.service';
 import { NotificationType } from '@prisma/client';
-import { TelegramService } from 'src/telegram/telegram.service'; 
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
@@ -28,8 +28,7 @@ export class ServiceBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
-    private readonly telegramService: TelegramService
-    
+    private readonly telegramService: TelegramService,
   ) {
     super(databaseService);
   }
@@ -222,7 +221,7 @@ export class ServiceBookingsService extends BookingsService {
             select: {
               userName: true,
               userId: true,
-              telegramChatId: true
+              telegramChatId: true,
             },
           },
         },
@@ -318,19 +317,18 @@ export class ServiceBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaffServiceBookingCancellation(
-          ownerEmail,
-          {
-            BookingName: serviceName,
-            startTime: startTime,
-            userName: userName,
-            serviceName: serviceName,
-            timezone: cancelledBooking.service.gym.timezone
-          }
-        )
+        .notifyStaffServiceBookingCancellation(ownerEmail, {
+          BookingName: serviceName,
+          startTime: startTime,
+          userName: userName,
+          serviceName: serviceName,
+          timezone: cancelledBooking.service.gym.timezone,
+        })
         .catch((err) => {
           this.logger.error('Failed to notify owner of cancellation', err);
-          throw new InternalServerErrorException('Failed to notify owner of cancellation');
+          throw new InternalServerErrorException(
+            'Failed to notify owner of cancellation',
+          );
         });
     }
 
@@ -623,9 +621,7 @@ export class ServiceBookingsService extends BookingsService {
     // Send confirmation email with localized time
     if (booking.user?.email && booking.startTime) {
       this.notificationsService
-        .notifyUserServiceBookingConfirmation(
-          booking.user.email,
-          {
+        .notifyUserServiceBookingConfirmation(booking.user.email, {
           BookingName: booking.service.name,
           serviceName: booking.service.name,
           duration: Number(booking.service.duration),
@@ -634,8 +630,13 @@ export class ServiceBookingsService extends BookingsService {
           timezone: booking.service.gym.timezone,
         })
         .catch((err) => {
-          this.logger.error(`Failed to send booking confirmation for ${bookingId}`, err);
-          throw new InternalServerErrorException('Failed to send booking confirmation');
+          this.logger.error(
+            `Failed to send booking confirmation for ${bookingId}`,
+            err,
+          );
+          throw new InternalServerErrorException(
+            'Failed to send booking confirmation',
+          );
         });
     }
 
@@ -646,9 +647,7 @@ export class ServiceBookingsService extends BookingsService {
 
       if (owner?.email) {
         this.notificationsService
-          .notifyStaffServiceBookingConfirmation(
-            owner.email,
-            {
+          .notifyStaffServiceBookingConfirmation(owner.email, {
             BookingName: booking.service.name,
             serviceName: booking.service.name,
             duration: Number(booking.service.duration),
@@ -754,8 +753,8 @@ export class ServiceBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { 
-        userName: string 
+      user: {
+        userName: string;
         userId: number;
         telegramChatId?: bigint | null;
       };
@@ -771,7 +770,6 @@ export class ServiceBookingsService extends BookingsService {
     const client = tx || this.databaseService;
 
     try {
-      
       await Promise.all([
         client.notification.create({
           data: {
@@ -781,23 +779,27 @@ export class ServiceBookingsService extends BookingsService {
           },
         }),
       ]);
-    } catch(error){
+    } catch (error) {
       console.error('Transaction failed, rolling back notifications:', error);
       throw error;
     }
 
+    if (booking.user.telegramChatId) {
+      const textToSend = `Your booking for service "${booking.service.name}" has been ${action}.`;
 
-  if (booking.user.telegramChatId) {
-    const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
-
-    await this.telegramService
-      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
-      .catch((err) => {
-        console.error('Telegram send failed:', err);
-      }); 
-  }
-  else {
-    this.logger.debug(`User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`);
-  }
+      await this.telegramService
+        .sendMessage(
+          booking.user.telegramChatId,
+          `🔔 ${textToSend}`,
+          booking.user.userId,
+        )
+        .catch((err) => {
+          console.error('Telegram send failed:', err);
+        });
+    } else {
+      this.logger.debug(
+        `User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`,
+      );
+    }
   }
 }

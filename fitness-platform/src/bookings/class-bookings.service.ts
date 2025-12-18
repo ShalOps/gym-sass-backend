@@ -17,7 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
 import { Action } from './bookings.service';
-import { TelegramService } from 'src/telegram/telegram.service'; 
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class ClassBookingsService extends BookingsService {
@@ -28,7 +28,7 @@ export class ClassBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
-    private readonly telegramService: TelegramService
+    private readonly telegramService: TelegramService,
   ) {
     super(databaseService);
   }
@@ -357,9 +357,11 @@ export class ClassBookingsService extends BookingsService {
 
     // Notify Trainer
     if (cancelledBooking.class.trainer?.email) {
-      const ownerEmail = await this.databaseService.user.findUnique({
-        where: { userId: cancelledBooking.class.gym.gymOwnerId },
-      }).then((user) => user?.email || '');
+      const ownerEmail = await this.databaseService.user
+        .findUnique({
+          where: { userId: cancelledBooking.class.gym.gymOwnerId },
+        })
+        .then((user) => user?.email || '');
       const trainerEmail = cancelledBooking.class.trainer.email;
       const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
       const className = cancelledBooking.class.className;
@@ -368,43 +370,49 @@ export class ClassBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaffClassBookingCancellation(
-          [trainerEmail,ownerEmail],
-          {
-            BookingName: className,
-            startTime: startTime,
-            userName: userName,
-            gymName: cancelledBooking.class.gym.gymName,
-            timezone: cancelledBooking.class.gym.timezone
-          }
-        )
+        .notifyStaffClassBookingCancellation([trainerEmail, ownerEmail], {
+          BookingName: className,
+          startTime: startTime,
+          userName: userName,
+          gymName: cancelledBooking.class.gym.gymName,
+          timezone: cancelledBooking.class.gym.timezone,
+        })
         .catch((err) => {
-          this.logger.error('Failed to notify trainer/owner of cancellation', err);
-          throw new InternalServerErrorException('Failed to notify trainer/owner of cancellation');
+          this.logger.error(
+            'Failed to notify trainer/owner of cancellation',
+            err,
+          );
+          throw new InternalServerErrorException(
+            'Failed to notify trainer/owner of cancellation',
+          );
         });
     }
 
     // notify the user that they have successfully cancelled the booking
-    if(cancelledBooking.user?.email){
+    if (cancelledBooking.user?.email) {
       const userEmail = cancelledBooking.user.email;
       const userName = `${cancelledBooking.user.firstName} ${cancelledBooking.user.lastName}`;
       const className = cancelledBooking.class.className;
       const startTime = cancelledBooking.startTime
         ? cancelledBooking.startTime.toLocaleString()
         : 'N/A';
-      this.notificationsService.notifyUserBookingCancellation(
-        userEmail,
-        {
+      this.notificationsService
+        .notifyUserBookingCancellation(userEmail, {
           BookingName: className,
           startTime: startTime,
           userName: userName,
           gymName: cancelledBooking.class.gym.gymName,
-          timezone: cancelledBooking.class.gym.timezone
-        }
-      ).catch((err)=>{
-        this.logger.error('Failed to notify user of booking cancellation', err);
-        throw new InternalServerErrorException('Failed to notify user of booking cancellation')
-      });
+          timezone: cancelledBooking.class.gym.timezone,
+        })
+        .catch((err) => {
+          this.logger.error(
+            'Failed to notify user of booking cancellation',
+            err,
+          );
+          throw new InternalServerErrorException(
+            'Failed to notify user of booking cancellation',
+          );
+        });
     }
 
     return cancelledBooking;
@@ -726,7 +734,6 @@ export class ClassBookingsService extends BookingsService {
 
     // Send confirmation email with localized time
     if (booking.user?.email && booking.startTime) {
-
       this.notificationsService
         .notifyUserBookingConfirmation(booking.user.email, {
           BookingName: booking.class.className,
@@ -744,28 +751,37 @@ export class ClassBookingsService extends BookingsService {
         );
     }
 
-    if(booking.class.trainerId && booking.class.gym.gymOwnerId && booking.startTime){
-      const ownerEmail = await this.databaseService.user.findUnique({
-        where:{ userId: booking.class.gym.gymOwnerId },
-      }).then((user) => user?.email || '');
+    if (
+      booking.class.trainerId &&
+      booking.class.gym.gymOwnerId &&
+      booking.startTime
+    ) {
+      const ownerEmail = await this.databaseService.user
+        .findUnique({
+          where: { userId: booking.class.gym.gymOwnerId },
+        })
+        .then((user) => user?.email || '');
 
-      const trainerEmail = await this.databaseService.user.findUnique({
-        where:{ userId: booking.class.trainerId },
-      }).then((user) => user?.email || '');
+      const trainerEmail = await this.databaseService.user
+        .findUnique({
+          where: { userId: booking.class.trainerId },
+        })
+        .then((user) => user?.email || '');
 
       this.notificationsService
-      .notifyStaffClassBookingConfirmation(
-        [trainerEmail,ownerEmail],
-        {
+        .notifyStaffClassBookingConfirmation([trainerEmail, ownerEmail], {
           BookingName: booking.class.className,
           startTime: booking.startTime,
           userName: booking.user.userName,
           gymName: booking.class.gym.gymName,
           timezone: booking.class.gym.timezone,
-        }
-      ).catch((err) =>
-        this.logger.error(`Failed to send staff booking confirmation for ${bookingId}`,err),
-      );
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send staff booking confirmation for ${bookingId}`,
+            err,
+          ),
+        );
     }
 
     await this.createBookingNotifications(
@@ -912,8 +928,8 @@ export class ClassBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { 
-        userName: string
+      user: {
+        userName: string;
         userId: number;
         telegramChatId?: bigint | null;
       };
@@ -929,39 +945,43 @@ export class ClassBookingsService extends BookingsService {
   ) {
     const client = tx || this.databaseService;
 
-      try {
-        await Promise.all([
-          client.notification.create({
-            data: {
-              userId: booking.class.gym.gymOwnerId,
-              type: notificationType,
-              message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-            },
-          }),
+    try {
+      await Promise.all([
+        client.notification.create({
+          data: {
+            userId: booking.class.gym.gymOwnerId,
+            type: notificationType,
+            message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+          },
+        }),
 
-          booking.class.trainerId !== booking.class.gym.gymOwnerId
-            ? client.notification.create({
-                data: {
-                  userId: booking.class.trainerId,
-                  type: notificationType,
-                  message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
-                },
-              })
-            : Promise.resolve(),
-        ]);
-      } catch(error) {
-          console.error('Transaction failed, rolling back notifications:', error);
-          throw error;
-      }
-  
-      if (booking.user.telegramChatId) {
-        const textToSend =  `Your booking for class "${booking.class.className}" has been ${action}.`;
-          
-            await this.telegramService
-            .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
-            .catch((err) => {
-                console.error('Telegram send failed:', err);
-            }); 
-        }
-        }
+        booking.class.trainerId !== booking.class.gym.gymOwnerId
+          ? client.notification.create({
+              data: {
+                userId: booking.class.trainerId,
+                type: notificationType,
+                message: `User with username ${booking.user.userName} ${action} your class ${booking.class.className}`,
+              },
+            })
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      console.error('Transaction failed, rolling back notifications:', error);
+      throw error;
+    }
+
+    if (booking.user.telegramChatId) {
+      const textToSend = `Your booking for class "${booking.class.className}" has been ${action}.`;
+
+      await this.telegramService
+        .sendMessage(
+          booking.user.telegramChatId,
+          `🔔 ${textToSend}`,
+          booking.user.userId,
+        )
+        .catch((err) => {
+          console.error('Telegram send failed:', err);
+        });
+    }
+  }
 }

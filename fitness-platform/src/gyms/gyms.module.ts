@@ -9,5 +9,4 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
   controllers: [GymsController],
   providers: [GymsService],
 })
-
 export class GymsModule {}

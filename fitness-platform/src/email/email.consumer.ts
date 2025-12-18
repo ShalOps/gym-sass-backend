@@ -12,7 +12,9 @@ export class EmailConsumer {
 
   @Process('send-email')
   async handleSendEmail(job: Job<sendEmailDto>) {
-    this.logger.log(`Processing email job ${job.id} for ${job.data.recipients}`);
+    this.logger.log(
+      `Processing email job ${job.id} for ${job.data.recipients}`,
+    );
 
     try {
       await this.emailService.sendEmail(job.data);

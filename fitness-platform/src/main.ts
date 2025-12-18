@@ -10,7 +10,9 @@ import { getHttpCorsConfig } from './config/cors.config';
 import helmet from 'helmet';
 import { Request, Response } from 'express';
 
-(BigInt.prototype as any).toJSON = function () { return this.toString(); };
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
 async function bootstrap() {
   await mkdir(UPLOADS_DIR_ABSOLUTE, { recursive: true });
 
