@@ -4,12 +4,16 @@ import type { Queue } from 'bull';
 import { DateUtil } from '../common/utils/date.util';
 import { User } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { DatabaseService } from '../database/database.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(@InjectQueue('email-queue') private readonly emailQueue: Queue) {}
+  constructor(
+    @InjectQueue('email-queue') private readonly emailQueue: Queue,
+    private readonly db: DatabaseService,
+  ) {}
 
   private async queueEmail(
     recipients: string[],
@@ -40,6 +44,100 @@ export class NotificationsService {
         }`,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Sends a notification for a new chat message
+   */
+  async notifyChatMessage(userId: number, senderName: string, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = `New message from ${senderName} 💬`;
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>You have a new message from <b>${senderName}</b>:</p>
+        <blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; margin: 10px 0;">
+          ${content}
+        </blockquote>
+        <p>Log in to the platform to reply.</p>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send chat notification to user ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Sends a notification for a Telegram fallback message
+   */
+  async notifyTelegramFallback(userId: number, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = 'Telegram Fallback Message 📱';
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>A message was sent to you via Telegram fallback:</p>
+        <blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; margin: 10px 0;">
+          ${content}
+        </blockquote>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send telegram fallback notification to user ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Sends a notification for a broadcast message
+   */
+  async notifyBroadcast(userId: number, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = 'Important Announcement 📢';
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>We have an important announcement for you:</p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; margin: 10px 0;">
+          ${content}
+        </div>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send broadcast notification to user ${userId}:`,
+        error,
+      );
     }
   }
 
