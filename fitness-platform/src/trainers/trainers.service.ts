@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { DatabaseService } from "src/database/database.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { Prisma } from "@prisma/client";
@@ -42,5 +42,23 @@ export class TrainerService {
 
           throw new InternalServerErrorException('failed to create trainer');
         }
+  }
+
+  async getTrainer(id: number) {
+    try {
+        const trainer = await this.databaseService.trainer.findUnique({
+          where: { id },
+          include: { user: true },
+        });
+
+        if (!trainer) {
+          throw new NotFoundException('Trainer not found');
+        }
+
+        return trainer;
+    } catch (error) {
+        throw new InternalServerErrorException('failed to get trainer');
+    }
+
   }
 }

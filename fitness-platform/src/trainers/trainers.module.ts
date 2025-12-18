@@ -8,4 +8,5 @@ import { DatabaseService } from 'src/database/database.service';
   controllers: [TrainerController],
   providers: [TrainerService, DatabaseService],
 })
+
 export class TrainerModule {}
