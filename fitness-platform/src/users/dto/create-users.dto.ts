@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsDateString,
   IsEnum,
+  IsBoolean
 } from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -112,4 +113,13 @@ export class CreateUsersDto {
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
+
+  @ApiPropertyOptional({
+    description: 'Whether the user is a vendor',
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isVendor?: boolean;
 }

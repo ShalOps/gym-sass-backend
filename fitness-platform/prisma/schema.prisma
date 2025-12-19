@@ -177,6 +177,7 @@ model User {
   goal                  Goal?
   role                  Role                      @default(CUSTOMER)
   telegramChatId        BigInt?
+  isVendor              Boolean                   @default(false)
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]
