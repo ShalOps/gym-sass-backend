@@ -18,7 +18,6 @@ enum Role {
   ADMIN
   GYMOWNER
   TRAINER
-  VENDOR
 }
 
 enum Gender {
