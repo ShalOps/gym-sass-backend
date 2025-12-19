@@ -140,6 +140,7 @@ export class AuthService {
         bio: true,
         profilePic: true,
         role: true,
+        isVendor: true,
         gender: true,
         goal: true,
       },
