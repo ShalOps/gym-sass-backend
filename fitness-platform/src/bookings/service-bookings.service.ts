@@ -17,7 +17,7 @@ import { PaymentService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Action } from './bookings.service';
 import { NotificationType } from '@prisma/client';
-import { TelegramService } from 'src/telegram/telegram.service'; 
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class ServiceBookingsService extends BookingsService {
@@ -28,8 +28,7 @@ export class ServiceBookingsService extends BookingsService {
     @Inject(forwardRef(() => PaymentService))
     private readonly paymentService: PaymentService,
     private readonly notificationsService: NotificationsService,
-    private readonly telegramService: TelegramService
-    
+    private readonly telegramService: TelegramService,
   ) {
     super(databaseService);
   }
@@ -222,7 +221,7 @@ export class ServiceBookingsService extends BookingsService {
             select: {
               userName: true,
               userId: true,
-              telegramChatId: true
+              telegramChatId: true,
             },
           },
         },
@@ -754,8 +753,8 @@ export class ServiceBookingsService extends BookingsService {
 
   async createBookingNotifications(
     booking: {
-      user: { 
-        userName: string 
+      user: {
+        userName: string;
         userId: number;
         telegramChatId?: bigint | null;
       };
@@ -771,7 +770,6 @@ export class ServiceBookingsService extends BookingsService {
     const client = tx || this.databaseService;
 
     try {
-      
       await Promise.all([
         client.notification.create({
           data: {
@@ -781,23 +779,27 @@ export class ServiceBookingsService extends BookingsService {
           },
         }),
       ]);
-    } catch(error){
+    } catch (error) {
       console.error('Transaction failed, rolling back notifications:', error);
       throw error;
     }
 
+    if (booking.user.telegramChatId) {
+      const textToSend = `Your booking for service "${booking.service.name}" has been ${action}.`;
 
-  if (booking.user.telegramChatId) {
-    const textToSend =  `Your booking for service "${booking.service.name}" has been ${action}.`;
-
-    await this.telegramService
-      .sendMessage(booking.user.telegramChatId, `🔔 ${textToSend}`, booking.user.userId)
-      .catch((err) => {
-        console.error('Telegram send failed:', err);
-      }); 
-  }
-  else {
-    this.logger.debug(`User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`);
-  }
+      await this.telegramService
+        .sendMessage(
+          booking.user.telegramChatId,
+          `🔔 ${textToSend}`,
+          booking.user.userId,
+        )
+        .catch((err) => {
+          console.error('Telegram send failed:', err);
+        });
+    } else {
+      this.logger.debug(
+        `User ${booking.user.userId} does not have a Telegram chat ID. Skipping Telegram notification.`,
+      );
+    }
   }
 }

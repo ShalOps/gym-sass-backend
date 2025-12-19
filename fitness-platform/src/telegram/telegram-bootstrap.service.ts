@@ -27,7 +27,7 @@ export class TelegramBootstrapService implements OnModuleInit {
       return;
     }
 
-    const webhookUrl = `${appUrl}/telegram/webhook`.replace(/\/+$/, ''); 
+    const webhookUrl = `${appUrl}/telegram/webhook`.replace(/\/+$/, '');
 
     try {
       await this.telegramService.setWebhook(webhookUrl);
