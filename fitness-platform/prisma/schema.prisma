@@ -192,6 +192,7 @@ model User {
   messagesSent          Message[]
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
+  products              Product[]                 
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -535,4 +536,33 @@ model FailedNotification {
   channel     Channel
   payload     String
   attemptedAt DateTime @default(now())
+}
+
+model Product {
+  id	            Int      @id @default(autoincrement())
+  name            String
+  type            ProductType
+  category        ProductCategory
+  description     String?
+  price           Float
+  image           String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  vendorID        Int
+  vendor          User        @relation(fields: [vendorID], references: [userId], onDelete: Restrict)
+  @@unique([name, vendorID])
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+}
+
+enum ProductCategory {
+  PROGRAMS      // PDF guides, training templates
+  ACCESSORIES
+  APPAREL
+  SUPPLEMENTS
+  EQUIPMENT
+  OTHER
 }
