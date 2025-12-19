@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
+import { AIFilter } from './filters/ai-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdir } from 'fs/promises';
 import { UPLOADS_DIR_ABSOLUTE } from './config/paths.config';
@@ -10,7 +11,15 @@ import { getHttpCorsConfig } from './config/cors.config';
 import helmet from 'helmet';
 import { Request, Response } from 'express';
 
-(BigInt.prototype as any).toJSON = function () {
+// Extend BigInt interface to include toJSON method
+declare global {
+  interface BigInt {
+    toJSON(): string;
+  }
+}
+
+// BigInt serialization polyfill for JSON
+BigInt.prototype.toJSON = function (this: bigint) {
   return this.toString();
 };
 async function bootstrap() {
@@ -30,7 +39,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  app.useGlobalFilters(new PrismaExceptionFilter(), new AIFilter());
 
   // Security: Block public access to chat uploads
   // This must be placed BEFORE app.useStaticAssets
