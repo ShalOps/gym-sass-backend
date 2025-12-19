@@ -171,69 +171,10 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiBearerAuth('JWT-auth')
   update(@Body() updateUsersDto: UpdateUsersDto, @Req() req: RequestWithUser) {
-    return this.usersService.update(updateUsersDto, req.user.userId);
+    return this.usersService.update(updateUsersDto, req.user.userId, req.user.isVendor);
   }
 
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles('ADMIN')
-  // @Patch(':id')
-  // @ApiOperation({ summary: 'Update user by ID (Admin only)' })
-  // @ApiParam({ name: 'id', type: Number, description: 'User ID' })
-  // @ApiBody({
-  //   description: 'User update data (all fields optional)',
-  //   schema: {
-  //     type: 'object',
-  //     properties: {
-  //       firstName: { type: 'string', description: 'User first name' },
-  //       lastName: { type: 'string', description: 'User last name' },
-  //       userName: { type: 'string', description: 'Unique username' },
-  //       password: {
-  //         type: 'string',
-  //         description: 'Password (min 8 characters)',
-  //         minLength: 8,
-  //       },
-  //       birthDate: {
-  //         type: 'string',
-  //         format: 'date-time',
-  //         description: 'Birth date',
-  //       },
-  //       gender: {
-  //         type: 'string',
-  //         enum: ['MALE', 'FEMALE'],
-  //         description: 'User gender',
-  //       },
-  //       email: {
-  //         type: 'string',
-  //         format: 'email',
-  //         description: 'Email address',
-  //       },
-  //       phoneNo: { type: 'string', description: 'Phone number' },
-  //       profilePic: { type: 'string', description: 'Profile picture URL' },
-  //       bio: { type: 'string', description: 'User bio' },
-  //       location: { type: 'string', description: 'User location' },
-  //       goal: {
-  //         type: 'string',
-  //         enum: ['WEIGHTLOSS', 'YOGA', 'BODYBUILDING'],
-  //         description: 'Fitness goal',
-  //       },
-  //       role: {
-  //         type: 'string',
-  //         enum: ['CUSTOMER', 'ADMIN', 'GYMOWNER', 'TRAINER'],
-  //         description: 'User role',
-  //       },
-  //     },
-  //   },
-  // })
-  // @ApiResponse({ status: 200, description: 'User updated' })
-  // @ApiResponse({ status: 404, description: 'User not found' })
-  // @ApiBearerAuth('JWT-auth')
-  // updateById(
-  //   @Param('id', ParseIntPipe) id: number,
-  //   @Body() updateUsersDto: UpdateUsersDto,
-  // ) {
-  //   return this.usersService.update(updateUsersDto, id);
-  // }
-
+  
   @UseGuards(JwtAuthGuard)
   @Delete()
   @ApiOperation({ summary: 'Delete user by ID' })
