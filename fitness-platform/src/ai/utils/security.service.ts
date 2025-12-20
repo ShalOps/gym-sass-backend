@@ -75,8 +75,8 @@ export class SecurityService {
       };
     }
 
-    // Check for suspicious patterns before sanitization
-    if (this.containsSuspiciousPatterns(message)) {
+    // Check for dangerous patterns that should be rejected entirely
+    if (this.containsDangerousPatterns(message)) {
       return {
         isValid: false,
         sanitizedMessage: '',
@@ -84,6 +84,7 @@ export class SecurityService {
       };
     }
 
+    // Sanitize XSS content that can be safely removed
     const sanitized = this.sanitizeInput(message);
 
     return { isValid: true, sanitizedMessage: sanitized };
@@ -160,22 +161,21 @@ export class SecurityService {
   }
 
   /**
-   * Checks for suspicious patterns in input
+   * Checks for dangerous patterns that should be rejected entirely
    */
-  private containsSuspiciousPatterns(input: string): boolean {
-    const suspiciousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /on\w+\s*=/i,
+  private containsDangerousPatterns(input: string): boolean {
+    const dangerousPatterns = [
       /<iframe/i,
       /<object/i,
       /<embed/i,
-      /data:text\/html/i,
+      /javascript:/i,
       /vbscript:/i,
+      /data:text\/html/i,
       /expression\s*\(/i,
+      /on\w+\s*=/i, // Event handlers like onload, onclick
     ];
 
-    return suspiciousPatterns.some((pattern) => pattern.test(input));
+    return dangerousPatterns.some((pattern) => pattern.test(input));
   }
 
   /**
