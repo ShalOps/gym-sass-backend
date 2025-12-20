@@ -29,6 +29,7 @@ import { ChatModule } from './chat/chat.module';
 import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { ProductModule } from './product/product.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { ProductModule } from './product/product.module';
     ChatModule,
     TelegramModule,
     ProductModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [
