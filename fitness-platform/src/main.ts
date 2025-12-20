@@ -67,7 +67,7 @@ async function bootstrap() {
     .addTag('gym-classes', 'Gym classes management endpoint')
     .addTag('reviews', 'Gym Reviews management endpoints')
     .addTag('gym-class-reviews', 'Gym Class Reviews management endpoints')
-
+    .addTag('AI', 'AI-powered features and recommendations')
     .addBearerAuth(
       {
         type: 'http',
