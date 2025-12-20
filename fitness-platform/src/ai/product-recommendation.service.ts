@@ -122,7 +122,7 @@ export class ProductRecommendationService implements IntentHandler {
       return JSON.stringify({
         type: 'product_recommendation',
         products: aiResponse || [],
-        explanation: `Recommendations based on your ${user.goals?.join(', ') || 'fitness'} goals and preferences.`,
+        explanation: `Recommendations based on your ${Array.isArray(user.goals) ? user.goals.join(', ') : user.goals || 'fitness'} goals and preferences.`,
       });
     } catch (error) {
       const errorMsg =
