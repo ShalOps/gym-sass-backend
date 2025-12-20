@@ -68,6 +68,63 @@ export class AssistantService {
     };
   }
 
+  /**
+   * Orchestrates feature-specific AI requests with security and auditing
+   * @param userId - The user's ID
+   * @param feature - The feature being accessed
+   * @param action - The action being performed
+   * @param input - The raw user input
+   * @param executionFn - The function to execute after sanitization
+   * @returns The result of the execution function
+   */
+  private async executeSecurely<T>(
+    userId: string,
+    feature: string,
+    action: string,
+    input: string,
+    executionFn: (sanitizedInput: string) => Promise<T>,
+  ): Promise<T> {
+    const startTime = Date.now();
+    const validation = this.securityService.validateAndSanitizeMessage(input);
+
+    if (!validation.isValid) {
+      this.auditService.logSecurityEvent(`invalid_input_${feature}`, {
+        userId,
+        error: validation.error,
+      });
+      throw new BadRequestException(validation.error);
+    }
+
+    const sanitizedInput = validation.sanitizedMessage;
+
+    try {
+      const result = await executionFn(sanitizedInput);
+
+      this.auditService.logAIInteraction({
+        userId,
+        action,
+        feature,
+        input: sanitizedInput,
+        output: typeof result === 'string' ? result : JSON.stringify(result),
+        processingTime: Date.now() - startTime,
+        success: true,
+      });
+
+      return result;
+    } catch (error) {
+      this.auditService.logAIInteraction({
+        userId,
+        action,
+        feature,
+        input: sanitizedInput,
+        processingTime: Date.now() - startTime,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
   // Process message with intent-based routing
   async processMessage(
     userId: string,
@@ -223,57 +280,6 @@ export class AssistantService {
         action: 'chat_stream_error',
         feature: 'general_chat',
         input: sanitizedMessage,
-        processingTime: Date.now() - startTime,
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Orchestrates feature-specific AI requests with security and auditing
-   */
-  private async executeSecurely<T>(
-    userId: string,
-    feature: string,
-    action: string,
-    input: string,
-    executionFn: (sanitizedInput: string) => Promise<T>,
-  ): Promise<T> {
-    const startTime = Date.now();
-    const validation = this.securityService.validateAndSanitizeMessage(input);
-
-    if (!validation.isValid) {
-      this.auditService.logSecurityEvent(`invalid_input_${feature}`, {
-        userId,
-        error: validation.error,
-      });
-      throw new BadRequestException(validation.error);
-    }
-
-    const sanitizedInput = validation.sanitizedMessage;
-
-    try {
-      const result = await executionFn(sanitizedInput);
-
-      this.auditService.logAIInteraction({
-        userId,
-        action,
-        feature,
-        input: sanitizedInput,
-        output: typeof result === 'string' ? result : JSON.stringify(result),
-        processingTime: Date.now() - startTime,
-        success: true,
-      });
-
-      return result;
-    } catch (error) {
-      this.auditService.logAIInteraction({
-        userId,
-        action,
-        feature,
-        input: sanitizedInput,
         processingTime: Date.now() - startTime,
         success: false,
         error: error instanceof Error ? error.message : String(error),
