@@ -12,6 +12,35 @@ import {
 } from './dto/ai-error-response.dto';
 import { AI_CONFIG } from './utils/ai-config.constants';
 
+// Search result type definitions
+interface GymResult {
+  type: 'gym';
+  id: number;
+  name: string;
+  description: string;
+  location: string;
+  rating?: number;
+}
+
+interface ClassResult {
+  type: 'class';
+  id: number;
+  name: string;
+  description: string;
+  location?: string;
+  rating?: number;
+  price: number;
+}
+
+interface TrainerResult {
+  type: 'trainer';
+  id: number;
+  name: string;
+  description: string;
+}
+
+type SearchResult = GymResult | ClassResult | TrainerResult;
+
 @Injectable()
 export class SearchEngineService implements IntentHandler {
   private readonly logger = new Logger(SearchEngineService.name);
@@ -224,157 +253,159 @@ export class SearchEngineService implements IntentHandler {
     timePreference?: string;
     fitnessLevel?: string;
   }) {
-    type GymResult = {
-      type: 'gym';
-      id: number;
-      name: string;
-      description: string;
-      location: string;
-      rating?: number;
-    };
-
-    type ClassResult = {
-      type: 'class';
-      id: number;
-      name: string;
-      description: string;
-      location?: string;
-      rating?: number;
-      price: number;
-    };
-
-    type TrainerResult = {
-      type: 'trainer';
-      id: number;
-      name: string;
-      description: string;
-    };
-
-    type SearchResult = GymResult | ClassResult | TrainerResult;
-
     const results: SearchResult[] = [];
 
-    // Search gyms
+    // Run all searches in parallel
+    const searchPromises: Promise<SearchResult[]>[] = [];
+
     if (
       parsedQuery.searchType === 'gym' ||
       parsedQuery.searchType === 'general'
     ) {
-      const gyms = await this.database.gym.findMany({
-        where: {
-          ...(parsedQuery.location && {
-            location: { contains: parsedQuery.location, mode: 'insensitive' },
-          }),
-          verified: true,
-        },
-        include: {
-          reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
-        },
-        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
-      });
-
-      results.push(
-        ...gyms.map(
-          (gym): GymResult => ({
-            type: 'gym',
-            id: gym.gymId,
-            name: gym.gymName,
-            description: `Gym located in ${gym.location}`,
-            location: gym.location,
-            rating:
-              gym.reviews?.length > 0
-                ? gym.reviews.reduce((sum, r) => sum + r.rating, 0) /
-                  gym.reviews.length
-                : undefined,
-          }),
-        ),
-      );
+      searchPromises.push(this.searchGyms(parsedQuery));
     }
 
-    // Search classes
     if (
       parsedQuery.searchType === 'class' ||
       parsedQuery.searchType === 'general'
     ) {
-      const classes = await this.database.gymClasses.findMany({
-        where: {
-          ...(parsedQuery.classType && {
-            className: { contains: parsedQuery.classType, mode: 'insensitive' },
-          }),
-          ...(parsedQuery.priceRange?.max && {
-            price: { lte: parsedQuery.priceRange.max },
-          }),
-          ...(parsedQuery.priceRange?.min && {
-            price: { gte: parsedQuery.priceRange.min },
-          }),
-        },
-        include: {
-          gym: true,
-          trainer: true,
-          reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
-        },
-        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
-      });
-
-      results.push(
-        ...classes.map(
-          (cls): ClassResult => ({
-            type: 'class',
-            id: cls.classId,
-            name: cls.className,
-            description: `Class at ${cls.gym?.gymName} with ${cls.trainer?.firstName} ${cls.trainer?.lastName}`,
-            location: cls.gym?.location,
-            rating:
-              cls.reviews?.length > 0
-                ? cls.reviews.reduce((sum, r) => sum + r.rating, 0) /
-                  cls.reviews.length
-                : undefined,
-            price: cls.price,
-          }),
-        ),
-      );
+      searchPromises.push(this.searchClasses(parsedQuery));
     }
 
-    // Search trainers
     if (
       parsedQuery.searchType === 'trainer' ||
       parsedQuery.searchType === 'general'
     ) {
-      const trainers = await this.database.user.findMany({
-        where: {
-          role: 'TRAINER',
-          ...(parsedQuery.keywords?.length > 0 && {
-            OR: [
-              {
-                firstName: {
-                  contains: parsedQuery.keywords[0],
-                  mode: 'insensitive',
-                },
-              },
-              {
-                lastName: {
-                  contains: parsedQuery.keywords[0],
-                  mode: 'insensitive',
-                },
-              },
-              { classTypes: { hasSome: parsedQuery.keywords } },
-            ],
-          }),
-        },
-        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
-      });
-
-      results.push(
-        ...trainers.map(
-          (trainer): TrainerResult => ({
-            type: 'trainer',
-            id: trainer.userId,
-            name: `${trainer.firstName} ${trainer.lastName}`,
-            description: `Trainer specializing in ${trainer.classTypes?.join(', ') || 'various classes'}`,
-          }),
-        ),
-      );
+      searchPromises.push(this.searchTrainers(parsedQuery));
     }
 
+    // Wait for all searches to complete
+    const searchResults = await Promise.all(searchPromises);
+
+    // Flatten results
+    results.push(...searchResults.flat());
+
     return results;
+  }
+
+  private async searchGyms(parsedQuery: {
+    searchType: 'gym' | 'class' | 'trainer' | 'general';
+    keywords: string[];
+    location?: string;
+    classType?: string;
+    priceRange?: { min?: number; max?: number };
+  }): Promise<GymResult[]> {
+    const gyms = await this.database.gym.findMany({
+      where: {
+        ...(parsedQuery.location && {
+          location: { contains: parsedQuery.location, mode: 'insensitive' },
+        }),
+        verified: true,
+      },
+      include: {
+        reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
+      },
+      take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
+    });
+
+    return gyms.map(
+      (gym): GymResult => ({
+        type: 'gym',
+        id: gym.gymId,
+        name: gym.gymName,
+        description: `Gym located in ${gym.location}`,
+        location: gym.location,
+        rating:
+          gym.reviews?.length > 0
+            ? gym.reviews.reduce((sum, r) => sum + r.rating, 0) /
+              gym.reviews.length
+            : undefined,
+      }),
+    );
+  }
+
+  private async searchClasses(parsedQuery: {
+    searchType: 'gym' | 'class' | 'trainer' | 'general';
+    keywords: string[];
+    location?: string;
+    classType?: string;
+    priceRange?: { min?: number; max?: number };
+  }): Promise<ClassResult[]> {
+    const classes = await this.database.gymClasses.findMany({
+      where: {
+        ...(parsedQuery.classType && {
+          className: { contains: parsedQuery.classType, mode: 'insensitive' },
+        }),
+        ...(parsedQuery.priceRange?.max && {
+          price: { lte: parsedQuery.priceRange.max },
+        }),
+        ...(parsedQuery.priceRange?.min && {
+          price: { gte: parsedQuery.priceRange.min },
+        }),
+      },
+      include: {
+        gym: true,
+        trainer: true,
+        reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
+      },
+      take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
+    });
+
+    return classes.map(
+      (cls): ClassResult => ({
+        type: 'class',
+        id: cls.classId,
+        name: cls.className,
+        description: `Class at ${cls.gym?.gymName} with ${cls.trainer?.firstName} ${cls.trainer?.lastName}`,
+        location: cls.gym?.location,
+        rating:
+          cls.reviews?.length > 0
+            ? cls.reviews.reduce((sum, r) => sum + r.rating, 0) /
+              cls.reviews.length
+            : undefined,
+        price: cls.price,
+      }),
+    );
+  }
+
+  private async searchTrainers(parsedQuery: {
+    searchType: 'gym' | 'class' | 'trainer' | 'general';
+    keywords: string[];
+    location?: string;
+    classType?: string;
+    priceRange?: { min?: number; max?: number };
+  }): Promise<TrainerResult[]> {
+    const trainers = await this.database.user.findMany({
+      where: {
+        role: 'TRAINER',
+        ...(parsedQuery.keywords?.length > 0 && {
+          OR: [
+            {
+              firstName: {
+                contains: parsedQuery.keywords[0],
+                mode: 'insensitive',
+              },
+            },
+            {
+              lastName: {
+                contains: parsedQuery.keywords[0],
+                mode: 'insensitive',
+              },
+            },
+            { classTypes: { hasSome: parsedQuery.keywords } },
+          ],
+        }),
+      },
+      take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
+    });
+
+    return trainers.map(
+      (trainer): TrainerResult => ({
+        type: 'trainer',
+        id: trainer.userId,
+        name: `${trainer.firstName} ${trainer.lastName}`,
+        description: `Trainer specializing in ${trainer.classTypes?.join(', ') || 'various classes'}`,
+      }),
+    );
   }
 }
