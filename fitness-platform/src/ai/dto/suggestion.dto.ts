@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  Length,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SuggestionRequestDto {
@@ -15,7 +21,6 @@ export class SuggestionRequestDto {
     example: 'gym',
     enum: ['gym', 'class', 'trainer'],
   })
-  @IsString()
   @IsEnum(['gym', 'class', 'trainer'])
   type: 'gym' | 'class' | 'trainer';
 
@@ -25,5 +30,6 @@ export class SuggestionRequestDto {
   })
   @IsOptional()
   @IsString()
+  @Length(1, 100)
   location?: string;
 }

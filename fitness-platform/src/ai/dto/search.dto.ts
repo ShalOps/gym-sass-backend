@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  Min,
+  Max,
+  Length,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SearchRequestDto {
@@ -16,6 +24,7 @@ export class SearchRequestDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Length(1, 500)
   query: string;
 
   @ApiPropertyOptional({
@@ -25,5 +34,7 @@ export class SearchRequestDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(1)
+  @Max(20)
   limit?: number = 10;
 }

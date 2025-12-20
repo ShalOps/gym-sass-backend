@@ -4,6 +4,10 @@ import {
   IsArray,
   IsNumber,
   IsNotEmpty,
+  IsEnum,
+  Min,
+  Max,
+  ArrayMaxSize,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -22,8 +26,8 @@ export class WorkoutPlanRequestDto {
     enum: ['beginner', 'intermediate', 'advanced'],
   })
   @IsOptional()
-  @IsString()
-  fitnessLevel?: string;
+  @IsEnum(['beginner', 'intermediate', 'advanced'])
+  fitnessLevel?: 'beginner' | 'intermediate' | 'advanced';
 
   @ApiPropertyOptional({
     description: 'User fitness goals',
@@ -33,6 +37,7 @@ export class WorkoutPlanRequestDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @ArrayMaxSize(5)
   goals?: string[];
 
   @ApiPropertyOptional({
@@ -41,5 +46,7 @@ export class WorkoutPlanRequestDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(15)
+  @Max(180)
   duration?: number;
 }

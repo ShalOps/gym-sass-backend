@@ -4,6 +4,10 @@ import {
   IsOptional,
   IsArray,
   IsNumber,
+  Min,
+  Max,
+  Length,
+  ArrayMaxSize,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -24,6 +28,7 @@ export class RecommendationRequestDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @ArrayMaxSize(3)
   categories?: string[];
 
   @ApiPropertyOptional({
@@ -32,6 +37,7 @@ export class RecommendationRequestDto {
   })
   @IsOptional()
   @IsString()
+  @Length(1, 100)
   location?: string;
 
   @ApiPropertyOptional({
@@ -41,5 +47,7 @@ export class RecommendationRequestDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(1)
+  @Max(20)
   limit?: number = 5;
 }
