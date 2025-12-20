@@ -75,16 +75,16 @@ export class SecurityService {
       };
     }
 
-    const sanitized = this.sanitizeInput(message);
-
-    // Check for suspicious patterns
-    if (this.containsSuspiciousPatterns(sanitized)) {
+    // Check for suspicious patterns before sanitization
+    if (this.containsSuspiciousPatterns(message)) {
       return {
         isValid: false,
         sanitizedMessage: '',
         error: 'Message contains invalid content',
       };
     }
+
+    const sanitized = this.sanitizeInput(message);
 
     return { isValid: true, sanitizedMessage: sanitized };
   }
