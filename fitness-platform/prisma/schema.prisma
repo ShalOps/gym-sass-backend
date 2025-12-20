@@ -193,7 +193,8 @@ model User {
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
   products              Product[]   
-  cart                  Cart?              
+  cart                  Cart? 
+  favorite              Favorite[]             
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -551,7 +552,8 @@ model Product {
   updatedAt       DateTime    @updatedAt
   vendorID        Int
   vendor          User        @relation(fields: [vendorID], references: [userId], onDelete: Restrict)
-  cartItems      CartItem[]
+  cartItems       CartItem[]
+  favorite        Favorite[]
   @@unique([name, vendorID])
 }
 
@@ -582,8 +584,20 @@ model CartItem{
   cartId        Int
   productId     Int 
   quantity      Int      @default(1)
+  
   cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, productId])
+}
+
+model Favorite{
+  id            Int         @id @default(autoincrement())
+  productId     Int 
+  userId        Int
+
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([productId, userId])
 }

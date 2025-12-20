@@ -30,6 +30,7 @@ import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { ProductModule } from './product/product.module';
 import { CartModule } from './cart/cart.module';
+import { FavoriteModule } from './favorite/favorite.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { CartModule } from './cart/cart.module';
     TelegramModule,
     ProductModule,
     CartModule,
+    FavoriteModule,
   ],
   controllers: [AppController],
   providers: [
