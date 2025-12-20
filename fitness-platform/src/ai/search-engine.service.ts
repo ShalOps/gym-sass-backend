@@ -10,6 +10,7 @@ import {
   createAIErrorResponse,
   AIErrorCode,
 } from './dto/ai-error-response.dto';
+import { AI_CONFIG } from './utils/ai-config.constants';
 
 @Injectable()
 export class SearchEngineService implements IntentHandler {
@@ -263,9 +264,9 @@ export class SearchEngineService implements IntentHandler {
           verified: true,
         },
         include: {
-          reviews: { take: 5 },
+          reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
         },
-        take: 10,
+        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
       });
 
       results.push(
@@ -306,9 +307,9 @@ export class SearchEngineService implements IntentHandler {
         include: {
           gym: true,
           trainer: true,
-          reviews: { take: 5 },
+          reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
         },
-        take: 10,
+        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
       });
 
       results.push(
@@ -356,7 +357,7 @@ export class SearchEngineService implements IntentHandler {
             ],
           }),
         },
-        take: 10,
+        take: AI_CONFIG.DATABASE_LIMITS.SEARCH_RESULTS,
       });
 
       results.push(

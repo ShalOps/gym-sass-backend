@@ -6,6 +6,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { WinstonLoggerService } from '../utils/winston-logger.service';
 import { CircuitBreakerService } from '../utils/circuit-breaker.service';
 import { AIUnavailableException } from '../exceptions/ai-unavailable.exception';
+import { AI_CONFIG } from '../utils/ai-config.constants';
 
 @Injectable()
 export class AiService {
@@ -54,7 +55,7 @@ export class AiService {
   // Retry wrapper with exponential backoff and circuit breaker
   private async withRetry<T>(
     fn: () => Promise<T>,
-    maxRetries = 3,
+    maxRetries = AI_CONFIG.PROCESSING_LIMITS.MAX_RETRIES,
     baseDelay = 1000,
   ): Promise<T> {
     return this.circuitBreaker.execute('gemini-api', async () => {

@@ -10,6 +10,7 @@ import {
   createAIErrorResponse,
   AIErrorCode,
 } from './dto/ai-error-response.dto';
+import { AI_CONFIG } from './utils/ai-config.constants';
 
 @Injectable()
 export class SuggestionEngineService implements IntentHandler {
@@ -94,22 +95,22 @@ export class SuggestionEngineService implements IntentHandler {
         this.database.gym.findMany({
           where: gymWhere,
           include: {
-            reviews: { take: 5 },
+            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
           },
-          take: 8,
+          take: AI_CONFIG.DATABASE_LIMITS.GYMS_FOR_SUGGESTIONS,
         }),
         this.database.gymClasses.findMany({
           where: classWhere,
           include: {
             gym: true,
             trainer: true,
-            reviews: { take: 5 },
+            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
           },
-          take: 8,
+          take: AI_CONFIG.DATABASE_LIMITS.CLASSES_FOR_SUGGESTIONS,
         }),
         this.database.user.findMany({
           where: trainerWhere,
-          take: 8,
+          take: AI_CONFIG.DATABASE_LIMITS.TRAINERS_FOR_SUGGESTIONS,
         }),
       ]);
 

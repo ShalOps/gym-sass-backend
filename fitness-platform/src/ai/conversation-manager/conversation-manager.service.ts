@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { DatabaseService } from '../../database/database.service';
+import { AI_CONFIG } from '../utils/ai-config.constants';
 
 interface AIConversation {
   id: string;
@@ -42,7 +43,7 @@ export class ConversationManagerService {
 
     if (conversation) {
       const state = conversation.state as unknown as AIConversation;
-      const ttl = 3600000; // 1 hour in ms
+      const ttl = AI_CONFIG.CACHE_CONFIG.CONVERSATION_TTL_MINUTES * 60 * 1000; // Convert minutes to milliseconds
       await this.cacheManager
         .set(key, state, ttl)
         .catch((e: Error) =>
@@ -95,7 +96,7 @@ export class ConversationManagerService {
     this.logger.debug(`saveConversation id=${conv?.id}`);
     if (!conv || !conv.id) throw new Error('Invalid conversation object');
 
-    const ttl = 3600000; // 1 hour in ms
+    const ttl = AI_CONFIG.CACHE_CONFIG.CONVERSATION_TTL_MINUTES * 60 * 1000; // Convert minutes to milliseconds
     const expiresAt = new Date(Date.now() + ttl);
 
     // Save to Redis (Primary)

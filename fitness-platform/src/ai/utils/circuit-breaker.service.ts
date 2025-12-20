@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { WinstonLoggerService } from './winston-logger.service';
+import { AI_CONFIG } from './ai-config.constants';
 
 interface CircuitBreakerState {
   failures: number;
@@ -9,8 +10,10 @@ interface CircuitBreakerState {
 
 @Injectable()
 export class CircuitBreakerService {
-  private readonly failureThreshold = 5;
-  private readonly recoveryTimeout = 60000; // 1 minute
+  private readonly failureThreshold =
+    AI_CONFIG.CIRCUIT_BREAKER.FAILURE_THRESHOLD;
+  private readonly recoveryTimeout =
+    AI_CONFIG.CIRCUIT_BREAKER.RECOVERY_TIMEOUT_MS;
   private readonly states: Map<string, CircuitBreakerState> = new Map();
 
   constructor(private logger: WinstonLoggerService) {}

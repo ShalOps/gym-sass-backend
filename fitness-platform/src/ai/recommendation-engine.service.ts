@@ -10,6 +10,7 @@ import {
   createAIErrorResponse,
   AIErrorCode,
 } from './dto/ai-error-response.dto';
+import { AI_CONFIG } from './utils/ai-config.constants';
 
 @Injectable()
 export class RecommendationEngineService implements IntentHandler {
@@ -100,16 +101,22 @@ export class RecommendationEngineService implements IntentHandler {
       // Fetch some sample gyms, classes, trainers for AI to rank
       const [gyms, classes, trainers] = await Promise.all([
         this.database.gym.findMany({
-          take: 5,
-          include: { reviews: { take: 5 } },
+          take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
+          include: {
+            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
+          },
         }),
         this.database.gymClasses.findMany({
-          take: 5,
-          include: { reviews: { take: 5 }, gym: true, trainer: true },
+          take: AI_CONFIG.DATABASE_LIMITS.CLASSES_PER_GYM,
+          include: {
+            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
+            gym: true,
+            trainer: true,
+          },
         }),
         this.database.user.findMany({
           where: { role: 'TRAINER' },
-          take: 5,
+          take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
         }),
       ]);
 

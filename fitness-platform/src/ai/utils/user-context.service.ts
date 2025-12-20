@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { DatabaseService } from '../../database/database.service';
+import { AI_CONFIG } from './ai-config.constants';
 
 export interface UserContext {
   userId: number;
@@ -58,7 +59,8 @@ export interface UserContext {
 @Injectable()
 export class UserContextService {
   private readonly logger = new Logger(UserContextService.name);
-  private readonly CACHE_TTL = 1800000; // 30 minutes
+  private readonly CACHE_TTL =
+    AI_CONFIG.CACHE_CONFIG.USER_CONTEXT_TTL_MINUTES * 60 * 1000; // Convert minutes to milliseconds
 
   constructor(
     private readonly database: DatabaseService,
@@ -139,24 +141,24 @@ export class UserContextService {
         where: { userId: numericUserId },
         include: {
           ClassBooking: {
-            take: 10,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_BOOKINGS,
             orderBy: { bookedAt: 'desc' },
             include: { class: true },
           },
           userMetrics: {
-            take: 1,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_REVIEWS,
             orderBy: { date: 'desc' },
           },
           viewHistories: {
-            take: 20,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_FEEDBACK,
             orderBy: { timestamp: 'desc' },
           },
           aifeedbacks: {
-            take: 10,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_FEEDBACK,
             orderBy: { timestamp: 'desc' },
           },
           searchQueries: {
-            take: 10,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_SEARCHES,
             orderBy: { createdAt: 'desc' },
           },
         },
