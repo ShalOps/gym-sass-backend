@@ -5,10 +5,8 @@ import { JSDOM } from 'jsdom';
 import crypto from 'crypto';
 
 // Create a DOMPurify instance
-//eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const jsdom = new JSDOM('');
 const DOMPurifyInstance = DOMPurify(
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   jsdom.window as unknown as Parameters<typeof DOMPurify>[0],
 );
 
