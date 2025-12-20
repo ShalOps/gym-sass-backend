@@ -23,6 +23,38 @@ export class ConversationManagerService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  /**
+   * Fetches conversation from DB and synchronizes it to Redis.
+   * @param key The cache key (conversation id or user-specific key)
+   * @param userId The user id associated with the conversation
+   * @returns The AIConversation object from DB or a default if not found
+   */
+  private async fetchAndSyncFromDb(
+    key: string,
+    userId: string,
+  ): Promise<AIConversation> {
+    const conversation = await this.database.aIConversation.findFirst({
+      where: {
+        id: key,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    });
+
+    if (conversation) {
+      const state = conversation.state as unknown as AIConversation;
+      const ttl = 3600000; // 1 hour in ms
+      await this.cacheManager
+        .set(key, state, ttl)
+        .catch((e: Error) =>
+          this.logger.error(`Failed to sync Redis from DB: ${e.message}`),
+        );
+      return state;
+    }
+
+    // Return default conversation if not found in DB
+    return { id: key, userId, messages: [] };
+  }
+
   async loadConversation(
     userId: string,
     conversationId?: string,
@@ -30,7 +62,7 @@ export class ConversationManagerService {
     const key = conversationId ?? `conv:${userId}`;
     this.logger.debug(`loadConversation key=${key}`);
 
-    // 1. Try Redis first (Stale-While-Revalidate pattern)
+    // Attempt to retrieve from Redis cache first using the Stale-While-Revalidate strategy
     try {
       const cached = await this.cacheManager.get<AIConversation>(key);
       if (cached) {
@@ -54,38 +86,9 @@ export class ConversationManagerService {
       );
     }
 
-    // 2. Cache miss - fetch from DB synchronously
+    // Cache miss - fetch from DB synchronously
     this.logger.debug(`Cache miss for ${key}, fetching from DB`);
     return this.fetchAndSyncFromDb(key, userId);
-  }
-
-  /**
-   * Fetches conversation from DB and synchronizes it to Redis
-   */
-  private async fetchAndSyncFromDb(
-    key: string,
-    userId: string,
-  ): Promise<AIConversation> {
-    const conversation = await this.database.aIConversation.findFirst({
-      where: {
-        id: key,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-    });
-
-    if (conversation) {
-      const state = conversation.state as unknown as AIConversation;
-      const ttl = 3600000; // 1 hour
-      await this.cacheManager
-        .set(key, state, ttl)
-        .catch((e: Error) =>
-          this.logger.error(`Failed to sync Redis from DB: ${e.message}`),
-        );
-      return state;
-    }
-
-    // Return default conversation if not found in DB
-    return { id: key, userId, messages: [] };
   }
 
   async saveConversation(conv: AIConversation): Promise<AIConversation> {
@@ -95,12 +98,12 @@ export class ConversationManagerService {
     const ttl = 3600000; // 1 hour in ms
     const expiresAt = new Date(Date.now() + ttl);
 
-    // 1. Save to Redis (Primary)
+    // Save to Redis (Primary)
     await this.cacheManager
       .set(conv.id, conv, ttl)
       .catch((e: Error) => this.logger.error(`Redis save error: ${e.message}`));
 
-    // 2. Save to Database (Fallback/Persistence)
+    // Save to Database (Fallback/Persistence)
     await this.database.aIConversation.upsert({
       where: { id: conv.id },
       update: {
