@@ -78,4 +78,8 @@ export class WinstonLoggerService {
   debug(message: string, meta?: any) {
     this.logger.debug(message, meta);
   }
+
+  info(message: string, meta?: any) {
+    this.logger.info(message, meta);
+  }
 }
