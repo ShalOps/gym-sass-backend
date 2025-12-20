@@ -118,6 +118,12 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "node_modules/(?!jsdom)/"
+    ],
+    "moduleNameMapper": {
+      "^jsdom$": "<rootDir>/../node_modules/jsdom/lib/api.js"
+    }
   }
 }
