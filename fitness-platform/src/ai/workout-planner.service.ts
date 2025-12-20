@@ -44,11 +44,14 @@ export class WorkoutPlannerService implements IntentHandler {
 
     const userId = parseInt(data.userId);
     if (isNaN(userId)) {
-      return JSON.stringify({
-        type: 'workout_plan',
-        plan: null,
-        note: 'Invalid user ID',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'workout_plan',
+          AIErrorCode.INVALID_INPUT,
+          'Invalid user ID provided',
+          `Received invalid userId: ${data.userId}`,
+        ),
+      );
     }
 
     try {

@@ -44,11 +44,14 @@ export class SearchEngineService implements IntentHandler {
 
     const userId = parseInt(data.userId);
     if (isNaN(userId)) {
-      return JSON.stringify({
-        type: 'search',
-        results: [],
-        note: 'Invalid user ID',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'search',
+          AIErrorCode.INVALID_INPUT,
+          'Invalid user ID provided',
+          `Received invalid userId: ${data.userId}`,
+        ),
+      );
     }
 
     try {

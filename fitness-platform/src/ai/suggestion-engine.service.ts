@@ -42,11 +42,14 @@ export class SuggestionEngineService implements IntentHandler {
 
     const userId = parseInt(data.userId);
     if (isNaN(userId)) {
-      return JSON.stringify({
-        type: 'suggestion',
-        suggestions: [],
-        note: 'Invalid user ID',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'suggestion',
+          AIErrorCode.INVALID_INPUT,
+          'Invalid user ID provided',
+          `Received invalid userId: ${data.userId}`,
+        ),
+      );
     }
 
     try {

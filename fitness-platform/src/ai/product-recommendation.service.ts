@@ -39,11 +39,14 @@ export class ProductRecommendationService implements IntentHandler {
 
     const userId = parseInt(data.userId);
     if (isNaN(userId)) {
-      return JSON.stringify({
-        type: 'product_recommendation',
-        products: [],
-        note: 'Invalid user ID',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'product_recommendation',
+          AIErrorCode.INVALID_INPUT,
+          'Invalid user ID provided',
+          `Received invalid userId: ${data.userId}`,
+        ),
+      );
     }
 
     try {
