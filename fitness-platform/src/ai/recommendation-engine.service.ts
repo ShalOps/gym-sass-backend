@@ -108,28 +108,94 @@ export class RecommendationEngineService implements IntentHandler {
       const trainerWhere: Record<string, unknown> =
         this.buildTrainerWhereClause(user);
 
-      // Fetch personalized gyms, classes, trainers for AI to rank
+      // Fetch personalized gyms, classes, trainers from database
       const [gyms, classes, trainers] = await Promise.all([
-        this.database.gym.findMany({
-          where: gymWhere,
-          take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
-          include: {
-            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
-          },
-        }),
-        this.database.gymClasses.findMany({
-          where: classWhere,
-          take: AI_CONFIG.DATABASE_LIMITS.CLASSES_PER_GYM,
-          include: {
-            reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
-            gym: true,
-            trainer: true,
-          },
-        }),
-        this.database.user.findMany({
-          where: trainerWhere,
-          take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
-        }),
+        this.database.gym
+          .findMany({
+            where: gymWhere,
+            include: {
+              reviews: {
+                select: { rating: true },
+              },
+              _count: {
+                select: { reviews: true },
+              },
+            },
+            take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
+          })
+          .then((gyms) =>
+            gyms.map((g) => ({
+              gymId: g.gymId,
+              gymName: g.gymName,
+              location: g.location,
+              verified: g.verified,
+              averageRating:
+                g.reviews.length > 0
+                  ? g.reviews.reduce((sum, r) => sum + r.rating, 0) /
+                    g.reviews.length
+                  : undefined,
+              reviewCount: g._count.reviews,
+            })),
+          ),
+        this.database.gymClasses
+          .findMany({
+            where: classWhere,
+            include: {
+              gym: {
+                select: { gymName: true },
+              },
+              trainer: {
+                select: { firstName: true, lastName: true },
+              },
+              reviews: {
+                select: { rating: true },
+              },
+              _count: {
+                select: { reviews: true },
+              },
+            },
+            take: AI_CONFIG.DATABASE_LIMITS.CLASSES_PER_GYM,
+          })
+          .then((classes) =>
+            classes.map((c) => ({
+              classId: c.classId,
+              className: c.className,
+              gymId: c.gymId,
+              gymName: c.gym?.gymName || '',
+              trainerId: c.trainerId || undefined,
+              trainerName: c.trainerId
+                ? `${c.trainer?.firstName} ${c.trainer?.lastName}`
+                : undefined,
+              price: c.price,
+              duration: c.duration,
+              averageRating:
+                c.reviews.length > 0
+                  ? c.reviews.reduce((sum, r) => sum + r.rating, 0) /
+                    c.reviews.length
+                  : undefined,
+              reviewCount: c._count.reviews,
+            })),
+          ),
+        this.database.user
+          .findMany({
+            where: trainerWhere,
+            select: {
+              userId: true,
+              firstName: true,
+              lastName: true,
+              classTypes: true,
+            },
+            take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
+          })
+          .then((trainers) =>
+            trainers.map((t) => ({
+              userId: t.userId,
+              firstName: t.firstName,
+              lastName: t.lastName,
+              classTypes: t.classTypes || [],
+              averageRating: undefined, // Could be calculated if needed
+            })),
+          ),
       ]);
 
       const prompt = `
@@ -152,21 +218,17 @@ export class RecommendationEngineService implements IntentHandler {
             id: g.gymId,
             name: g.gymName,
             location: g.location,
-            rating:
-              g.reviews?.reduce((sum, r) => sum + r.rating, 0) /
-              (g.reviews?.length || 1),
+            rating: g.averageRating,
           })),
         )}
         Classes: ${JSON.stringify(
           classes.map((c) => ({
             id: c.classId,
             name: c.className,
-            gym: c.gym?.gymName,
-            trainer: c.trainer?.firstName + ' ' + c.trainer?.lastName,
+            gym: c.gymName,
+            trainer: c.trainerName,
             price: c.price,
-            rating:
-              c.reviews?.reduce((sum, r) => sum + r.rating, 0) /
-              (c.reviews?.length || 1),
+            rating: c.averageRating,
           })),
         )}
         Trainers: ${JSON.stringify(
