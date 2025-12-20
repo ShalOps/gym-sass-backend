@@ -101,15 +101,24 @@ export class RecommendationEngineService implements IntentHandler {
         })),
       );
 
-      // Fetch some sample gyms, classes, trainers for AI to rank
+      // Build dynamic where clauses based on user preferences
+      const gymWhere: Record<string, unknown> = this.buildGymWhereClause(user);
+      const classWhere: Record<string, unknown> =
+        this.buildClassWhereClause(user);
+      const trainerWhere: Record<string, unknown> =
+        this.buildTrainerWhereClause(user);
+
+      // Fetch personalized gyms, classes, trainers for AI to rank
       const [gyms, classes, trainers] = await Promise.all([
         this.database.gym.findMany({
+          where: gymWhere,
           take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
           include: {
             reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
           },
         }),
         this.database.gymClasses.findMany({
+          where: classWhere,
           take: AI_CONFIG.DATABASE_LIMITS.CLASSES_PER_GYM,
           include: {
             reviews: { take: AI_CONFIG.DATABASE_LIMITS.REVIEWS_PER_ITEM },
@@ -118,7 +127,7 @@ export class RecommendationEngineService implements IntentHandler {
           },
         }),
         this.database.user.findMany({
-          where: { role: 'TRAINER' },
+          where: trainerWhere,
           take: AI_CONFIG.DATABASE_LIMITS.RECOMMENDATIONS_PER_TYPE,
         }),
       ]);
@@ -276,5 +285,105 @@ export class RecommendationEngineService implements IntentHandler {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 3)
       .map(([className]) => className);
+  }
+
+  private buildGymWhereClause(user: {
+    preferredLocations?: string[];
+    location?: string;
+    [key: string]: any;
+  }): Record<string, unknown> {
+    const where: Record<string, unknown> = {
+      verified: true,
+    };
+
+    // Location preferences
+    if (
+      Array.isArray(user.preferredLocations) &&
+      user.preferredLocations.length > 0
+    ) {
+      where.location = {
+        in: user.preferredLocations,
+      };
+    } else if (user.location) {
+      where.location = {
+        contains: user.location.split(',')[0], // City-level matching
+        mode: 'insensitive',
+      };
+    }
+
+    return where;
+  }
+
+  private buildClassWhereClause(user: {
+    classTypes?: string[];
+    priceRange?: any;
+    instructors?: number[];
+  }): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+
+    // Class type preferences
+    if (Array.isArray(user.classTypes) && user.classTypes.length > 0) {
+      where.className = {
+        in: user.classTypes.map((type: string) => type.toLowerCase()),
+      };
+    }
+
+    // Price range
+    if (user.priceRange) {
+      const priceRange: { min?: number; max?: number } =
+        typeof user.priceRange === 'string'
+          ? (JSON.parse(user.priceRange) as { min?: number; max?: number })
+          : (user.priceRange as { min?: number; max?: number });
+      if (priceRange?.max) {
+        where.price = {
+          ...(typeof where.price === 'object' && where.price !== null
+            ? where.price
+            : {}),
+          lte: priceRange.max,
+        };
+      }
+      if (priceRange?.min) {
+        where.price = {
+          ...(typeof where.price === 'object' && where.price !== null
+            ? where.price
+            : {}),
+          gte: priceRange.min,
+        };
+      }
+    }
+
+    // Preferred instructors
+    if (Array.isArray(user.instructors) && user.instructors.length > 0) {
+      where.trainerId = {
+        in: user.instructors,
+      };
+    }
+
+    return where;
+  }
+
+  private buildTrainerWhereClause(user: {
+    classTypes?: string[];
+    instructors?: number[];
+  }): Record<string, unknown> {
+    const where: Record<string, unknown> = {
+      role: 'TRAINER',
+    };
+
+    // Class type preferences
+    if (user.classTypes?.length && user.classTypes.length > 0) {
+      where.classTypes = {
+        hasSome: user.classTypes,
+      };
+    }
+
+    // Preferred instructors
+    if (user.instructors?.length && user.instructors.length > 0) {
+      where.userId = {
+        in: user.instructors,
+      };
+    }
+
+    return where;
   }
 }
