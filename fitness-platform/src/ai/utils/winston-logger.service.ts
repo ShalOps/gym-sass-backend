@@ -63,23 +63,99 @@ export class WinstonLoggerService {
     });
   }
 
-  log(message: string, meta?: any) {
-    this.logger.info(message, meta);
+  log(message: string, meta?: Record<string, unknown>) {
+    try {
+      this.logger.info(message, meta);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Failed to log message',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          service: 'ai-service',
+          originalMessage: message,
+          originalMeta: meta,
+        }),
+      );
+    }
   }
 
-  error(message: string, meta?: any) {
-    this.logger.error(message, meta);
+  error(message: string, meta?: Record<string, unknown>) {
+    try {
+      this.logger.error(message, meta);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Failed to log error',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          service: 'ai-service',
+          originalMessage: message,
+          originalMeta: meta,
+        }),
+      );
+    }
   }
 
-  warn(message: string, meta?: any) {
-    this.logger.warn(message, meta);
+  warn(message: string, meta?: Record<string, unknown>) {
+    try {
+      this.logger.warn(message, meta);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Failed to log warning',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          service: 'ai-service',
+          originalMessage: message,
+          originalMeta: meta,
+        }),
+      );
+    }
   }
 
-  debug(message: string, meta?: any) {
-    this.logger.debug(message, meta);
+  debug(message: string, meta?: Record<string, unknown>) {
+    try {
+      this.logger.debug(message, meta);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Failed to log debug',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          service: 'ai-service',
+          originalMessage: message,
+          originalMeta: meta,
+        }),
+      );
+    }
   }
 
-  info(message: string, meta?: any) {
-    this.logger.info(message, meta);
+  info(message: string, meta?: Record<string, unknown>) {
+    try {
+      this.logger.info(message, meta);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          message: 'Failed to log info',
+          error: errorMessage,
+          timestamp: new Date().toISOString(),
+          service: 'ai-service',
+          originalMessage: message,
+          originalMeta: meta,
+        }),
+      );
+    }
   }
 }
