@@ -3,6 +3,7 @@ import validator from 'validator';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 import crypto from 'crypto';
+import { Logger } from '@nestjs/common';
 
 // Create a DOMPurify instance
 const jsdom = new JSDOM('');
@@ -115,15 +116,29 @@ export class SecurityService {
   }
 
   /**
-   * Anonymizes user ID for AI prompts (optional additional layer)
+   * Anonymizes user ID for AI prompts using HMAC-SHA256 with salt
    */
   anonymizeUserId(userId: string | number): string {
-    // Simple hash for anonymization - in production, use proper hashing
-    const hash: string = crypto
-      .createHash('sha256')
-      .update(String(userId))
-      .digest('hex');
-    return hash.substring(0, 16); // First 16 chars of hash
+    const salt = process.env.ANONYMIZATION_SALT;
+    if (typeof salt !== 'string' || !salt) {
+      Logger.warn(
+        'ANONYMIZATION_SALT environment variable is not set. Using random salt for development. Set ANONYMIZATION_SALT in production.',
+        'SecurityService',
+      );
+      // Generate a random salt for development - this changes on each restart
+      const randomSalt = crypto.randomBytes(32).toString('hex');
+      const hmac = crypto.createHmac('sha256', randomSalt);
+      hmac.update(String(userId));
+      return hmac.digest('hex');
+    }
+
+    // Use HMAC-SHA256 for keyed hashing to prevent rainbow table attacks
+    const hmac = crypto.createHmac('sha256', salt);
+    hmac.update(String(userId));
+    const hash = hmac.digest('hex');
+
+    // Return full hash for maximum security
+    return hash;
   }
 
   /**
