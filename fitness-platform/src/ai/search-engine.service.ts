@@ -6,6 +6,10 @@ import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
 import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
+import {
+  createAIErrorResponse,
+  AIErrorCode,
+} from './dto/ai-error-response.dto';
 
 @Injectable()
 export class SearchEngineService implements IntentHandler {
@@ -195,11 +199,15 @@ export class SearchEngineService implements IntentHandler {
           ? (error as { message: string }).message
           : String(error);
       this.logger.error(`Error in search engine: ${errorMessage}`);
-      return JSON.stringify({
-        type: 'search',
-        results: [],
-        note: 'Unable to perform search at this time',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'search',
+          AIErrorCode.SERVICE_UNAVAILABLE,
+          'Unable to perform search at this time',
+          errorMessage,
+          { results: [] },
+        ),
+      );
     }
   }
 

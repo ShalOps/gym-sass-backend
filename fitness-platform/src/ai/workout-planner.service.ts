@@ -6,6 +6,10 @@ import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
 import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
+import {
+  createAIErrorResponse,
+  AIErrorCode,
+} from './dto/ai-error-response.dto';
 
 @Injectable()
 export class WorkoutPlannerService implements IntentHandler {
@@ -125,11 +129,15 @@ export class WorkoutPlannerService implements IntentHandler {
           ? (error as { message: string }).message
           : String(error);
       this.logger.error(`Error in workout planner: ${errorMsg}`);
-      return JSON.stringify({
-        type: 'workout_plan',
-        plan: null,
-        note: 'Unable to generate workout plan at this time',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'workout_plan',
+          AIErrorCode.SERVICE_UNAVAILABLE,
+          'Unable to generate workout plan at this time',
+          errorMsg,
+          { plan: null },
+        ),
+      );
     }
   }
 }

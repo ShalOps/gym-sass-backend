@@ -6,6 +6,10 @@ import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
 import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
+import {
+  createAIErrorResponse,
+  AIErrorCode,
+} from './dto/ai-error-response.dto';
 
 @Injectable()
 export class RecommendationEngineService implements IntentHandler {
@@ -176,11 +180,15 @@ export class RecommendationEngineService implements IntentHandler {
           ? (error as { message: string }).message
           : String(error);
       this.logger.error(`Error in recommendation engine: ${errorMsg}`);
-      return JSON.stringify({
-        type: 'recommendation',
-        items: [],
-        note: 'Unable to generate recommendations at this time',
-      });
+      return JSON.stringify(
+        createAIErrorResponse(
+          'recommendation',
+          AIErrorCode.SERVICE_UNAVAILABLE,
+          'Unable to generate recommendations at this time',
+          errorMsg,
+          { items: [] },
+        ),
+      );
     }
   }
 
