@@ -1,7 +1,18 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { WinstonLoggerService } from '../utils/winston-logger.service';
 import { AuditService } from '../utils/audit.service';
+import { AI_CONFIG } from '../utils/ai-config.constants';
+import {
+  AIErrorCode,
+  createAIErrorResponse,
+} from '../dto/ai-error-response.dto';
 
 @Injectable()
 export class AIRateLimitGuard implements CanActivate {
@@ -9,7 +20,8 @@ export class AIRateLimitGuard implements CanActivate {
     string,
     { count: number; resetTime: number }
   >();
-  private readonly maxRequestsPerMinute = 10; // Conservative limit for AI calls
+  private readonly maxRequestsPerMinute =
+    AI_CONFIG.RATE_LIMITS.GENERAL_AI_REQUESTS;
   private readonly windowMs = 60 * 1000; // 1 minute
 
   constructor(
@@ -47,7 +59,15 @@ export class AIRateLimitGuard implements CanActivate {
         limit: this.maxRequestsPerMinute,
         url: request.url,
       });
-      return false;
+      throw new HttpException(
+        createAIErrorResponse(
+          'rate_limit',
+          AIErrorCode.RATE_LIMITED,
+          `Rate limit exceeded. Maximum ${this.maxRequestsPerMinute} requests per minute.`,
+          `User ${userId} exceeded rate limit of ${this.maxRequestsPerMinute} requests per minute`,
+        ),
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     userRequests.count++;
