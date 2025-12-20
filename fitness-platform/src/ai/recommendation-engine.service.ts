@@ -84,6 +84,7 @@ export class RecommendationEngineService implements IntentHandler {
           sessionRating: b.sessionRating,
           class: { className: b.className },
         })),
+        user.preferredTimes || [],
       );
       const interestPatterns = this.analyzeViewHistory(
         user.recentViews.map((v) => ({
@@ -187,9 +188,9 @@ export class RecommendationEngineService implements IntentHandler {
     bookings: Array<{
       attended?: boolean;
       sessionRating?: number;
-      preferredTimes?: string[];
       class?: { className?: string };
     }>,
+    userPreferredTimes: string[],
   ): {
     totalBookings: number;
     attendanceRate: number;
@@ -208,9 +209,7 @@ export class RecommendationEngineService implements IntentHandler {
       totalBookings: bookings.length,
       attendanceRate: bookings.length > 0 ? attendedCount / bookings.length : 0,
       averageRating: avgRating,
-      preferredTimes: [
-        ...new Set(bookings.flatMap((b) => b.preferredTimes || [])),
-      ],
+      preferredTimes: userPreferredTimes,
       commonClasses: this.getMostCommonClasses(bookings),
     };
   }
