@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AiService } from './ai/ai.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class SuggestionEngineService implements IntentHandler {
     private readonly aiService: AiService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly userContext: UserContextService,
   ) {}
 
   async handle(data: IntentData): Promise<string> {
@@ -43,27 +45,8 @@ export class SuggestionEngineService implements IntentHandler {
     }
 
     try {
-      // Fetch comprehensive user data
-      const user = await this.database.user.findUnique({
-        where: { userId },
-        include: {
-          ClassBooking: {
-            take: 10,
-            orderBy: { bookedAt: 'desc' },
-            include: { class: true },
-          },
-          viewHistories: {
-            where: { entityType: { in: ['gym', 'class', 'trainer'] } },
-            take: 20,
-            orderBy: { timestamp: 'desc' },
-          },
-          aifeedbacks: {
-            where: { feature: 'suggestion' },
-            take: 10,
-            orderBy: { timestamp: 'desc' },
-          },
-        },
-      });
+      // Get user context from cache or DB
+      const user = await this.userContext.getUserContext(data.userId);
 
       if (!user) {
         return JSON.stringify({
@@ -76,28 +59,15 @@ export class SuggestionEngineService implements IntentHandler {
       // Minimize user data for privacy before sending to AI
       const minimizedUserData = this.securityService.minimizeUserDataForAI({
         userId: user.userId,
-        fitnessLevel: user.fitnessLevel ?? undefined,
-        goals: Array.isArray(user.goals)
-          ? user.goals.join(', ')
-          : (user.goals ?? undefined),
-        preferredTimes: Array.isArray(user.preferredTimes)
-          ? user.preferredTimes.join(', ')
-          : (user.preferredTimes ?? undefined),
-        preferredLocations: Array.isArray(user.preferredLocations)
-          ? user.preferredLocations.join(', ')
-          : (user.preferredLocations ?? undefined),
-        classTypes: Array.isArray(user.classTypes)
-          ? user.classTypes.join(', ')
-          : (user.classTypes ?? undefined),
-        priceRange:
-          user.priceRange !== undefined
-            ? typeof user.priceRange === 'object'
-              ? JSON.stringify(user.priceRange)
-              : String(user.priceRange)
-            : undefined,
-        equipmentAtHome: Array.isArray(user.equipmentAtHome)
-          ? user.equipmentAtHome.join(', ')
-          : (user.equipmentAtHome ?? undefined),
+        fitnessLevel: user.fitnessLevel,
+        goals: user.goals?.join(', '),
+        preferredTimes: user.preferredTimes?.join(', '),
+        preferredLocations: user.preferredLocations?.join(', '),
+        classTypes: user.classTypes?.join(', '),
+        priceRange: user.priceRange
+          ? JSON.stringify(user.priceRange)
+          : undefined,
+        equipmentAtHome: user.equipmentAtHome?.join(', '),
       });
 
       // Log data access for compliance
@@ -177,26 +147,6 @@ export class SuggestionEngineService implements IntentHandler {
       ];
 
       // Use AI to rank suggestions based on user profile and message context
-      interface BookingHistoryEntry {
-        className?: string;
-        rating?: number;
-        attended?: boolean;
-      }
-
-      interface UserProfile {
-        goals?: string[];
-        fitnessLevel?: string;
-        location?: string;
-        preferredLocations?: string[];
-        preferredTimes?: string[];
-        classTypes?: string[];
-        instructors?: number[];
-        priceRange?: { min?: number; max?: number };
-        bookingHistory?: BookingHistoryEntry[];
-        viewHistory?: unknown[];
-        aiFeedback?: unknown[];
-      }
-
       const rankingPrompt: string = `
         User Profile: ${JSON.stringify({
           goals: user.goals,
@@ -207,22 +157,14 @@ export class SuggestionEngineService implements IntentHandler {
           classTypes: user.classTypes,
           instructors: user.instructors,
           priceRange: user.priceRange,
-          bookingHistory: (
-            user.ClassBooking as {
-              class?: { className: string };
-              sessionRating?: number;
-              attended?: boolean;
-            }[]
-          )
-            ?.slice(0, 5)
-            .map((b) => ({
-              className: b.class?.className,
-              rating: b.sessionRating,
-              attended: b.attended,
-            })),
-          viewHistory: user.viewHistories?.slice(0, 10),
-          aiFeedback: user.aifeedbacks,
-        } as UserProfile)}
+          bookingHistory: user.recentBookings?.slice(0, 5).map((b) => ({
+            className: b.className,
+            rating: b.sessionRating,
+            attended: b.attended,
+          })),
+          viewHistory: user.recentViews?.slice(0, 10),
+          aiFeedback: user.recentFeedback,
+        })}
         Available Suggestions: ${JSON.stringify(allSuggestions)}
         User Message: ${data.message}
 

@@ -15,6 +15,7 @@ import { WinstonLoggerService } from './utils/winston-logger.service';
 import { CircuitBreakerService } from './utils/circuit-breaker.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { AIRateLimitGuard } from './guards/ai-rate-limit.guard';
 import { DatabaseModule } from '../database/database.module';
 
@@ -33,6 +34,7 @@ import { DatabaseModule } from '../database/database.module';
     CircuitBreakerService,
     SecurityService,
     AuditService,
+    UserContextService,
     AIRateLimitGuard,
   ],
   imports: [

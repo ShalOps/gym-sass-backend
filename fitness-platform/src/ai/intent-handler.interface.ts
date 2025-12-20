@@ -3,7 +3,7 @@ export interface IntentData {
   message: string;
   conversationId?: string;
   userTier?: string;
-  // add more fields as needed (user profile, preferences)
+  // Use UserContextService for profile data; don't add fields here.
 }
 
 export interface IntentHandler {

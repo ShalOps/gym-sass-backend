@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AiService } from './ai/ai.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class SearchEngineService implements IntentHandler {
     private readonly aiService: AiService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly userContext: UserContextService,
   ) {}
 
   async handle(data: IntentData): Promise<string> {
@@ -45,20 +47,8 @@ export class SearchEngineService implements IntentHandler {
     }
 
     try {
-      // Fetch user context for personalized search
-      const user = await this.database.user.findUnique({
-        where: { userId },
-        include: {
-          searchQueries: {
-            take: 10,
-            orderBy: { createdAt: 'desc' },
-          },
-          viewHistories: {
-            take: 20,
-            orderBy: { timestamp: 'desc' },
-          },
-        },
-      });
+      // Get user context from cache or DB
+      const user = await this.userContext.getUserContext(userId);
 
       if (!user) {
         return JSON.stringify({
@@ -116,11 +106,11 @@ export class SearchEngineService implements IntentHandler {
         - Preferred Times: ${typeof minimizedUserData.preferredTimes === 'string' ? minimizedUserData.preferredTimes : ''}
         - Class Types: ${typeof minimizedUserData.classTypes === 'string' ? minimizedUserData.classTypes : ''}
         - Price Range: ${JSON.stringify(minimizedUserData.priceRange)}
-        - Recent Searches: ${user.searchQueries
+        - Recent Searches: ${user.recentSearches
           ?.slice(0, 3)
           .map((s) => s.query)
           .join(', ')}
-        - Recent Views: ${user.viewHistories
+        - Recent Views: ${user.recentViews
           ?.slice(0, 5)
           .map((v) => `${v.entityType}:${v.entityId}`)
           .join(', ')}
@@ -165,7 +155,8 @@ export class SearchEngineService implements IntentHandler {
           preferredTimes: user.preferredTimes,
           classTypes: user.classTypes,
           priceRange: user.priceRange,
-          viewHistory: user.viewHistories?.slice(0, 10),
+          viewHistory: user.recentViews?.slice(0, 10),
+          recentSearches: user.recentSearches?.slice(0, 5),
         })}
         Parsed Query: ${JSON.stringify(parsedQuery)}
         Search Results: ${JSON.stringify(searchResults)}

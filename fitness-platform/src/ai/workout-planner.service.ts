@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AiService } from './ai/ai.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class WorkoutPlannerService implements IntentHandler {
     private readonly aiService: AiService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly userContext: UserContextService,
   ) {}
 
   async handle(data: IntentData): Promise<string> {
@@ -46,21 +48,8 @@ export class WorkoutPlannerService implements IntentHandler {
     }
 
     try {
-      // Fetch user profile with metrics and bookings
-      const user = await this.database.user.findUnique({
-        where: { userId },
-        include: {
-          userMetrics: {
-            take: 5,
-            orderBy: { date: 'desc' },
-          },
-          ClassBooking: {
-            take: 10,
-            orderBy: { bookedAt: 'desc' },
-            include: { class: true },
-          },
-        },
-      });
+      // Get user context from cache or DB
+      const user = await this.userContext.getUserContext(data.userId);
 
       if (!user) {
         return JSON.stringify({
@@ -73,28 +62,15 @@ export class WorkoutPlannerService implements IntentHandler {
       // Minimize user data for privacy before sending to AI
       const minimizedUserData = this.securityService.minimizeUserDataForAI({
         userId: user.userId,
-        fitnessLevel: user.fitnessLevel ?? undefined,
-        goals: Array.isArray(user.goals)
-          ? user.goals.join(', ')
-          : (user.goals ?? undefined),
-        preferredTimes: Array.isArray(user.preferredTimes)
-          ? user.preferredTimes.join(', ')
-          : (user.preferredTimes ?? undefined),
-        preferredLocations: Array.isArray(user.preferredLocations)
-          ? user.preferredLocations.join(', ')
-          : (user.preferredLocations ?? undefined),
-        classTypes: Array.isArray(user.classTypes)
-          ? user.classTypes.join(', ')
-          : (user.classTypes ?? undefined),
-        priceRange:
-          user.priceRange !== undefined
-            ? typeof user.priceRange === 'object'
-              ? JSON.stringify(user.priceRange)
-              : String(user.priceRange)
-            : undefined,
-        equipmentAtHome: Array.isArray(user.equipmentAtHome)
-          ? user.equipmentAtHome.join(', ')
-          : (user.equipmentAtHome ?? undefined),
+        fitnessLevel: user.fitnessLevel,
+        goals: user.goals?.join(', '),
+        preferredTimes: user.preferredTimes?.join(', '),
+        preferredLocations: user.preferredLocations?.join(', '),
+        classTypes: user.classTypes?.join(', '),
+        priceRange: user.priceRange
+          ? JSON.stringify(user.priceRange)
+          : undefined,
+        equipmentAtHome: user.equipmentAtHome?.join(', '),
       });
 
       // Log data access for compliance
@@ -106,29 +82,27 @@ export class WorkoutPlannerService implements IntentHandler {
       );
 
       // Prepare prompt for AI
-      const latestMetrics = user.userMetrics?.[0];
-      const bmi =
-        latestMetrics?.height && latestMetrics?.weight
-          ? latestMetrics.weight / (latestMetrics.height / 100) ** 2
-          : undefined;
+      const bmi = user.latestMetrics?.bmi;
 
       const prompt = `
         User Profile:
           - Fitness Level: ${typeof minimizedUserData.fitnessLevel === 'string' ? minimizedUserData.fitnessLevel : ''}
           - Goals: ${typeof minimizedUserData.goals === 'string' ? minimizedUserData.goals : ''}
-          - Height: ${latestMetrics?.height}
-          - Weight: ${latestMetrics?.weight}
+          - Height: ${user.latestMetrics?.height}
+          - Weight: ${user.latestMetrics?.weight}
           - BMI: ${bmi}
           - Equipment at Home: ${typeof minimizedUserData.equipmentAtHome === 'string' ? minimizedUserData.equipmentAtHome : ''}
         - Injuries: ${user.injuries?.join(', ')}
         - Health Notes: ${user.healthNotes}
         - Preferences: ${JSON.stringify(user.preferences)}
-        - Booking History: ${user.ClassBooking?.map(
-          (b) =>
-            `${b.class?.className} (${b.sessionRating || 'no rating'})${
-              b.attended ? ' [attended]' : ''
-            }`,
-        ).join('; ')}
+        - Booking History: ${user.recentBookings
+          .map(
+            (b) =>
+              `${b.className} (${b.sessionRating || 'no rating'})${
+                b.attended ? ' [attended]' : ''
+              }`,
+          )
+          .join('; ')}
 
         User Message: ${data.message}
 

@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AiService } from './ai/ai.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
 
 @Injectable()
@@ -26,6 +27,7 @@ export class ProductRecommendationService implements IntentHandler {
     private readonly aiService: AiService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly userContext: UserContextService,
   ) {}
 
   async handle(data: IntentData): Promise<string> {
@@ -41,22 +43,8 @@ export class ProductRecommendationService implements IntentHandler {
     }
 
     try {
-      // Fetch user profile with relevant data
-      const user = await this.database.user.findUnique({
-        where: { userId },
-        include: {
-          viewHistories: {
-            where: { entityType: 'product' },
-            take: 20,
-            orderBy: { timestamp: 'desc' },
-          },
-          aifeedbacks: {
-            where: { feature: 'product_recommendation' },
-            take: 10,
-            orderBy: { timestamp: 'desc' },
-          },
-        },
-      });
+      // Get user context from cache or DB
+      const user = await this.userContext.getUserContext(userId);
 
       if (!user) {
         return JSON.stringify({
@@ -109,8 +97,8 @@ export class ProductRecommendationService implements IntentHandler {
           priceRange: minimizedUserData.priceRange,
           equipmentAtHome: minimizedUserData.equipmentAtHome,
           lastActiveAt: user.lastActiveAt,
-          viewHistory: user.viewHistories?.slice(0, 5), // Recent product views
-          aiFeedback: user.aifeedbacks,
+          viewHistory: user.recentViews?.slice(0, 5), // Recent product views
+          aiFeedback: user.recentFeedback,
         })}
         Message: ${data.message}
 

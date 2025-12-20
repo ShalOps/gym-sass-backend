@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AiService } from './ai/ai.service';
 import { SecurityService } from './utils/security.service';
 import { AuditService } from './utils/audit.service';
+import { UserContextService } from './utils/user-context.service';
 import { z } from 'zod';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class RecommendationEngineService implements IntentHandler {
     private readonly aiService: AiService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly userContext: UserContextService,
   ) {}
 
   async handle(data: IntentData): Promise<string> {
@@ -42,29 +44,8 @@ export class RecommendationEngineService implements IntentHandler {
     }
 
     try {
-      // Fetch comprehensive user data with all enhanced fields
-      const user = await this.database.user.findUnique({
-        where: { userId },
-        include: {
-          ClassBooking: {
-            take: 10,
-            orderBy: { bookedAt: 'desc' },
-            include: { class: true },
-          },
-          userMetrics: {
-            take: 5,
-            orderBy: { date: 'desc' },
-          },
-          viewHistories: {
-            take: 20,
-            orderBy: { timestamp: 'desc' },
-          },
-          aifeedbacks: {
-            take: 10,
-            orderBy: { timestamp: 'desc' },
-          },
-        },
-      });
+      // Get user context from cache or DB
+      const user = await this.userContext.getUserContext(data.userId);
 
       if (!user) {
         return JSON.stringify({
@@ -77,43 +58,16 @@ export class RecommendationEngineService implements IntentHandler {
       // Minimize user data for privacy before sending to AI
       const minimizedUserData = this.securityService.minimizeUserDataForAI({
         userId: user.userId,
-        fitnessLevel: user.fitnessLevel ?? undefined,
-        goals: Array.isArray(user.goals)
-          ? user.goals.join(', ')
-          : (user.goals ?? undefined),
-        preferredTimes: Array.isArray(user.preferredTimes)
-          ? user.preferredTimes.join(', ')
-          : (user.preferredTimes ?? undefined),
-        preferredLocations: Array.isArray(user.preferredLocations)
-          ? user.preferredLocations.join(', ')
-          : (user.preferredLocations ?? undefined),
-        classTypes: Array.isArray(user.classTypes)
-          ? user.classTypes.join(', ')
-          : (user.classTypes ?? undefined),
-        priceRange:
-          user.priceRange !== undefined
-            ? typeof user.priceRange === 'object'
-              ? JSON.stringify(user.priceRange)
-              : String(user.priceRange)
-            : undefined,
-        equipmentAtHome: Array.isArray(user.equipmentAtHome)
-          ? user.equipmentAtHome.join(', ')
-          : (user.equipmentAtHome ?? undefined),
+        fitnessLevel: user.fitnessLevel,
+        goals: user.goals?.join(', '),
+        preferredTimes: user.preferredTimes?.join(', '),
+        preferredLocations: user.preferredLocations?.join(', '),
+        classTypes: user.classTypes?.join(', '),
+        priceRange: user.priceRange
+          ? JSON.stringify(user.priceRange)
+          : undefined,
+        equipmentAtHome: user.equipmentAtHome?.join(', '),
       });
-
-      // Calculate BMI from user metrics or profile
-      let bmi: number | undefined = undefined;
-      if (user.userMetrics && user.userMetrics.length > 0) {
-        const latestMetric = user.userMetrics[0];
-        if (latestMetric.height && latestMetric.weight) {
-          // height in meters, weight in kg
-          const heightM = latestMetric.height / 100;
-          bmi = latestMetric.weight / (heightM * heightM);
-        }
-      } else if (user.height && user.weight) {
-        const heightM = user.height / 100;
-        bmi = user.weight / (heightM * heightM);
-      }
 
       // Log data access for compliance
       this.auditService.logDataAccess(
@@ -123,20 +77,20 @@ export class RecommendationEngineService implements IntentHandler {
         Object.keys(minimizedUserData),
       );
 
-      // Analyze booking patterns
+      // Analyze booking patterns using pre-fetched data
       const bookingInsights = this.analyzeBookingPatterns(
-        (user.ClassBooking || []).map((b) => ({
-          attended: b.attended === null ? undefined : b.attended,
-          sessionRating: b.sessionRating === null ? undefined : b.sessionRating,
-          preferredTimes: b.preferredTimes ?? undefined,
-          class: b.class ? { className: b.class.className } : undefined,
+        user.recentBookings.map((b) => ({
+          attended: b.attended,
+          sessionRating: b.sessionRating,
+          class: { className: b.className },
         })),
       );
-      const interestPatterns: {
-        totalViews: number;
-        topEntityTypes: [string, number][];
-        recentInterests: string[];
-      } = this.analyzeViewHistory(user.viewHistories || []);
+      const interestPatterns = this.analyzeViewHistory(
+        user.recentViews.map((v) => ({
+          entityType: v.entityType,
+          entityId: v.entityId,
+        })),
+      );
 
       // Fetch some sample gyms, classes, trainers for AI to rank
       const [gyms, classes, trainers] = await Promise.all([
@@ -163,10 +117,10 @@ export class RecommendationEngineService implements IntentHandler {
           classTypes: minimizedUserData.classTypes,
           priceRange: minimizedUserData.priceRange,
           equipmentAtHome: minimizedUserData.equipmentAtHome,
-          calculatedBMI: bmi,
+          calculatedBMI: user.latestMetrics?.bmi,
           bookingInsights,
           interestPatterns,
-          aiFeedback: user.aifeedbacks,
+          aiFeedback: user.recentFeedback,
         })}
         Available Options:
         Gyms: ${JSON.stringify(
