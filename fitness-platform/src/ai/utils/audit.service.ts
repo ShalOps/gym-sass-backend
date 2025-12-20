@@ -23,21 +23,26 @@ export class AuditService {
    * Logs AI interaction for compliance and monitoring
    */
   logAIInteraction(logData: Omit<AIAuditLog, 'timestamp'>) {
-    const auditLog: AIAuditLog = {
-      ...logData,
-      timestamp: new Date(),
-    };
+    try {
+      const auditLog: AIAuditLog = {
+        ...logData,
+        timestamp: new Date(),
+      };
 
-    // Log to Winston with structured data
-    this.logger.log('AI Interaction', {
-      audit: true,
-      ...auditLog,
-      // Sanitize sensitive data in logs
-      input: this.sanitizeForLogging(logData.input),
-      output: logData.output
-        ? this.sanitizeForLogging(logData.output)
-        : undefined,
-    });
+      // Log to Winston with structured data
+      this.logger.log('AI Interaction', {
+        audit: true,
+        ...auditLog,
+        // Sanitize sensitive data in logs
+        input: this.sanitizeForLogging(logData.input),
+        output: logData.output
+          ? this.sanitizeForLogging(logData.output)
+          : undefined,
+      });
+    } catch (error) {
+      // Silently fail logging to avoid disrupting the main flow
+      this.logger.error('Failed to log AI interaction:', error);
+    }
   }
 
   /**
@@ -49,15 +54,20 @@ export class AuditService {
     purpose: string,
     accessedFields: string[],
   ) {
-    this.logger.log('Data Access', {
-      audit: true,
-      type: 'data_access',
-      userId,
-      dataType,
-      purpose,
-      accessedFields,
-      timestamp: new Date(),
-    });
+    try {
+      this.logger.log('Data Access', {
+        audit: true,
+        type: 'data_access',
+        userId,
+        dataType,
+        purpose,
+        accessedFields,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      // Silently fail logging to avoid disrupting the main flow
+      this.logger.error('Failed to log data access:', error);
+    }
   }
 
   /**
@@ -68,31 +78,41 @@ export class AuditService {
     details: unknown,
     severity: 'low' | 'medium' | 'high' = 'medium',
   ) {
-    // Sanitize details if it's an object
-    const sanitizedDetails = this.sanitizeObject(details);
+    try {
+      // Sanitize details if it's an object
+      const sanitizedDetails = this.sanitizeObject(details);
 
-    this.logger.warn(`Security Event: ${event}`, {
-      audit: true,
-      type: 'security',
-      event,
-      details: sanitizedDetails,
-      severity,
-      timestamp: new Date(),
-    });
+      this.logger.warn(`Security Event: ${event}`, {
+        audit: true,
+        type: 'security',
+        event,
+        details: sanitizedDetails,
+        severity,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      // Silently fail logging to avoid disrupting the main flow
+      this.logger.error('Failed to log security event:', error);
+    }
   }
 
   /**
    * Logs rate limiting events
    */
   logRateLimit(userId: string, endpoint: string, limit: number) {
-    this.logger.warn('Rate Limit Exceeded', {
-      audit: true,
-      type: 'rate_limit',
-      userId,
-      endpoint,
-      limit,
-      timestamp: new Date(),
-    });
+    try {
+      this.logger.warn('Rate Limit Exceeded', {
+        audit: true,
+        type: 'rate_limit',
+        userId,
+        endpoint,
+        limit,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      // Silently fail logging to avoid disrupting the main flow
+      this.logger.error('Failed to log rate limit:', error);
+    }
   }
 
   /**
@@ -104,12 +124,12 @@ export class AuditService {
     // Remove or mask sensitive patterns
     return text
       .replace(/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, '[CARD_NUMBER]') // Credit cards
-      .replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[SSN]') // SSN
+      .replace(/\b\d{10,15}\b/g, '[PHONE]') // Phone numbers (10-15 digits)
+      .replace(/(\d{3}[-.]?\d{2}[-.]?\d{4})/g, '[SSN]') // SSN (3-2-4 digits with optional separators)
       .replace(
         /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
         '[EMAIL]',
-      ) // Email
-      .replace(/\b\d{10,15}\b/g, '[PHONE]'); // Phone numbers
+      ); // Email
   }
 
   /**
