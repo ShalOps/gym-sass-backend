@@ -7,6 +7,10 @@ import { WinstonLoggerService } from '../utils/winston-logger.service';
 import { CircuitBreakerService } from '../utils/circuit-breaker.service';
 import { AIUnavailableException } from '../exceptions/ai-unavailable.exception';
 import { AI_CONFIG } from '../utils/ai-config.constants';
+import {
+  AIErrorCode,
+  createAIErrorResponse,
+} from '../dto/ai-error-response.dto';
 
 @Injectable()
 export class AiService {
@@ -42,13 +46,51 @@ export class AiService {
         'GEMINI_API_KEY environment variable is not set',
         'AiService',
       );
-      // this.logger.warn('GEMINI_API_KEY environment variable is not set');
+      // this.logger.error(
+      //   'GEMINI_API_KEY environment variable is not set - AI features will not work',
+      // );
+      throw new AIUnavailableException(
+        JSON.stringify(
+          createAIErrorResponse(
+            'ai_service',
+            AIErrorCode.CONFIGURATION_ERROR,
+            'AI service configuration error',
+            'GEMINI_API_KEY environment variable is required but not set',
+          ),
+        ),
+      );
     }
 
     this.genAI = new GoogleGenAI({ apiKey });
     this.modelName = this.configService.get<string>(
       'GEMINI_MODEL',
       'gemini-2.5-flash',
+    );
+  }
+
+  // Helper method to check if error is JSON parsing/validation related
+  private isJsonParsingError(error: unknown, errorMessage: string): boolean {
+    return (
+      error instanceof SyntaxError ||
+      errorMessage.includes('parse') ||
+      errorMessage.includes('validate')
+    );
+  }
+
+  // Helper method to create INTERNAL_ERROR exception for JSON parsing issues
+  private createJsonParsingError(
+    context: string,
+    errorMessage: string,
+  ): AIUnavailableException {
+    return new AIUnavailableException(
+      JSON.stringify(
+        createAIErrorResponse(
+          context,
+          AIErrorCode.INTERNAL_ERROR,
+          'Failed to process AI response',
+          `Invalid response format from AI service: ${errorMessage}`,
+        ),
+      ),
     );
   }
 
@@ -136,7 +178,7 @@ User message: "${message}"
 
       const text = (result.text ?? '').trim();
       if (!text) {
-        throw new Error('No text in response');
+        throw new AIUnavailableException('AI service returned empty response');
       }
       this.logger.debug(`Gemini response: ${text}`, { response: text });
 
@@ -163,6 +205,14 @@ User message: "${message}"
         stack: error instanceof Error ? error.stack : undefined,
         message,
       });
+
+      // Check if this is a JSON parsing or validation error (internal error)
+      if (this.isJsonParsingError(error, errorMessage)) {
+        throw this.createJsonParsingError(
+          'intent_classification',
+          errorMessage,
+        );
+      }
 
       // Fallback to general_chat with low confidence
       return { intent: 'general_chat', confidence: 0.5 };
@@ -196,7 +246,7 @@ User message: "${message}"
 
       const text = (result.text ?? '').trim();
       if (!text) {
-        throw new Error('No text in response');
+        throw new AIUnavailableException('AI service returned empty response');
       }
       this.logger.debug(`Generated reply: ${text.substring(0, 100)}...`, {
         responseLength: text.length,
@@ -256,7 +306,7 @@ User message: "${message}"
 
       const text = (result.text ?? '').trim();
       if (!text) {
-        throw new Error('No text in response');
+        throw new AIUnavailableException('AI service returned empty response');
       }
       const parsed: unknown = JSON.parse(text);
       const validated = schema.parse(parsed);
@@ -279,6 +329,15 @@ User message: "${message}"
           promptSnippet: prompt.substring(0, 100),
         },
       );
+
+      // Check if this is a JSON parsing or validation error (internal error)
+      if (this.isJsonParsingError(error, errorMessage)) {
+        throw this.createJsonParsingError(
+          'intent_classification',
+          errorMessage,
+        );
+      }
+
       throw new AIUnavailableException(
         `Failed to generate structured response: ${errorMessage}`,
       );
