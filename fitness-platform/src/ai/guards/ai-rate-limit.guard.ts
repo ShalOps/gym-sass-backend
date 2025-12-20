@@ -97,7 +97,7 @@ export class AIRateLimitGuard implements CanActivate {
   }
 
   private getRateLimitForEndpoint(endpoint: string): number {
-    if (endpoint.includes('/chat/')) {
+    if (endpoint.includes('/chat')) {
       return AI_CONFIG.RATE_LIMITS.CHAT_REQUESTS;
     }
     if (endpoint.includes('/recommend')) {
