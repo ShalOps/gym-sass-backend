@@ -68,11 +68,14 @@ export class AuditService {
     details: unknown,
     severity: 'low' | 'medium' | 'high' = 'medium',
   ) {
+    // Sanitize details if it's an object
+    const sanitizedDetails = this.sanitizeObject(details);
+
     this.logger.warn(`Security Event: ${event}`, {
       audit: true,
       type: 'security',
       event,
-      details: details as Record<string, unknown>,
+      details: sanitizedDetails,
       severity,
       timestamp: new Date(),
     });
@@ -107,6 +110,29 @@ export class AuditService {
         '[EMAIL]',
       ) // Email
       .replace(/\b\d{10,15}\b/g, '[PHONE]'); // Phone numbers
+  }
+
+  /**
+   * Sanitizes an object recursively
+   */
+  private sanitizeObject(obj: unknown): unknown {
+    if (typeof obj === 'string') {
+      return this.sanitizeForLogging(obj);
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.sanitizeObject(item));
+    }
+
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = this.sanitizeObject(value);
+      }
+      return result;
+    }
+
+    return obj;
   }
 
   /**
