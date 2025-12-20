@@ -11,6 +11,7 @@ import {
   AIErrorCode,
   createAIErrorResponse,
 } from '../dto/ai-error-response.dto';
+import { SecurityService } from '../utils/security.service';
 
 @Injectable()
 export class AiService {
@@ -39,6 +40,7 @@ export class AiService {
     private configService: ConfigService,
     private logger: WinstonLoggerService,
     private circuitBreaker: CircuitBreakerService,
+    private securityService: SecurityService,
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
@@ -270,7 +272,9 @@ User message: "${message}"
 
       // Fallback response
       return {
-        text: "I apologize, but I'm experiencing technical difficulties right now. Please try again later.",
+        text: this.securityService.sanitizeAIResponse(
+          "I apologize, but I'm experiencing technical difficulties right now. Please try again later.",
+        ),
       };
     }
   }

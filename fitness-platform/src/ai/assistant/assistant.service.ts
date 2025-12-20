@@ -167,7 +167,7 @@ export class AssistantService {
       if (classification.intent === 'general_chat') {
         // Fallback to general AI reply for non-specific intents
         const gen = await this.aiService.generateResponse(sanitizedMessage);
-        reply = gen.text;
+        reply = this.securityService.sanitizeAIResponse(gen.text);
       } else {
         // Route to specific intent handler
         const handler = this.intentHandlers[classification.intent];
@@ -179,16 +179,17 @@ export class AssistantService {
             userTier,
           };
           const handlerReply = await handler.handle(intentData);
-          reply =
+          const rawReply =
             typeof handlerReply === 'string'
               ? handlerReply
               : JSON.stringify(handlerReply);
+          reply = this.securityService.sanitizeAIResponse(rawReply);
         } else {
           this.logger.warn(
             `No handler found for intent: ${classification.intent}`,
           );
           const gen = await this.aiService.generateResponse(sanitizedMessage);
-          reply = gen.text;
+          reply = this.securityService.sanitizeAIResponse(gen.text);
         }
       }
 

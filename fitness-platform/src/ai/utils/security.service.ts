@@ -28,6 +28,24 @@ export class SecurityService {
     return sanitized.trim();
   }
 
+  /**
+   * Sanitizes AI-generated content to prevent XSS while preserving safe formatting
+   */
+  sanitizeAIResponse(content: string): string {
+    if (!content || typeof content !== 'string') {
+      return '';
+    }
+
+    // For AI responses, allow some safe formatting but prevent XSS
+    const sanitized = DOMPurifyInstance.sanitize(content, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'], // Safe formatting tags
+      ALLOWED_ATTR: [], // No attributes allowed
+      ALLOW_DATA_ATTR: false,
+    });
+
+    return sanitized.trim();
+  }
+
   validateAndSanitizeMessage(message: string): {
     isValid: boolean;
     sanitizedMessage: string;
