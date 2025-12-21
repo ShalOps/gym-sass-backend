@@ -41,7 +41,9 @@ export class AuditService {
       });
     } catch (error) {
       // Silently fail logging to avoid disrupting the main flow
-      this.logger.error('Failed to log AI interaction:', error);
+      this.logger.error('Failed to log AI interaction:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -66,7 +68,9 @@ export class AuditService {
       });
     } catch (error) {
       // Silently fail logging to avoid disrupting the main flow
-      this.logger.error('Failed to log data access:', error);
+      this.logger.error('Failed to log data access:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -92,7 +96,9 @@ export class AuditService {
       });
     } catch (error) {
       // Silently fail logging to avoid disrupting the main flow
-      this.logger.error('Failed to log security event:', error);
+      this.logger.error('Failed to log security event:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -111,7 +117,9 @@ export class AuditService {
       });
     } catch (error) {
       // Silently fail logging to avoid disrupting the main flow
-      this.logger.error('Failed to log rate limit:', error);
+      this.logger.error('Failed to log rate limit:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
