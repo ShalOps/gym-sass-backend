@@ -244,6 +244,11 @@ export class SearchEngineService implements IntentHandler {
     }
   }
 
+  /**
+   * Performs database searches based on parsed query parameters
+   * @param parsedQuery Parsed query object from AI
+   * @returns Array of search results
+   */
   private async performSearch(parsedQuery: {
     searchType: 'gym' | 'class' | 'trainer' | 'general';
     keywords: string[];
@@ -288,6 +293,11 @@ export class SearchEngineService implements IntentHandler {
     return results;
   }
 
+  /**
+   * Searches gyms based on parsed query parameters
+   * @param parsedQuery Parsed query object from AI
+   * @returns Array of gym search results
+   */
   private async searchGyms(parsedQuery: {
     searchType: 'gym' | 'class' | 'trainer' | 'general';
     keywords: string[];
@@ -324,6 +334,11 @@ export class SearchEngineService implements IntentHandler {
     );
   }
 
+  /**
+   * Searches classes based on parsed query parameters
+   * @param parsedQuery Parsed query object from AI
+   * @returns Array of class search results
+   */
   private async searchClasses(parsedQuery: {
     searchType: 'gym' | 'class' | 'trainer' | 'general';
     keywords: string[];
@@ -368,6 +383,11 @@ export class SearchEngineService implements IntentHandler {
     );
   }
 
+  /**
+   * Searches trainers based on parsed query parameters
+   * @param parsedQuery Parsed query object from AI
+   * @returns Array of trainer search results
+   */
   private async searchTrainers(parsedQuery: {
     searchType: 'gym' | 'class' | 'trainer' | 'general';
     keywords: string[];

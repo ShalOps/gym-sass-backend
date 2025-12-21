@@ -273,6 +273,12 @@ export class RecommendationEngineService implements IntentHandler {
     }
   }
 
+  /**
+   * Analyzes booking patterns for a user
+   * @param bookings Array of booking objects
+   * @param userPreferredTimes User's preferred times for classes
+   * @returns Analysis of booking patterns
+   */
   private analyzeBookingPatterns(
     bookings: Array<{
       attended?: boolean;
@@ -303,6 +309,11 @@ export class RecommendationEngineService implements IntentHandler {
     };
   }
 
+  /**
+   * Analyzes view history for a user
+   * @param viewHistory Array of view history objects
+   * @returns Analysis of view history
+   */
   private analyzeViewHistory(
     viewHistory: Array<{ entityType: string; entityId: number }>,
   ): {
@@ -329,6 +340,11 @@ export class RecommendationEngineService implements IntentHandler {
     };
   }
 
+  /**
+   * Gets the most common classes from a list of bookings
+   * @param bookings Array of booking objects
+   * @returns Array of most common class names
+   */
   private getMostCommonClasses(
     bookings: Array<{ class?: { className?: string } }>,
   ): string[] {
@@ -349,6 +365,11 @@ export class RecommendationEngineService implements IntentHandler {
       .map(([className]) => className);
   }
 
+  /**
+   * Builds where clause for gym queries based on user preferences
+   * @param user User context object
+   * @returns Where clause object
+   */
   private buildGymWhereClause(user: {
     preferredLocations?: string[];
     location?: string;
@@ -376,6 +397,11 @@ export class RecommendationEngineService implements IntentHandler {
     return where;
   }
 
+  /**
+   * Builds where clause for class queries based on user preferences
+   * @param user User context object
+   * @returns Where clause object
+   */
   private buildClassWhereClause(user: {
     classTypes?: string[];
     priceRange?: any;
@@ -424,6 +450,11 @@ export class RecommendationEngineService implements IntentHandler {
     return where;
   }
 
+  /**
+   * Builds where clause for trainer queries based on user preferences
+   * @param user User context object
+   * @returns Where clause object
+   */
   private buildTrainerWhereClause(user: {
     classTypes?: string[];
     instructors?: number[];

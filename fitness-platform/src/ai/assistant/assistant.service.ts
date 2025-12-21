@@ -125,7 +125,6 @@ export class AssistantService {
     }
   }
 
-  // Process message with intent-based routing
   async processMessage(
     userId: string,
     message: string,
@@ -237,7 +236,6 @@ export class AssistantService {
     }
   }
 
-  // Process message with streaming response
   async processMessageStream(
     userId: string,
     message: string,
@@ -272,8 +270,7 @@ export class AssistantService {
         success: true,
       });
 
-      // For streaming, we'll just use the general AI response for now
-      // as feature-specific streaming requires more complex orchestration
+      // Streaming currently supports only general AI responses; feature-specific streaming is not yet implemented.
       return this.aiService.generateStreamResponse(sanitizedMessage);
     } catch (error) {
       this.auditService.logAIInteraction({

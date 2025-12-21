@@ -30,13 +30,14 @@ export class SecurityService {
 
   /**
    * Sanitizes AI-generated content to prevent XSS while preserving safe formatting
+   * @param content AI-generated content
+   * @returns Sanitized content
    */
   sanitizeAIResponse(content: string): string {
     if (!content || typeof content !== 'string') {
       return '';
     }
 
-    // For AI responses, allow some safe formatting but prevent XSS
     const sanitized = DOMPurifyInstance.sanitize(content, {
       ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li'], // Safe formatting tags
       ALLOWED_ATTR: [], // No attributes allowed
@@ -46,6 +47,11 @@ export class SecurityService {
     return sanitized.trim();
   }
 
+  /**
+   * Validates and sanitizes user input messages for AI processing
+   * @param message User input message
+   * @returns Validation result with sanitized message or error
+   */
   validateAndSanitizeMessage(message: string): {
     isValid: boolean;
     sanitizedMessage: string;
@@ -91,7 +97,29 @@ export class SecurityService {
   }
 
   /**
+   * Checks for dangerous patterns that should be rejected entirely
+   * @param input User input string
+   * @returns True if dangerous patterns are found, else false
+   */
+  private containsDangerousPatterns(input: string): boolean {
+    const dangerousPatterns = [
+      /<iframe/i,
+      /<object/i,
+      /<embed/i,
+      /javascript:/i,
+      /vbscript:/i,
+      /data:text\/html/i,
+      /expression\s*\(/i,
+      /on\w+\s*=/i, // Event handlers like onload, onclick
+    ];
+
+    return dangerousPatterns.some((pattern) => pattern.test(input));
+  }
+
+  /**
    * Minimizes user data sent to AI prompts for privacy
+   * @param userData Partial user data object
+   * @returns Minimized user data
    */
   minimizeUserDataForAI(
     userData:
@@ -104,7 +132,6 @@ export class SecurityService {
           classTypes?: string;
           priceRange?: string;
           equipmentAtHome?: string;
-          // Add other fields as needed
         }
       | null
       | undefined,
@@ -136,6 +163,8 @@ export class SecurityService {
 
   /**
    * Anonymizes user ID for AI prompts using HMAC-SHA256 with salt
+   * @param userId User ID
+   * @returns Anonymized user ID hash
    */
   anonymizeUserId(userId: string | number): string {
     const salt = process.env.ANONYMIZATION_SALT;
@@ -151,35 +180,18 @@ export class SecurityService {
       return hmac.digest('hex');
     }
 
-    // Use HMAC-SHA256 for keyed hashing to prevent rainbow table attacks
+    // Use HMAC-SHA256 for keyed hashing
     const hmac = crypto.createHmac('sha256', salt);
     hmac.update(String(userId));
     const hash = hmac.digest('hex');
 
-    // Return full hash for maximum security
-    return hash;
-  }
-
-  /**
-   * Checks for dangerous patterns that should be rejected entirely
-   */
-  private containsDangerousPatterns(input: string): boolean {
-    const dangerousPatterns = [
-      /<iframe/i,
-      /<object/i,
-      /<embed/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /data:text\/html/i,
-      /expression\s*\(/i,
-      /on\w+\s*=/i, // Event handlers like onload, onclick
-    ];
-
-    return dangerousPatterns.some((pattern) => pattern.test(input));
+    return hash; // Return hex string of the hash
   }
 
   /**
    * Validates file uploads for AI-related content (if needed)
+   * @param file Uploaded file object
+   * @returns Validation result
    */
   validateFileUpload(
     file: { size?: number; mimetype?: unknown } | null | undefined,

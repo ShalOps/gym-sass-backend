@@ -42,6 +42,11 @@ export class CircuitBreakerService {
     }
   }
 
+  /**
+   * Retrieves or initializes the circuit breaker state for a given key
+   * @param key Unique identifier for the circuit breaker instance
+   * @returns CircuitBreakerState object
+   */
   private getState(key: string): CircuitBreakerState {
     if (!this.states.has(key)) {
       this.states.set(key, {
@@ -53,12 +58,21 @@ export class CircuitBreakerService {
     return this.states.get(key)!;
   }
 
+  /**
+   * Handles successful operation execution
+   * @param key Unique identifier for the circuit breaker instance
+   */
   private onSuccess(key: string) {
     const state = this.getState(key);
     state.failures = 0;
     state.state = 'CLOSED';
   }
 
+  /**
+   * Handles failed operation execution
+   * @param key Unique identifier for the circuit breaker instance
+   * @param error Error object from the failed operation
+   */
   private onFailure(key: string, error: any) {
     const state = this.getState(key);
     state.failures++;

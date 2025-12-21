@@ -209,6 +209,11 @@ export class SuggestionEngineService implements IntentHandler {
     }
   }
 
+  /**
+   * Builds where clause for gym queries based on user preferences
+   * @param user User profile object containing preferences
+   * @returns Where clause object for querying gyms
+   */
   private buildGymWhereClause(user: {
     preferredLocations?: string[];
     location?: string;
@@ -228,7 +233,7 @@ export class SuggestionEngineService implements IntentHandler {
       };
     } else if (user.location) {
       where.location = {
-        contains: user.location.split(',')[0], // City-level matching
+        contains: user.location.split(',')[0],
         mode: 'insensitive',
       };
     }
@@ -236,6 +241,11 @@ export class SuggestionEngineService implements IntentHandler {
     return where;
   }
 
+  /**
+   * Builds where clause for class queries based on user preferences
+   * @param user User profile object containing preferences
+   * @returns Where clause object for querying classes
+   */
   private buildClassWhereClause(user: {
     classTypes?: string[];
     priceRange?: any;
@@ -284,6 +294,11 @@ export class SuggestionEngineService implements IntentHandler {
     return where;
   }
 
+  /**
+   * Builds where clause for trainer queries based on user preferences
+   * @param user User profile object containing preferences
+   * @returns Where clause object for querying trainers
+   */
   private buildTrainerWhereClause(user: {
     classTypes?: string[];
     instructors?: number[];

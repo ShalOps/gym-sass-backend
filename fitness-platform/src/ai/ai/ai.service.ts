@@ -18,7 +18,9 @@ export class AiService {
   private genAI: GoogleGenAI;
   private modelName: string;
 
-  // Zod schemas for structured outputs
+  /**
+   * Schema for intent detection responses, defining possible intents and confidence scores
+   */
   private intentSchema = z.object({
     intent: z.enum([
       'personalized_recommendations',
@@ -31,7 +33,9 @@ export class AiService {
     confidence: z.number().min(0).max(1),
   });
 
-  // Schema for standard AI reply responses, ensuring consistent text output structure
+  /**
+   * Schema for standard AI reply responses, ensuring consistent text output structure
+   */
   private replySchema = z.object({
     text: z.string(),
   });
@@ -70,7 +74,12 @@ export class AiService {
     );
   }
 
-  // Helper method to check if error is JSON parsing/validation related
+  /**
+   * Determines if an error is related to JSON parsing or validation.
+   * @param error - The error object to check
+   * @param errorMessage - The error message string
+   * @returns True if the error is a JSON parsing/validation error, else false
+   */
   private isJsonParsingError(error: unknown, errorMessage: string): boolean {
     return (
       error instanceof SyntaxError ||
@@ -79,7 +88,12 @@ export class AiService {
     );
   }
 
-  // Helper method to create INTERNAL_ERROR exception for JSON parsing issues
+  /**
+   * Creates an AIUnavailableException for JSON parsing errors.
+   * @param context - The context in which the error occurred
+   * @param errorMessage - The error message describing the parsing issue
+   * @returns An AIUnavailableException with detailed error information
+   */
   private createJsonParsingError(
     context: string,
     errorMessage: string,
@@ -96,7 +110,12 @@ export class AiService {
     );
   }
 
-  // Retry wrapper with exponential backoff and circuit breaker
+  /**
+   * Executes a function with retry logic and circuit breaker protection.
+   * @param fn - The asynchronous function to execute
+   * @param maxRetries - Maximum number of retry attempts
+   * @param baseDelay - Base delay in milliseconds for exponential backoff
+   */
   private async withRetry<T>(
     fn: () => Promise<T>,
     maxRetries = AI_CONFIG.PROCESSING_LIMITS.MAX_RETRIES,
@@ -137,7 +156,11 @@ export class AiService {
     });
   }
 
-  // Intent classification using Gemini with structured output (updated to use JSON mode)
+  /**
+   * Classify the intent of a user message using the AI.
+   * @param message - The user's message to classify
+   * @returns An object containing the intent and confidence score
+   */
   async classifyIntent(
     message: string,
   ): Promise<{ intent: string; confidence: number }> {
@@ -221,7 +244,6 @@ User message: "${message}"
     }
   }
 
-  // Response generation using Gemini (updated to support config)
   async generateResponse(prompt: string): Promise<{ text: string }> {
     this.logger.debug(
       `Generating reply for prompt: ${prompt.substring(0, 100)}...`,
@@ -279,7 +301,6 @@ User message: "${message}"
     }
   }
 
-  // Optional: Method for structured generation with custom schema (updated to use JSON mode)
   async generateStructuredResponse<T>(
     prompt: string,
     schema: z.ZodSchema<T>,
@@ -348,7 +369,6 @@ User message: "${message}"
     }
   }
 
-  // Streaming response method for real-time AI generation
   async generateStreamResponse(prompt: string) {
     this.logger.debug(
       `Generating streaming response for prompt: ${prompt.substring(0, 100)}...`,
@@ -393,7 +413,6 @@ User message: "${message}"
     }
   }
 
-  // Streaming structured response method for real-time JSON generation
   async generateStructuredStreamResponse<T>(
     prompt: string,
     schema: z.ZodSchema<T>,
@@ -418,7 +437,7 @@ User message: "${message}"
           },
         },
       });
-      return response; // Returns an async iterable for streaming structured JSON
+      return response;
     } catch (error) {
       const errorMessage =
         error &&
@@ -442,7 +461,10 @@ User message: "${message}"
     }
   }
 
-  // Create a chat session for multi-turn conversations
+  /**
+   * Create a chat session with multi-turn capabilities
+   * @returns Chat session instance
+   */
   createChat() {
     this.logger.debug('Creating new chat session');
 

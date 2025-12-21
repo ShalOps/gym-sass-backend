@@ -20,7 +20,8 @@ export class AuditService {
   constructor(private logger: WinstonLoggerService) {}
 
   /**
-   * Logs AI interaction for compliance and monitoring
+   * Log AI interaction details for auditing purposes
+   * @param logData Data related to the AI interaction
    */
   logAIInteraction(logData: Omit<AIAuditLog, 'timestamp'>) {
     try {
@@ -48,7 +49,11 @@ export class AuditService {
   }
 
   /**
-   * Logs data access for privacy compliance
+   * Log data access for privacy compliance
+   * @param userId ID of the user whose data was accessed
+   * @param dataType Type of data accessed
+   * @param purpose Purpose of data access
+   * @param accessedFields List of fields that were accessed
    */
   logDataAccess(
     userId: string,
@@ -75,7 +80,10 @@ export class AuditService {
   }
 
   /**
-   * Logs security events
+   * Log security events
+   * @param event Description of the security event
+   * @param details Additional details about the event
+   * @param severity Severity level of the event
    */
   logSecurityEvent(
     event: string,
@@ -103,7 +111,10 @@ export class AuditService {
   }
 
   /**
-   * Logs rate limiting events
+   * Log rate limiting events
+   * @param userId ID of the user who was rate limited
+   * @param endpoint The API endpoint that was rate limited
+   * @param limit The rate limit that was exceeded
    */
   logRateLimit(userId: string, endpoint: string, limit: number) {
     try {
@@ -125,6 +136,8 @@ export class AuditService {
 
   /**
    * Sanitizes sensitive data for logging
+   * @param text Input text to sanitize
+   * @returns Sanitized text
    */
   private sanitizeForLogging(text: string): string {
     if (!text) return text;
@@ -142,6 +155,8 @@ export class AuditService {
 
   /**
    * Sanitizes an object recursively
+   * @param obj Input object
+   * @returns Sanitized object
    */
   private sanitizeObject(obj: unknown): unknown {
     if (typeof obj === 'string') {
@@ -168,8 +183,8 @@ export class AuditService {
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   async generateComplianceReport(startDate: Date, endDate: Date): Promise<any> {
-    // This would query logs for compliance reporting
-    // For now, return placeholder
+    // Placeholder: In a production implementation, this method would query and aggregate logs for compliance reporting.
+    // Currently, this functionality is not implemented.
     return {
       period: { startDate, endDate },
       totalInteractions: 0,

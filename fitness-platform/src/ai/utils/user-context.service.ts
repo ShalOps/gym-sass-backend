@@ -60,7 +60,7 @@ export interface UserContext {
 export class UserContextService {
   private readonly logger = new Logger(UserContextService.name);
   private readonly CACHE_TTL =
-    AI_CONFIG.CACHE_CONFIG.USER_CONTEXT_TTL_MINUTES * 60 * 1000; // Convert minutes to milliseconds
+    AI_CONFIG.CACHE_CONFIG.USER_CONTEXT_TTL_MINUTES * 60 * 1000;
 
   constructor(
     private readonly database: DatabaseService,
@@ -69,6 +69,8 @@ export class UserContextService {
 
   /**
    * Gets cached user context, fetching from DB if not cached or expired
+   * @param userId User ID
+   * @returns UserContext or null if not found
    */
   async getUserContext(userId: string | number): Promise<UserContext | null> {
     const cacheKey = `user_context:${userId}`;
@@ -110,6 +112,7 @@ export class UserContextService {
 
   /**
    * Invalidates user context cache (call when user data changes)
+   * @param userId User ID
    */
   async invalidateUserContext(userId: string | number): Promise<void> {
     const cacheKey = `user_context:${userId}`;
@@ -125,6 +128,8 @@ export class UserContextService {
 
   /**
    * Fetches comprehensive user context from database
+   * @param userId User ID
+   * @returns UserContext or null if not found
    */
   private async fetchUserContextFromDb(
     userId: string | number,

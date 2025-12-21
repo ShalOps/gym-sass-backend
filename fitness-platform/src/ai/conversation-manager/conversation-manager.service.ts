@@ -71,8 +71,8 @@ export class ConversationManagerService {
           `Cache hit for ${key}. Returning immediately and revalidating in background.`,
         );
 
-        // Background revalidation: fetch from DB and update cache
-        // We don't await this to keep the response fast
+        // Initiate background revalidation: fetch the latest data from the database and update the cache.
+        // This operation is non-blocking to ensure a prompt response.
         this.fetchAndSyncFromDb(key, userId).catch((err: Error) =>
           this.logger.error(
             `Background sync failed for ${key}: ${err.message}`,
