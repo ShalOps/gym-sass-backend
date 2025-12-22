@@ -1,8 +1,10 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, HttpException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { DatabaseService } from "src/database/database.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { UpdateTrainerDto } from "./dto/update-trainer.dto";
+import { includes } from "zod";
+import { de } from "zod/v4/locales";
 
 @Injectable()
 export class TrainerService {
@@ -54,10 +56,74 @@ export class TrainerService {
 
         return trainer;
     } catch (error) {
+        if (error instanceof HttpException) throw error;
+        console.log(error);
         throw new InternalServerErrorException('failed to get trainer');
     }
 
   }
+  async updateTrainer(id: number, dto: UpdateTrainerDto, userId: number) {
+    try {
+      const user = await this.databaseService.user.findUnique({where: {userId}});
+    if(!user){
+      throw new NotFoundException('This user does not exist');
+    }
+    const userRole = user?.role;
+    if (userRole === Role.ADMIN) {
+      return this.databaseService.trainer.update({
+        where: { id: id },
+        data: dto
+      });
+    }
+    if(userRole === Role.TRAINER ){
+      const trainer = await this.databaseService.trainer.findUnique({where: {id}});
 
-  
+      if(!trainer){
+        throw new NotFoundException('Trainer not found');
+      }
+      if(trainer.userId !== userId){
+        throw new NotFoundException('Trainers can only update their own profile');
+      }
+      if (trainer.verified) {
+        const isChangingSensitiveFields =
+          dto.certificationFiles ||
+          dto.yearsOfExperience ||
+          dto.specializations;
+        if(isChangingSensitiveFields) {
+          await this.databaseService.verificationRequest.create({
+            data:{
+              trainerId: trainer.id,
+              requestedChanges: {
+                certificationFiles: dto.certificationFiles,
+                yearsOfExperience: dto.yearsOfExperience,
+                specializations: dto.specializations
+              }
+            }
+          });
+        };
+
+        delete dto.certificationFiles;
+        delete dto.specializations;
+        delete dto.yearsOfExperience;
+      }
+
+      const {verified, ...allowedData} = dto;
+      return this.databaseService.trainer.update({
+        where: { id },
+        data: allowedData,
+      });
+    }
+
+    throw new ForbiddenException('Unauthorized to update this trainer');
+
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw new InternalServerErrorException('failed to update trainer');
+    }
+
+  }
+
+
+
 }

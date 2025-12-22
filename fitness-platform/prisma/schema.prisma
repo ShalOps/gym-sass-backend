@@ -633,5 +633,14 @@ model TrainerReview {
   booking TrainerBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }
 
+model VerificationRequest {
+  id                Int      @id @default(autoincrement())
+  trainerId         Int
+  trainer           Trainer  @relation(fields: [trainerId], references: [id])
+  requestedChanges  Json     // Stores the DTO (yearsOfExp, certs, etc.)
+  status            VerificationStatus @default(PENDING)
+  createdAt         DateTime @default(now())
+}
+
 
 
