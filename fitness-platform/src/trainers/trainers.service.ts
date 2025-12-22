@@ -3,8 +3,7 @@ import { DatabaseService } from "src/database/database.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { Prisma, Role } from "@prisma/client";
 import { UpdateTrainerDto } from "./dto/update-trainer.dto";
-import { includes } from "zod";
-import { de } from "zod/v4/locales";
+
 
 @Injectable()
 export class TrainerService {
@@ -18,14 +17,31 @@ export class TrainerService {
             gender: dto.gender,
             dob: dto.dob,
             hourlyRate: new Prisma.Decimal(dto.hourlyRate),
-            specializations: dto.specializations,
+            certifications: {
+              create: dto.certificationFiles.map(cert => ({
+                name: cert.name,
+                issuingOrganization: cert.issuingOrganization,
+                issueDate: new Date(cert.issueDate),
+                expiryDate: cert.expiryDate ? new Date(cert.expiryDate) : null,
+                fileUrl: cert.fileUrl
+              }))
+            },
             yearsOfExperience: dto.yearsOfExperience,
-            certificationFiles: dto.certificationFiles,
+            specializations: {
+              create: dto.specializations.map(spec => ({
+                category: spec.category,
+                detail: spec.detail
+              }))
+            },
             profilePicture: dto.profilePicture,
             verified: dto.verified,
           };
 
-        return this.databaseService.trainer.create({ data });
+        return this.databaseService.trainer.create({ data:{
+          ...data,
+          user: { connect: { userId: userId } }
+        } });
+
         } catch (error) {
           if(error.code === 'P2002') {
             throw new Error('Trainer for this user already exists.');
@@ -123,7 +139,21 @@ export class TrainerService {
     }
 
   }
+  async linkToUser(trainerId: number, userId: number) {
+    return this.databaseService.trainer.update({
+      where: { id: trainerId },
+      data: { userId },
+    });
+  }
 
-
+  async uploadFiles(trainerId: number, files: { profilePicture?: string; certificationFiles?: string[] }) {
+    const updateData: any = {};
+    if (files.profilePicture) updateData.profilePicture = files.profilePicture;
+    if (files.certificationFiles) updateData.certificationFiles = files.certificationFiles;
+    return this.databaseService.trainer.update({
+      where: { id: trainerId },
+      data: updateData,
+    });
+  }
 
 }

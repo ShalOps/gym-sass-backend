@@ -555,10 +555,10 @@ model Trainer {
   gender             String?
   dob                DateTime?
   hourlyRate         Decimal  @db.Decimal(10, 2)
-  specializations    Json
+  specializations    TrainerSpecialization[]?
   yearsOfExperience  Int
   profilePicture     String?
-  certificationFiles Json
+  certificationFiles Certification[]?
   verified           Boolean  @default(false)
   verificationStatus VerificationStatus   @default(PENDING)
   createdAt          DateTime @default(now())
@@ -639,7 +639,28 @@ model VerificationRequest {
   trainer           Trainer  @relation(fields: [trainerId], references: [id])
   requestedChanges  Json     // Stores the DTO (yearsOfExp, certs, etc.)
   status            VerificationStatus @default(PENDING)
+  adminNote         String?
   createdAt         DateTime @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Certification {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  issuingOrganization String
+  issueDate           DateTime
+  expiryDate          DateTime?
+  fileUrl             String   // Storage path/URL
+  trainerId           Int
+  trainer             Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+}
+
+model TrainerSpecialization {
+  id        Int      @id @default(autoincrement())
+  category  Category
+  detail    String
+  trainerId Int
+  trainer   Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
 }
 
 

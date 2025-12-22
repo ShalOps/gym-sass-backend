@@ -1,4 +1,7 @@
-import { IsString, IsNumber, IsOptional, IsArray, IsBoolean, IsDate, IsDecimal } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, IsBoolean, IsDate, IsDecimal, ValidateNested } from 'class-validator';
+import { CertificationDto } from './certification.dto';
+import { Type } from 'class-transformer';
+import { SpecializationDto } from './specializaton.dto';
 
 export class CreateTrainerDto {
 
@@ -18,15 +21,19 @@ export class CreateTrainerDto {
     @IsDecimal({ decimal_digits: '0,2' })
     hourlyRate: string;
 
-    @IsOptional()
-    specializations: object[];
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => SpecializationDto)
+    specializations: SpecializationDto[];
 
     @IsOptional()
     @IsNumber()
     yearsOfExperience: number;
 
-    @IsOptional()
-    certificationFiles: object[];
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CertificationDto)
+    certificationFiles: CertificationDto[];
 
     @IsOptional()
     profilePicture?: string
