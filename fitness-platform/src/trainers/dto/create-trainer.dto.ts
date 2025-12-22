@@ -1,7 +1,6 @@
 import { IsString, IsNumber, IsOptional, IsArray, IsBoolean, IsDate, IsDecimal } from 'class-validator';
 
 export class CreateTrainerDto {
-    userId: number;
 
     @IsOptional()
     @IsString()

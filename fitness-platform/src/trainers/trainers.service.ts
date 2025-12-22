@@ -2,19 +2,16 @@ import { Injectable, InternalServerErrorException, NotFoundException } from "@ne
 import { DatabaseService } from "src/database/database.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { Prisma } from "@prisma/client";
+import { UpdateTrainerDto } from "./dto/update-trainer.dto";
 
 @Injectable()
 export class TrainerService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async createTrainer(dto: CreateTrainerDto) {
+  async createTrainer(dto: CreateTrainerDto,userId: number) {
         try {
           const data: Prisma.TrainerCreateInput =  {
-              user: {
-                connect: {
-                  userId: dto.userId,
-                },
-              },
+            user: { connect: { userId: userId } },
             bio: dto.bio,
             gender: dto.gender,
             dob: dto.dob,
@@ -61,4 +58,6 @@ export class TrainerService {
     }
 
   }
+
+  
 }
