@@ -189,7 +189,7 @@ User message: "${message}"
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
             responseMimeType: 'application/json',
             // @ts-expect-error zod-to-json-schema type incompatibility (works at runtime)
             responseJsonSchema: zodToJsonSchema(this.intentSchema),
@@ -259,7 +259,7 @@ User message: "${message}"
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
             thinkingConfig: {
               thinkingBudget: 0, // Disable thinking for faster responses
             },
@@ -317,7 +317,7 @@ User message: "${message}"
           contents: prompt,
           config: {
             temperature: 0.1, // Lower temperature for more reliable JSON
-            maxOutputTokens: 1024,
+            maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
             responseMimeType: 'application/json',
             // @ts-expect-error zod-to-json-schema type incompatibility (works at runtime)
             responseJsonSchema: zodToJsonSchema(schema),
@@ -383,7 +383,7 @@ User message: "${message}"
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 1024,
+          maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
           thinkingConfig: {
             thinkingBudget: 0, // Disable thinking for faster responses
           },
@@ -428,7 +428,7 @@ User message: "${message}"
         contents: prompt,
         config: {
           temperature: 0.1, // Lower temperature for more reliable JSON
-          maxOutputTokens: 1024,
+          maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
           responseMimeType: 'application/json',
           // @ts-expect-error zod-to-json-schema type incompatibility (works at runtime)
           responseJsonSchema: zodToJsonSchema(schema),
@@ -475,7 +475,7 @@ User message: "${message}"
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 1024,
+          maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
           thinkingConfig: {
             thinkingBudget: 0, // Disable thinking for faster responses
           },

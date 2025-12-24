@@ -37,7 +37,7 @@ export const AI_CONFIG = {
   // AI processing limits
   PROCESSING_LIMITS: {
     MAX_PROMPT_LENGTH: 2000,
-    MAX_RESPONSE_LENGTH: 4000,
+    MAX_OUTPUT_TOKENS: 1024,
     MAX_RETRIES: 3,
     TIMEOUT_MS: 30000,
   },
