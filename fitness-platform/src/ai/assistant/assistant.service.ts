@@ -385,4 +385,130 @@ export class AssistantService {
       throw error;
     }
   }
+
+  async getUserConversations(userId: string) {
+    this.logger.debug(`getUserConversations userId=${userId}`);
+
+    try {
+      const conversations =
+        await this.conversationManager.listUserConversations(userId);
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'list_conversations',
+        feature: 'conversation_management',
+        input: '',
+        output: `Retrieved ${conversations.length} conversations`,
+        processingTime: 0,
+        success: true,
+      });
+
+      return {
+        conversations,
+        total: conversations.length,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to get user conversations: ${errorMessage}`);
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'list_conversations',
+        feature: 'conversation_management',
+        input: '',
+        processingTime: 0,
+        success: false,
+        error: errorMessage,
+      });
+
+      throw error;
+    }
+  }
+
+  async getConversation(userId: string, conversationId: string) {
+    this.logger.debug(
+      `getConversation userId=${userId} conversationId=${conversationId}`,
+    );
+
+    try {
+      const conversation = await this.conversationManager.loadConversation(
+        userId,
+        conversationId,
+      );
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'get_conversation',
+        feature: 'conversation_management',
+        input: conversationId,
+        output: `Retrieved conversation with ${conversation.messages.length} messages`,
+        processingTime: 0,
+        success: true,
+      });
+
+      return conversation;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to get conversation: ${errorMessage}`);
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'get_conversation',
+        feature: 'conversation_management',
+        input: conversationId,
+        processingTime: 0,
+        success: false,
+        error: errorMessage,
+      });
+
+      throw error;
+    }
+  }
+
+  async deleteConversation(userId: string, conversationId: string) {
+    this.logger.debug(
+      `deleteConversation userId=${userId} conversationId=${conversationId}`,
+    );
+
+    try {
+      const deleted = await this.conversationManager.deleteConversation(
+        conversationId,
+        userId,
+      );
+
+      if (!deleted) {
+        throw new Error('Conversation not found or access denied');
+      }
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'delete_conversation',
+        feature: 'conversation_management',
+        input: conversationId,
+        output: 'Conversation deleted successfully',
+        processingTime: 0,
+        success: true,
+      });
+
+      return { message: 'Conversation deleted successfully' };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to delete conversation: ${errorMessage}`);
+
+      this.auditService.logAIInteraction({
+        userId,
+        action: 'delete_conversation',
+        feature: 'conversation_management',
+        input: conversationId,
+        processingTime: 0,
+        success: false,
+        error: errorMessage,
+      });
+
+      throw error;
+    }
+  }
 }
