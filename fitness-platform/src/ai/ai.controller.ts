@@ -14,6 +14,7 @@ import { WorkoutPlanRequestDto } from './dto/workout-plan.dto';
 import { SuggestionRequestDto } from './dto/suggestion.dto';
 import { ProductRecommendationRequestDto } from './dto/product-recommendation.dto';
 import { SearchRequestDto } from './dto/search.dto';
+import { AIFeedbackDto } from './dto/ai-feedback.dto';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AIRateLimitGuard } from './guards/ai-rate-limit.guard';
@@ -208,5 +209,16 @@ export class AiController {
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async search(@Query() query: SearchRequestDto) {
     return this.assistant.search(query.userId, query);
+  }
+
+  @Post('feedback')
+  @ApiOperation({ summary: 'Submit feedback for AI responses' })
+  @ApiBody({ type: AIFeedbackDto })
+  @ApiResponse({ status: 201, description: 'Feedback submitted successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid input.' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
+  async submitFeedback(@Body() body: AIFeedbackDto) {
+    await this.assistant.submitFeedback(body.userId, body);
+    return { message: 'Feedback submitted successfully' };
   }
 }

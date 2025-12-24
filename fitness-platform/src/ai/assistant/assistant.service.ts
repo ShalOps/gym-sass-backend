@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { DatabaseService } from '../../database/database.service';
 import { AiService } from '../ai/ai.service';
 import { ConversationManagerService } from '../conversation-manager/conversation-manager.service';
 import { IntentHandler } from '../intent-handler.interface';
@@ -14,6 +15,7 @@ import { WorkoutPlanRequestDto } from '../dto/workout-plan.dto';
 import { SuggestionRequestDto } from '../dto/suggestion.dto';
 import { ProductRecommendationRequestDto } from '../dto/product-recommendation.dto';
 import { SearchRequestDto } from '../dto/search.dto';
+import { AIFeedbackDto } from '../dto/ai-feedback.dto';
 
 @Injectable()
 export class AssistantService {
@@ -32,6 +34,7 @@ export class AssistantService {
     private readonly searchEngine: SearchEngineService,
     private readonly securityService: SecurityService,
     private readonly auditService: AuditService,
+    private readonly database: DatabaseService,
   ) {
     // Initialize intent handlers mapping
     this.intentHandlers = {
@@ -342,5 +345,44 @@ export class AssistantService {
       input,
       () => this.searchEngine.handle({ userId, message: input }),
     );
+  }
+
+  async submitFeedback(userId: string, feedback: AIFeedbackDto) {
+    try {
+      const user = await this.database.user.findUnique({
+        where: { userId: parseInt(userId) },
+      });
+
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      await this.database.aIFeedback.create({
+        data: {
+          userId: parseInt(userId),
+          feature: feedback.feature,
+          rating: feedback.rating,
+        },
+      });
+
+      // Log the feedback for auditing
+      this.logger.log(userId, 'ai_feedback_submitted', {
+        feature: feedback.feature,
+        rating: feedback.rating,
+      });
+
+      this.logger.log(
+        `AI feedback submitted by user ${userId} for feature ${feedback.feature}`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Failed to submit AI feedback: ${errorMessage}`,
+        errorStack,
+      );
+      throw error;
+    }
   }
 }

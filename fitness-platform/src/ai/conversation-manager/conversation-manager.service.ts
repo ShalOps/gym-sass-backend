@@ -43,7 +43,7 @@ export class ConversationManagerService {
 
     if (conversation) {
       const state = conversation.state as unknown as AIConversation;
-      const ttl = AI_CONFIG.CACHE_CONFIG.CONVERSATION_TTL_MINUTES * 60 * 1000; // Convert minutes to milliseconds
+      const ttl = AI_CONFIG.CACHE_CONFIG.CONVERSATION_TTL_MINUTES * 60 * 1000;
       await this.cacheManager
         .set(key, state, ttl)
         .catch((e: Error) =>
