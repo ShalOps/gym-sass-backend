@@ -124,4 +124,45 @@ export class ConversationManagerService {
 
     return conv;
   }
+
+  async listUserConversations(userId: string): Promise<AIConversation[]> {
+    this.logger.debug(`listUserConversations userId=${userId}`);
+
+    // Get from database (primary source of truth)
+    const conversations = await this.database.aIConversation.findMany({
+      where: {
+        userId: parseInt(userId),
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return conversations.map((conv) => conv.state as unknown as AIConversation);
+  }
+
+  async deleteConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<boolean> {
+    this.logger.debug(
+      `deleteConversation id=${conversationId} userId=${userId}`,
+    );
+
+    // Delete from database
+    const result = await this.database.aIConversation.deleteMany({
+      where: {
+        id: conversationId,
+        userId: parseInt(userId),
+      },
+    });
+
+    // Also delete from Redis cache if it exists
+    await this.cacheManager
+      .del(conversationId)
+      .catch((e: Error) =>
+        this.logger.error(`Redis delete error: ${e.message}`),
+      );
+
+    return result.count > 0;
+  }
 }
