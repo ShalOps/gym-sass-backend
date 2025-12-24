@@ -117,104 +117,103 @@ export class ProductRecommendationService implements IntentHandler {
         categories = [...new Set(categories)]; // Remove duplicates
       }
 
-      const where: any = {};
-      if (categories.length > 0) {
-        where.category = { in: categories };
-      }
-      if (user.priceRange) {
-        where.price = {};
-        if (user.priceRange.min !== undefined)
-          where.price.gte = user.priceRange.min;
-        if (user.priceRange.max !== undefined)
-          where.price.lte = user.priceRange.max;
-      }
+      // const where: any = {};
+      // if (categories.length > 0) {
+      //   where.category = { in: categories };
+      // }
+      // if (user.priceRange) {
+      //   where.price = {};
+      //   if (user.priceRange.min !== undefined)
+      //     where.price.gte = user.priceRange.min;
+      //   if (user.priceRange.max !== undefined)
+      //     where.price.lte = user.priceRange.max;
+      // }
 
-      // TODO: Remove 'as any' once colleague merges schema enhancements with AI fields
-      const products = await (this.database as any).product.findMany({
-        where,
-        include: {
-          vendor: {
-            select: {
-              firstName: true,
-              lastName: true,
-              vendorRating: true,
-              verified: true,
-            },
-          },
-        },
-        take: 7,
-        orderBy: { rating: 'desc' }, // Prioritize highly-rated products
-        select: {
-          productId: true,
-          name: true,
-          description: true,
-          price: true,
-          category: true,
-          tags: true,
-          targetFitnessLevels: true,
-          targetGoals: true,
-          rating: true,
-          reviewCount: true,
-          totalSold: true,
-          inStock: true,
-          vendor: true,
-        },
-      });
+      // const products = await (this.database as any).product.findMany({
+      //   where,
+      //   include: {
+      //     vendor: {
+      //       select: {
+      //         firstName: true,
+      //         lastName: true,
+      //         vendorRating: true,
+      //         verified: true,
+      //       },
+      //     },
+      //   },
+      //   take: 7,
+      //   orderBy: { rating: 'desc' }, // Prioritize highly-rated products
+      //   select: {
+      //     productId: true,
+      //     name: true,
+      //     description: true,
+      //     price: true,
+      //     category: true,
+      //     tags: true,
+      //     targetFitnessLevels: true,
+      //     targetGoals: true,
+      //     rating: true,
+      //     reviewCount: true,
+      //     totalSold: true,
+      //     inStock: true,
+      //     vendor: true,
+      //   },
+      // });
 
-      if (products.length === 0) {
-        return JSON.stringify({
-          type: 'product_recommendation',
-          products: [],
-          explanation: 'No products found matching your criteria.',
-        });
-      }
+      // if (products.length === 0) {
+      //   return JSON.stringify({
+      //     type: 'product_recommendation',
+      //     products: [],
+      //     explanation: 'No products found matching your criteria.',
+      //   });
+      // }
 
       // Transform database products to AI-friendly format with essential recommendation data
-      const productsList = products.map((p) => ({
-        id: p.productId,
-        name: p.name,
-        description: p.description || '',
-        price: p.price,
-        category: p.category,
-        tags: p.tags,
-        targetFitnessLevels: p.targetFitnessLevels,
-        targetGoals: p.targetGoals,
-        rating: p.rating,
-        reviewCount: p.reviewCount,
-        totalSold: p.totalSold,
-        inStock: p.inStock,
-        vendor: {
-          name:
-            `${p.vendor?.firstName || ''} ${p.vendor?.lastName || ''}`.trim() ||
-            'Unknown',
-          rating: p.vendor?.vendorRating,
-          verified: p.vendor?.verified,
-        },
-      }));
+      // const productsList = products.map((p) => ({
+      //   id: p.productId,
+      //   name: p.name,
+      //   description: p.description || '',
+      //   price: p.price,
+      //   category: p.category,
+      //   tags: p.tags,
+      //   targetFitnessLevels: p.targetFitnessLevels,
+      //   targetGoals: p.targetGoals,
+      //   rating: p.rating,
+      //   reviewCount: p.reviewCount,
+      //   totalSold: p.totalSold,
+      //   inStock: p.inStock,
+      //   vendor: {
+      //     name:
+      //       `${p.vendor?.firstName || ''} ${p.vendor?.lastName || ''}`.trim() ||
+      //       'Unknown',
+      //     rating: p.vendor?.vendorRating,
+      //     verified: p.vendor?.verified,
+      //   },
+      // }));
 
-      const prompt = `
-User Profile: ${JSON.stringify({
-        goals: minimizedUserData.goals,
-        fitnessLevel: user.fitnessLevel,
-        priceRange: minimizedUserData.priceRange,
-        equipmentAtHome: minimizedUserData.equipmentAtHome,
-      })}
+      //       const prompt = `
+      // User Profile: ${JSON.stringify({
+      //         goals: minimizedUserData.goals,
+      //         fitnessLevel: user.fitnessLevel,
+      //         priceRange: minimizedUserData.priceRange,
+      //         equipmentAtHome: minimizedUserData.equipmentAtHome,
+      //       })}
 
-Available Products: ${JSON.stringify(productsList)}
+      // Available Products: ${JSON.stringify(productsList)}
 
-Task: Recommend 3-5 products from the list that best match the user's fitness goals and level. Consider ratings, reviews, and vendor reputation. Prioritize products with high ratings and good availability.
+      // Task: Recommend 3-5 products from the list that best match the user's fitness goals and level. Consider ratings, reviews, and vendor reputation. Prioritize products with high ratings and good availability.
 
-Return JSON array with: id, name, description, price, category, reasoning (why it fits their profile).
-`;
+      // Return JSON array with: id, name, description, price, category, reasoning (why it fits their profile).
+      // `;
 
-      const aiResponse = await this.aiService.generateStructuredResponse(
-        prompt,
-        this.productSchema,
-      );
+      // const aiResponse = await this.aiService.generateStructuredResponse(
+      //   prompt,
+      //   this.productSchema,
+      // );
 
       return JSON.stringify({
         type: 'product_recommendation',
-        products: aiResponse || [],
+        // products: aiResponse || [],
         explanation: `Recommendations based on your ${Array.isArray(user.goals) ? user.goals.join(', ') : user.goals || 'fitness'} goals and preferences.`,
       });
     } catch (error) {
