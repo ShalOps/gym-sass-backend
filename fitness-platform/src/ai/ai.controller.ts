@@ -6,6 +6,8 @@ import {
   Query,
   Sse,
   UseGuards,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { AssistantService } from './assistant/assistant.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
@@ -15,6 +17,7 @@ import { SuggestionRequestDto } from './dto/suggestion.dto';
 import { ProductRecommendationRequestDto } from './dto/product-recommendation.dto';
 import { SearchRequestDto } from './dto/search.dto';
 import { AIFeedbackDto } from './dto/ai-feedback.dto';
+import { ConversationDto, ConversationListDto } from './dto/conversation.dto';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AIRateLimitGuard } from './guards/ai-rate-limit.guard';
@@ -220,5 +223,51 @@ export class AiController {
   async submitFeedback(@Body() body: AIFeedbackDto) {
     await this.assistant.submitFeedback(body.userId, body);
     return { message: 'Feedback submitted successfully' };
+  }
+
+  @Get('conversations')
+  @ApiOperation({ summary: 'Get all conversations for the authenticated user' })
+  @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
+  @ApiOkResponse({
+    description: 'List of user conversations.',
+    type: ConversationListDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input.' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
+  async getUserConversations(@Query('userId') userId: string) {
+    return this.assistant.getUserConversations(userId);
+  }
+
+  @Get('conversations/:conversationId')
+  @ApiOperation({ summary: 'Get a specific conversation by ID' })
+  @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
+  @ApiOkResponse({
+    description: 'Conversation details.',
+    type: ConversationDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input.' })
+  @ApiResponse({ status: 404, description: 'Conversation not found.' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
+  async getConversation(
+    @Param('conversationId') conversationId: string,
+    @Query('userId') userId: string,
+  ) {
+    return this.assistant.getConversation(userId, conversationId);
+  }
+
+  @Delete('conversations/:conversationId')
+  @ApiOperation({ summary: 'Delete a specific conversation' })
+  @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation deleted successfully.',
+  })
+  @ApiResponse({ status: 404, description: 'Conversation not found.' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
+  async deleteConversation(
+    @Param('conversationId') conversationId: string,
+    @Query('userId') userId: string,
+  ) {
+    return this.assistant.deleteConversation(userId, conversationId);
   }
 }
