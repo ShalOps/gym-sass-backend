@@ -4,6 +4,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductCategory, ProductType } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { Product } from '@prisma/client';
+import * as fs from 'fs';
 const PAGE_SIZE = 10;
 
 
@@ -22,7 +23,7 @@ export class ProductService {
     return { data, hasMore, nextCursor };
   }
 
-  async create(createProductDto: CreateProductDto, userId: number, isVendor: boolean) {
+  async create(createProductDto: CreateProductDto, userId: number, imagePath: string, isVendor: boolean, documentPath: string | null) {
     
     if (!isVendor) {
       throw new UnauthorizedException('Only vendors can create products');
@@ -30,7 +31,10 @@ export class ProductService {
     
     const product = await this.databaseService.product.create({
       data: {
-        ...createProductDto, vendorID: userId
+        ...createProductDto, 
+        image: imagePath,
+        vendorID: userId,
+        document: documentPath
       }
     })
 
@@ -108,23 +112,96 @@ export class ProductService {
     return product;
   }
 
-  async update(id: number, updateProductDto: UpdateProductDto, userId: number, isVendor: boolean) {
-    if (!isVendor) {
-      throw new UnauthorizedException('Only vendors can update products');
-    }
+  async update(
+    id: number, 
+    updateProductDto: UpdateProductDto,
+    userId: number, 
+    isVendor: boolean,
+    newImagePath?: string, 
+    newDocumentPath?: string
+  ) {
 
-    const productVendorId = await this.findOne(id);
+      if (!isVendor) {
+        throw new UnauthorizedException('Only vendors can update products');
+      }
 
-    if (productVendorId.vendorID !== userId) {
-      throw new UnauthorizedException('Vendors can only update their own products');
-    }
+      const productVendorId = await this.findOne(id);
 
-    return await this.databaseService.product.update({
-      where: { id },
-      data: { ...updateProductDto },
-    });
-   
+      if (productVendorId.vendorID !== userId) {
+        throw new UnauthorizedException('Vendors can only update their own products');
+      }
+
+      const currentProduct = await this.databaseService.product.findUnique({
+        where: { id },
+      });
+
+      if (!currentProduct) {
+        throw new NotFoundException('Product not found');
+      }
+      if((currentProduct.type == ProductType.PHYSICAL) && updateProductDto.type != ProductType.DIGITAL){
+        if(newDocumentPath){
+            throw new BadRequestException("Cannot upload Document on physical product")
+        }
+      }
+      
+      if((newImagePath && currentProduct.image) && (newDocumentPath && currentProduct.document)){
+
+        const updatedProduct = await this.databaseService.product.update({
+          where: { id },
+          data: { 
+            ...updateProductDto,
+            image: newImagePath,
+            document: newDocumentPath
+           },
+        });
+        this.deleteFileOnDisk(currentProduct.image);
+        this.deleteFileOnDisk(currentProduct.document);
+        return updatedProduct
+
+      }
+      else if (newImagePath && currentProduct.image) {
+          const updatedProduct = await this.databaseService.product.update({
+            where: { id },
+            data: { 
+              ...updateProductDto,
+              image: newImagePath,
+            },
+          });
+        this.deleteFileOnDisk(currentProduct.image);
+        return updatedProduct
+
+      } 
+      else if (newDocumentPath && currentProduct.document) {
+        const updatedProduct = await this.databaseService.product.update({
+            where: { id },
+            data: { 
+              ...updateProductDto,
+              document: newDocumentPath
+            },
+          });
+        this.deleteFileOnDisk(currentProduct.document);
+        return updatedProduct
+      }
+
+      return await this.databaseService.product.update({
+            where: { id },
+            data: { 
+              ...updateProductDto,
+              document: newDocumentPath
+            },
+          });
+
   }
+
+  private deleteFileOnDisk(filePath: string) {
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        console.error(`Failed to delete old file: ${filePath}`, err);
+      }
+    }
+}
 
   async remove(id: number, userId: number, isVendor: boolean) {
 
@@ -132,12 +209,21 @@ export class ProductService {
       throw new UnauthorizedException('Only vendors can update products');
     }
 
-    const productVendorId = await this.findOne(id);
+    const product = await this.findOne(id);
 
-    if (productVendorId.vendorID !== userId) {
+    if (product.vendorID !== userId) {
       throw new UnauthorizedException('Vendors can only update their own products');
     }
 
+    const imagePath = product.image
+    const documentPath = product.document
+    
+    if (imagePath){
+      this.deleteFileOnDisk(imagePath)
+    }
+    if (documentPath){
+      this.deleteFileOnDisk(documentPath)
+    }
     return await this.databaseService.product.delete({
       where: { id },
     });

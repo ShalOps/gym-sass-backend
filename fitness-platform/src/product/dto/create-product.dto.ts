@@ -53,11 +53,5 @@ export class CreateProductDto {
   @Min(0)
   price: number;
 
-  @ApiProperty({
-    description: 'Image URL or path for the product',
-    example: '/images/protein.jpg',
-  })
-  @IsString()
-  image: string;
 
 }

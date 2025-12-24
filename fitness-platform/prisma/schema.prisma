@@ -548,6 +548,7 @@ model Product {
   description     String?
   price           Float
   image           String
+  document        String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   vendorID        Int
