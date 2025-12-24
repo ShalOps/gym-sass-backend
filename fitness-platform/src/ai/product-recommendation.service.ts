@@ -61,7 +61,7 @@ export class ProductRecommendationService implements IntentHandler {
         });
       }
 
-      // Minimize user data for privacy before sending to AI
+      // Sanitize user data for AI privacy compliance
       const minimizedUserData = this.securityService.minimizeUserDataForAI({
         userId: user.userId,
         fitnessLevel: user.fitnessLevel ?? undefined,
@@ -96,23 +96,116 @@ export class ProductRecommendationService implements IntentHandler {
         Object.keys(minimizedUserData),
       );
 
-      // For MVP, since marketplace models don't exist yet, use AI to generate recommendations
+      // Retrieve marketplace products tailored to user context
+      const goalCategoryMap: Record<string, string[]> = {
+        weightloss: ['SUPPLEMENTS', 'APPAREL'],
+        'muscle-gain': ['SUPPLEMENTS', 'EQUIPMENT'],
+        endurance: ['SUPPLEMENTS', 'EQUIPMENT'],
+        flexibility: ['EQUIPMENT', 'APPAREL'],
+        'strength-training': ['SUPPLEMENTS', 'EQUIPMENT'],
+        'general-fitness': ['SUPPLEMENTS', 'EQUIPMENT'],
+        recovery: ['SUPPLEMENTS', 'EQUIPMENT'],
+        // Add more mappings as needed
+      };
+
+      let categories: string[] = [];
+      if (user.goals) {
+        for (const goal of user.goals) {
+          const cats = goalCategoryMap[goal];
+          if (cats) categories.push(...cats);
+        }
+        categories = [...new Set(categories)]; // Remove duplicates
+      }
+
+      const where: any = {};
+      if (categories.length > 0) {
+        where.category = { in: categories };
+      }
+      if (user.priceRange) {
+        where.price = {};
+        if (user.priceRange.min !== undefined)
+          where.price.gte = user.priceRange.min;
+        if (user.priceRange.max !== undefined)
+          where.price.lte = user.priceRange.max;
+      }
+
+      // TODO: Remove 'as any' once colleague merges schema enhancements with AI fields
+      const products = await (this.database as any).product.findMany({
+        where,
+        include: {
+          vendor: {
+            select: {
+              firstName: true,
+              lastName: true,
+              vendorRating: true,
+              verified: true,
+            },
+          },
+        },
+        take: 7,
+        orderBy: { rating: 'desc' }, // Prioritize highly-rated products
+        select: {
+          productId: true,
+          name: true,
+          description: true,
+          price: true,
+          category: true,
+          tags: true,
+          targetFitnessLevels: true,
+          targetGoals: true,
+          rating: true,
+          reviewCount: true,
+          totalSold: true,
+          inStock: true,
+          vendor: true,
+        },
+      });
+
+      if (products.length === 0) {
+        return JSON.stringify({
+          type: 'product_recommendation',
+          products: [],
+          explanation: 'No products found matching your criteria.',
+        });
+      }
+
+      // Transform database products to AI-friendly format with essential recommendation data
+      const productsList = products.map((p) => ({
+        id: p.productId,
+        name: p.name,
+        description: p.description || '',
+        price: p.price,
+        category: p.category,
+        tags: p.tags,
+        targetFitnessLevels: p.targetFitnessLevels,
+        targetGoals: p.targetGoals,
+        rating: p.rating,
+        reviewCount: p.reviewCount,
+        totalSold: p.totalSold,
+        inStock: p.inStock,
+        vendor: {
+          name:
+            `${p.vendor?.firstName || ''} ${p.vendor?.lastName || ''}`.trim() ||
+            'Unknown',
+          rating: p.vendor?.vendorRating,
+          verified: p.vendor?.verified,
+        },
+      }));
+
       const prompt = `
-        User Profile: ${JSON.stringify({
-          goals: minimizedUserData.goals,
-          preferences: user.preferences,
-          priceRange: minimizedUserData.priceRange,
-          equipmentAtHome: minimizedUserData.equipmentAtHome,
-          lastActiveAt: user.lastActiveAt,
-          viewHistory: user.recentViews?.slice(0, 5), // Recent product views
-          aiFeedback: user.recentFeedback,
-        })}
-        Message: ${data.message}
+User Profile: ${JSON.stringify({
+        goals: minimizedUserData.goals,
+        fitnessLevel: user.fitnessLevel,
+        priceRange: minimizedUserData.priceRange,
+        equipmentAtHome: minimizedUserData.equipmentAtHome,
+      })}
 
-        Based on the user's fitness goals, preferences, and browsing history, recommend 3-5 fitness-related products (supplements, equipment, apparel) that would help them achieve their goals. Consider their budget and existing equipment.
+Available Products: ${JSON.stringify(productsList)}
 
-        Return a JSON array of products with: id (use sequential numbers), name, description, estimated price range, category, and why it fits their profile.
-      `;
+Task: Recommend 3-5 products from the list that best match the user's fitness goals and level. Consider ratings, reviews, and vendor reputation. Prioritize products with high ratings and good availability.
+
+Return JSON array with: id, name, description, price, category, reasoning (why it fits their profile).
+`;
 
       const aiResponse = await this.aiService.generateStructuredResponse(
         prompt,
