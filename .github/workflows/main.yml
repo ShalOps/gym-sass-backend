@@ -1,4 +1,4 @@
-name: Deploy Fitness SaaS
+name: Deploy Fitness SaaS (Staging)
 
 on:
   push:
@@ -7,49 +7,63 @@ on:
 
 jobs:
   deploy_staging:
-    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
+          chmod 600 ~/.ssh/github_actions
           ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      - name: Connect with VPS and deploy
+      - name: Deploy to VPS
         run: |
-          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} bash -s <<'EOF'
-            mkdir -p apps/fitness-saas && cd apps/fitness-saas
+          ssh -i ~/.ssh/github_actions \
+            -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} <<'EOF'
+
+            set -euo pipefail
+
+            APP_DIR=~/apps/fitness-saas
+            APP_NAME=fitness-saas
+            PORT=45235
+
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
 
             if [ -d ".git" ]; then
-              git stash
+              echo "Updating existing repository..."
+              git reset --hard
+              git clean -fd
               git pull origin staging
             else
+              echo "Cloning repository..."
               git clone -b staging git@github.com:ShalOps/gym-sass-backend.git .
             fi
 
-            npm install --force
+            echo "Installing dependencies..."
+            npm ci
 
-            # Run Prisma migrations
+            echo "Running Prisma..."
             npx prisma generate
             npx prisma db push
 
-            # Build the application
+            echo "Building application..."
             npm run build
 
-            pid=$(pm2 pid "fitness-saas" 2>/dev/null)
-            if [ -n "$pid" ]; then
-              echo "Reloading fitness-saas"
-              pm2 reload "fitness-saas"
-              pm2 save
+            if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
+              echo "Reloading PM2 process..."
+              pm2 reload "$APP_NAME"
             else
-              echo "Starting new application"
-              PORT=45235 pm2 start npm --name "fitness-saas" -- start
-              pm2 startup
-              pm2 save
+              echo "Starting PM2 process..."
+              PORT=$PORT pm2 start npm --name "$APP_NAME" -- start
             fi
+
+            pm2 save
+            echo "Deployment completed successfully 🚀"
+
           EOF
