@@ -155,7 +155,7 @@ export class UserContextService {
             orderBy: { date: 'desc' },
           },
           viewHistories: {
-            take: AI_CONFIG.DATABASE_LIMITS.USER_FEEDBACK,
+            take: AI_CONFIG.DATABASE_LIMITS.USER_VIEWS,
             orderBy: { timestamp: 'desc' },
           },
           aifeedbacks: {
