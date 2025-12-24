@@ -10,6 +10,7 @@ import { ProductRecommendationService } from '../product-recommendation.service'
 import { SearchEngineService } from '../search-engine.service';
 import { SecurityService } from '../utils/security.service';
 import { AuditService } from '../utils/audit.service';
+import { AIResponseBuilder } from '../utils/response-builder';
 import { RecommendationRequestDto } from '../dto/recommendation.dto';
 import { WorkoutPlanRequestDto } from '../dto/workout-plan.dto';
 import { SuggestionRequestDto } from '../dto/suggestion.dto';
@@ -223,8 +224,18 @@ export class AssistantService {
         success: true,
       });
 
-      return result;
+      return AIResponseBuilder.success(
+        result,
+        'chat',
+        userId,
+        Date.now() - startTime,
+      );
     } catch (error) {
+      this.logger.error(
+        `Failed to process message for user ${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       // Log failed interaction
       this.auditService.logAIInteraction({
         userId,
@@ -235,6 +246,15 @@ export class AssistantService {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       });
+
+      return AIResponseBuilder.error(
+        'MESSAGE_PROCESSING_FAILED',
+        'Failed to process message',
+        'chat',
+        userId,
+        Date.now() - startTime,
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -290,35 +310,56 @@ export class AssistantService {
   }
 
   async getRecommendations(userId: string, query: RecommendationRequestDto) {
+    const startTime = Date.now();
     const input = `Recommendations for ${query.categories ? query.categories.join(', ') : 'fitness'} in ${query.location || 'any location'}`;
-    return this.executeSecurely(
+    const result = await this.executeSecurely(
       userId,
       'personalized_recommendations',
       'get_recommendations',
       input,
       () => this.recommendationEngine.handle({ userId, message: input }),
     );
+    return AIResponseBuilder.fromServiceResult(
+      result,
+      'recommendations',
+      userId,
+      Date.now() - startTime,
+    );
   }
 
   async getWorkoutPlan(userId: string, query: WorkoutPlanRequestDto) {
+    const startTime = Date.now();
     const input = `Workout plan for fitness level: ${query.fitnessLevel}, goals: ${query.goals?.join(', ')}`;
-    return this.executeSecurely(
+    const result = await this.executeSecurely(
       userId,
       'workout_plans',
       'get_plan',
       input,
       () => this.workoutPlanner.handle({ userId, message: input }),
     );
+    return AIResponseBuilder.fromServiceResult(
+      result,
+      'workout_plans',
+      userId,
+      Date.now() - startTime,
+    );
   }
 
   async getSuggestions(userId: string, query: SuggestionRequestDto) {
+    const startTime = Date.now();
     const input = `Suggest ${query.type} in ${query.location}`;
-    return this.executeSecurely(
+    const result = await this.executeSecurely(
       userId,
       'gym_class_trainer_suggestions',
       'get_suggestions',
       input,
       () => this.suggestionEngine.handle({ userId, message: input }),
+    );
+    return AIResponseBuilder.fromServiceResult(
+      result,
+      'suggestions',
+      userId,
+      Date.now() - startTime,
     );
   }
 
@@ -326,24 +367,38 @@ export class AssistantService {
     userId: string,
     query: ProductRecommendationRequestDto,
   ) {
+    const startTime = Date.now();
     const input = `Recommend products for goals: ${query.goals?.join(', ')}`;
-    return this.executeSecurely(
+    const result = await this.executeSecurely(
       userId,
       'product_recommendations',
       'get_products',
       input,
       () => this.productRecommendation.handle({ userId, message: input }),
     );
+    return AIResponseBuilder.fromServiceResult(
+      result,
+      'product_recommendations',
+      userId,
+      Date.now() - startTime,
+    );
   }
 
   async search(userId: string, query: SearchRequestDto) {
+    const startTime = Date.now();
     const input = query.query || '';
-    return this.executeSecurely(
+    const result = await this.executeSecurely(
       userId,
       'natural_language_search',
       'search',
       input,
       () => this.searchEngine.handle({ userId, message: input }),
+    );
+    return AIResponseBuilder.fromServiceResult(
+      result,
+      'search',
+      userId,
+      Date.now() - startTime,
     );
   }
 
@@ -387,6 +442,7 @@ export class AssistantService {
   }
 
   async getUserConversations(userId: string) {
+    const startTime = Date.now();
     this.logger.debug(`getUserConversations userId=${userId}`);
 
     try {
@@ -399,14 +455,20 @@ export class AssistantService {
         feature: 'conversation_management',
         input: '',
         output: `Retrieved ${conversations.length} conversations`,
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: true,
       });
 
-      return {
+      const data = {
         conversations,
         total: conversations.length,
       };
+      return AIResponseBuilder.success(
+        data,
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -417,16 +479,24 @@ export class AssistantService {
         action: 'list_conversations',
         feature: 'conversation_management',
         input: '',
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: false,
         error: errorMessage,
       });
 
-      throw error;
+      return AIResponseBuilder.error(
+        'CONVERSATION_LIST_FAILED',
+        'Failed to retrieve conversations',
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+        { originalError: errorMessage },
+      );
     }
   }
 
   async getConversation(userId: string, conversationId: string) {
+    const startTime = Date.now();
     this.logger.debug(
       `getConversation userId=${userId} conversationId=${conversationId}`,
     );
@@ -443,11 +513,16 @@ export class AssistantService {
         feature: 'conversation_management',
         input: conversationId,
         output: `Retrieved conversation with ${conversation.messages.length} messages`,
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: true,
       });
 
-      return conversation;
+      return AIResponseBuilder.success(
+        conversation,
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -458,16 +533,24 @@ export class AssistantService {
         action: 'get_conversation',
         feature: 'conversation_management',
         input: conversationId,
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: false,
         error: errorMessage,
       });
 
-      throw error;
+      return AIResponseBuilder.error(
+        'CONVERSATION_NOT_FOUND',
+        'Conversation not found or access denied',
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+        { conversationId, originalError: errorMessage },
+      );
     }
   }
 
   async deleteConversation(userId: string, conversationId: string) {
+    const startTime = Date.now();
     this.logger.debug(
       `deleteConversation userId=${userId} conversationId=${conversationId}`,
     );
@@ -488,11 +571,16 @@ export class AssistantService {
         feature: 'conversation_management',
         input: conversationId,
         output: 'Conversation deleted successfully',
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: true,
       });
 
-      return { message: 'Conversation deleted successfully' };
+      return AIResponseBuilder.success(
+        { message: 'Conversation deleted successfully' },
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -503,12 +591,19 @@ export class AssistantService {
         action: 'delete_conversation',
         feature: 'conversation_management',
         input: conversationId,
-        processingTime: 0,
+        processingTime: Date.now() - startTime,
         success: false,
         error: errorMessage,
       });
 
-      throw error;
+      return AIResponseBuilder.error(
+        'CONVERSATION_DELETE_FAILED',
+        'Failed to delete conversation',
+        'conversation_management',
+        userId,
+        Date.now() - startTime,
+        { conversationId, originalError: errorMessage },
+      );
     }
   }
 }

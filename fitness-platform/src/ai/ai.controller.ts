@@ -18,6 +18,8 @@ import { ProductRecommendationRequestDto } from './dto/product-recommendation.dt
 import { SearchRequestDto } from './dto/search.dto';
 import { AIFeedbackDto } from './dto/ai-feedback.dto';
 import { ConversationDto, ConversationListDto } from './dto/conversation.dto';
+import { AIStandardResponseDto } from './dto/standard-response.dto';
+import { AIResponseBuilder } from './utils/response-builder';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AIRateLimitGuard } from './guards/ai-rate-limit.guard';
@@ -41,20 +43,28 @@ export class AiController {
   @Post('chat/message')
   @ApiOperation({ summary: 'Send a message to the AI assistant' })
   @ApiBody({ type: ChatMessageDto })
-  @ApiResponse({ status: 200, description: 'AI response message.' })
+  @ApiOkResponse({
+    description: 'AI chat response',
+    type: AIStandardResponseDto<{
+      userId: string;
+      conversationId: string;
+      intent: string;
+      confidence: number;
+      reply: string;
+      timestamp: string;
+    }>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async handleMessage(@Body() body: ChatMessageDto) {
     // TODO: Fetch userTier from subscription service
     const userTier = 'premium'; // Placeholder
-    const result = await this.assistant.processMessage(
+    return this.assistant.processMessage(
       body.userId,
       body.message,
       body.conversationId,
       userTier,
     );
-
-    return { message: result };
   }
 
   @Sse('chat/message/stream')
@@ -123,7 +133,14 @@ export class AiController {
     required: false,
     description: 'Result limit',
   })
-  @ApiOkResponse({ description: 'Personalized recommendations.' })
+  @ApiOkResponse({
+    description: 'Personalized recommendations',
+    type: AIStandardResponseDto<{
+      type: string;
+      items: any[];
+      explanation: string;
+    }>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async getRecommendations(@Query() query: RecommendationRequestDto) {
@@ -151,7 +168,10 @@ export class AiController {
     required: false,
     description: 'Workout duration',
   })
-  @ApiOkResponse({ description: 'Personalized workout plan.' })
+  @ApiOkResponse({
+    description: 'Personalized workout plan',
+    type: AIStandardResponseDto<any>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async getWorkoutPlan(@Query() query: WorkoutPlanRequestDto) {
@@ -172,7 +192,10 @@ export class AiController {
     required: false,
     description: 'Location filter',
   })
-  @ApiOkResponse({ description: 'Suggestions based on user preferences.' })
+  @ApiOkResponse({
+    description: 'Suggestions based on user preferences',
+    type: AIStandardResponseDto<any>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async getSuggestions(@Query() query: SuggestionRequestDto) {
@@ -188,7 +211,10 @@ export class AiController {
     required: false,
     description: 'Fitness goals',
   })
-  @ApiOkResponse({ description: 'Product recommendations.' })
+  @ApiOkResponse({
+    description: 'Product recommendations',
+    type: AIStandardResponseDto<any>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async getProductRecommendations(
@@ -207,7 +233,10 @@ export class AiController {
     required: false,
     description: 'Result limit',
   })
-  @ApiOkResponse({ description: 'Search results.' })
+  @ApiOkResponse({
+    description: 'Search results',
+    type: AIStandardResponseDto<any>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async search(@Query() query: SearchRequestDto) {
@@ -217,20 +246,29 @@ export class AiController {
   @Post('feedback')
   @ApiOperation({ summary: 'Submit feedback for AI responses' })
   @ApiBody({ type: AIFeedbackDto })
-  @ApiResponse({ status: 201, description: 'Feedback submitted successfully.' })
+  @ApiOkResponse({
+    description: 'Feedback submitted successfully',
+    type: AIStandardResponseDto<{ message: string }>,
+  })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
   async submitFeedback(@Body() body: AIFeedbackDto) {
+    const startTime = Date.now();
     await this.assistant.submitFeedback(body.userId, body);
-    return { message: 'Feedback submitted successfully' };
+    return AIResponseBuilder.success(
+      { message: 'Feedback submitted successfully' },
+      'feedback',
+      body.userId,
+      Date.now() - startTime,
+    );
   }
 
   @Get('conversations')
   @ApiOperation({ summary: 'Get all conversations for the authenticated user' })
   @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
   @ApiOkResponse({
-    description: 'List of user conversations.',
-    type: ConversationListDto,
+    description: 'List of user conversations',
+    type: AIStandardResponseDto<ConversationListDto>,
   })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
@@ -242,8 +280,8 @@ export class AiController {
   @ApiOperation({ summary: 'Get a specific conversation by ID' })
   @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
   @ApiOkResponse({
-    description: 'Conversation details.',
-    type: ConversationDto,
+    description: 'Conversation details',
+    type: AIStandardResponseDto<ConversationDto>,
   })
   @ApiResponse({ status: 400, description: 'Invalid input.' })
   @ApiResponse({ status: 404, description: 'Conversation not found.' })
@@ -260,7 +298,8 @@ export class AiController {
   @ApiQuery({ name: 'userId', type: String, description: 'User ID' })
   @ApiResponse({
     status: 200,
-    description: 'Conversation deleted successfully.',
+    description: 'Conversation deleted successfully',
+    type: AIStandardResponseDto<{ message: string }>,
   })
   @ApiResponse({ status: 404, description: 'Conversation not found.' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded.' })
