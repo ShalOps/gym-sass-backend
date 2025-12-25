@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { TrainerService } from "./trainers.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { AuthGuard } from "@nestjs/passport";
@@ -42,7 +42,8 @@ export class TrainerController {
     return this.trainerService.updateTrainer(+id, dto, userId);
   }
 
-
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER)
   @Post(':id/upload')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -64,6 +65,7 @@ export class TrainerController {
       profilePicture?: Express.Multer.File[],
       certificationFiles?: Express.Multer.File[]
     },
+    @Req() req:any
   ) {
     // Extract the paths to save in the DB
     const filePaths = {
@@ -71,8 +73,20 @@ export class TrainerController {
       certificationFiles: files.certificationFiles?.map(f => f.path),
     };
 
-    return this.trainerService.uploadFiles(id, filePaths);
+    const userId = req.user.userId;
+    return this.trainerService.uploadFiles(id, filePaths,userId);
+
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post('approve-update/:requestId')
+  approveProfileUpdate(@Param('requestId', ParseIntPipe) requestId: number,@Req() req:any) {
+    const userId = req.user.userId;
+    return this.trainerService.approveProfileUpdate(requestId, userId);
+
+  }
+
 }
 
 

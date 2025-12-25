@@ -201,6 +201,7 @@ model User {
   trainers              Trainer?
   TrainerBookings       TrainerBooking[]
   TrainerReviews        TrainerReview[]
+  VerificationRequests  VerificationRequest[]
 
 
   createdAt DateTime  @default(now())
@@ -555,10 +556,10 @@ model Trainer {
   gender             String?
   dob                DateTime?
   hourlyRate         Decimal  @db.Decimal(10, 2)
-  specializations    TrainerSpecialization[]?
+  specializations    TrainerSpecialization[]
   yearsOfExperience  Int
   profilePicture     String?
-  certificationFiles Certification[]?
+  certificationFiles Certification[]
   verified           Boolean  @default(false)
   verificationStatus VerificationStatus   @default(PENDING)
   createdAt          DateTime @default(now())
@@ -570,6 +571,7 @@ model Trainer {
   gyms          TrainerGym[]
   bookings      TrainerBooking[]
   reviews       TrainerReview[]
+  VerificationRequest VerificationRequest[]
 }
 
 model TrainerAvailability {
@@ -637,11 +639,13 @@ model VerificationRequest {
   id                Int      @id @default(autoincrement())
   trainerId         Int
   trainer           Trainer  @relation(fields: [trainerId], references: [id])
-  requestedChanges  Json     // Stores the DTO (yearsOfExp, certs, etc.)
+  requestedChanges  Json
   status            VerificationStatus @default(PENDING)
+  updatedBy         Int?
+  updatedByUser     User?    @relation(fields: [updatedBy],  references: [userId])
   adminNote         String?
   createdAt         DateTime @default(now())
-  updatedAt         DateTime      @updatedAt
+  updatedAt         DateTime @updatedAt
 }
 
 model Certification {
