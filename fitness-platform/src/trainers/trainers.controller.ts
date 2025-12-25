@@ -81,12 +81,18 @@ export class TrainerController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Post('approve-update/:requestId')
-  approveProfileUpdate(@Param('requestId', ParseIntPipe) requestId: number,@Req() req:any) {
+  approveProfileUpdate(@Param('requestId', ParseIntPipe) requestId: number,@Req() req:any,@Body() body:any) {
     const userId = req.user.userId;
-    return this.trainerService.approveProfileUpdate(requestId, userId);
+    return this.trainerService.approveProfileUpdate(requestId, userId, body);
 
   }
-
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post('verify/:trainerId')
+  verifyTrainer(@Param('trainerId', ParseIntPipe) trainerId: number,@Req() req:any,@Body() verifyTrainer:boolean) {
+    const userId = req.user.userId;
+    return this.trainerService.verifyTrainer(trainerId, userId, verifyTrainer);
+  }
 }
 
 

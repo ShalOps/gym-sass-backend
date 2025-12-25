@@ -3,12 +3,12 @@ import { DatabaseService } from "src/database/database.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { Prisma, Role } from "@prisma/client";
 import { UpdateTrainerDto } from "./dto/update-trainer.dto";
-import { CertificationDto } from "./dto/certification.dto";
+import { NotificationsService } from "src/notifications/notifications.service";
 
 
 @Injectable()
 export class TrainerService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService, private readonly notificationsService: NotificationsService  ) {}
 
   async createTrainer(dto: CreateTrainerDto,userId: number) {
         try {
@@ -37,7 +37,14 @@ export class TrainerService {
             profilePicture: dto.profilePicture,
             verified: dto.verified,
           };
+        // admin email
+        const email = await this.databaseService.user.findFirst({where: {role: Role.ADMIN}});
 
+        if (email) {
+          this.notificationsService.notifyAdminVerificationRequest(email.email).catch((err) => {
+            console.error('Failed to send admin notification email:', err);
+          });
+        }
         return this.databaseService.trainer.create({ data:{
           ...data,
           user: { connect: { userId: userId } }
@@ -174,6 +181,11 @@ export class TrainerService {
         where: { id },
         data: data,
       });
+      const adminemail = await this.databaseService.user.findFirst({where: {role: Role.ADMIN}});
+      this.notificationsService.notifyAdminVerificationRequest(user.email).catch((err) => {
+        console.error('Failed to send admin notification email:', err);
+      });
+
 
       return {
         ...updatedTrainer,
@@ -221,13 +233,13 @@ export class TrainerService {
     try {
       const trainer = await this.databaseService.trainer.findUnique({ where: { id: trainerId } });
       if (!trainer) throw new NotFoundException('Trainer not found');
-        return this.databaseService.verificationRequest.create({
-          data: {
-            trainerId: trainerId,
-            status: 'PENDING',
-            requestedChanges: dto as Prisma.InputJsonValue
-          },
-      });
+      return this.databaseService.verificationRequest.create({
+        data: {
+          trainerId: trainerId,
+          status: 'PENDING',
+          requestedChanges: dto as Prisma.InputJsonValue
+        },
+    });
     } catch (error) {
       if (error instanceof HttpException) throw error;
       console.log(error);
@@ -236,7 +248,7 @@ export class TrainerService {
 
   }
 
-  async approveProfileUpdate(requestId: number,userId: number) {
+  async approveProfileUpdate(requestId: number,userId: number, body: any) {
     try {
       const request = await this.databaseService.verificationRequest.findUnique({
         where: { id: requestId },
@@ -291,14 +303,15 @@ export class TrainerService {
           }),
         );
       }
-
+      const status = body.status === 'REJECTED' ? 'REJECTED' : 'APPROVED';
+      const adminNote = body.adminNote || (status === 'APPROVED' ? 'Approved after review' : 'Rejected after review');
       tx.push(
         this.databaseService.verificationRequest.update({
           where: { id: requestId },
           data: {
-            status: 'APPROVED',
+            status: status,
             updatedBy: userId,
-            adminNote: 'Approved after review',
+            adminNote: adminNote,
           },
         }),
       );
@@ -309,5 +322,31 @@ export class TrainerService {
       throw new InternalServerErrorException('failed to approve profile update');
     }
 
+  }
+
+  async verifyTrainer(trainerId: number,userId: number,verifyTrainer: boolean) {
+    try {
+      const trainer = await this.databaseService.trainer.findUnique({ where: { id: trainerId } });
+      if (!trainer) {
+        throw new NotFoundException('Trainer not found');
+      }
+      if(trainer.verified) {
+        throw new BadRequestException('Trainer is already verified');
+      }
+      const user = await this.databaseService.user.findUnique({where: {userId}});
+      if(!user || user.role !== Role.ADMIN){
+        throw new ForbiddenException('Only admins can verify trainers');
+      }
+      const trainerVerificationStatus = verifyTrainer ? "APPROVED" : "REJECTED";
+      return this.databaseService.trainer.update({
+        where: { id: trainerId },
+        data: { verified: verifyTrainer, verificationStatus: trainerVerificationStatus },
+      });
+
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw new InternalServerErrorException('failed to verify trainer');
+    }
   }
 }
