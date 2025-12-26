@@ -38,14 +38,6 @@ export class CartController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Patch(':productId')
-  @ApiOperation({ summary: 'Update cart item quantity by providing productId but can\'t be less than 1' })
-  @ApiBearerAuth('JWT-auth')
-  update(@Param('productId') productId: string, @Body() updateCartItemDto: UpdateCartItemDto, @Req() req: RequestWithUser) {
-    return this.cartService.update(+productId, updateCartItemDto, req.user.userId);
-  }
-
-  @UseGuards(JwtAuthGuard)
   @Delete(':productId')
   @ApiOperation({ summary: 'Delete cart item by providing productId' })
   @ApiBearerAuth('JWT-auth')

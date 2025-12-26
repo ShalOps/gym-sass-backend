@@ -10,10 +10,4 @@ export class CreateCartItemDto {
   @IsInt()
   productId: number;
 
-  @ApiProperty({ example: 1, description: 'Quantity to add', default: 1 })
-  @IsInt()
-  @IsPositive()
-  @IsOptional()
-  @Min(1)
-  quantity?: number = 1;
 }

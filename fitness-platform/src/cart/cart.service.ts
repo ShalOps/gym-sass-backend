@@ -54,7 +54,6 @@ export class CartService {
       data: {
         cartId: checkIfUserOwnsCart.id,
         productId: createCartItemDto.productId,
-        quantity: createCartItemDto.quantity,
       },
     });
 
@@ -76,50 +75,6 @@ export class CartService {
       take: PAGE_SIZE + 1,
       });
     return this.paginate(cartItems);
-  }
-
-
-  async update(productId: number, updateCartItemDto: UpdateCartItemDto, userId: number) {
-    let checkIfUserOwnsCart = await this.databaseService.cart.findUnique({
-      where: {
-        cartOwnerId: userId,
-      },
-      select: {
-        id: true
-      }
-    }); 
-
-    if (!checkIfUserOwnsCart) {
-      throw new NotFoundException('User does not own a cart');
-    }
-
-    const checkProductExistsInCart = this.databaseService.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: checkIfUserOwnsCart.id,
-          productId: productId,
-        },
-      },
-    })
-
-    if(!checkProductExistsInCart){
-      throw new NotFoundException("Product doesn't exist in users cart")
-    }
-
-    const updateCartItem = await this.databaseService.cartItem.update({
-      where: {
-        cartId_productId: {
-          cartId: checkIfUserOwnsCart.id,
-          productId: productId,
-        },
-      },
-      data: {
-        quantity: updateCartItemDto.quantity,
-      },
-    })
-
-    return updateCartItem
-
   }
 
   async remove(productId: number, userId: number) {
