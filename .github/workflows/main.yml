@@ -28,12 +28,13 @@ jobs:
 
             set -euo pipefail
 
-            APP_DIR=~/apps/fitness-saas
+            ROOT_DIR=~/apps/fitness-saas
+            APP_DIR="$ROOT_DIR/fitness-platform"
             APP_NAME=fitness-saas
-            PORT=45235
+            PORT=64389
 
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
+            mkdir -p "$ROOT_DIR"
+            cd "$ROOT_DIR"
 
             if [ -d ".git" ]; then
               echo "Updating existing repository..."
@@ -44,6 +45,8 @@ jobs:
               echo "Cloning repository..."
               git clone -b staging git@github.com:ShalOps/gym-sass-backend.git .
             fi
+
+            cd "$APP_DIR"
 
             echo "Installing dependencies..."
             npm ci
@@ -60,10 +63,13 @@ jobs:
               pm2 reload "$APP_NAME"
             else
               echo "Starting PM2 process..."
-              PORT=$PORT pm2 start npm --name "$APP_NAME" -- start
+              PORT=$PORT pm2 start npm \
+                --name "$APP_NAME" \
+                --cwd "$APP_DIR" \
+                -- start
             fi
 
             pm2 save
-            echo "Deployment completed successfully 🚀"
+            echo "Deployment completed successfully"
 
           EOF
