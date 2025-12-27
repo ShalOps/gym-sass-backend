@@ -1,4 +1,4 @@
-name: Deploy Fitness SaaS (Staging)
+name: Deploy Fitness SaaS API
 
 on:
   push:
@@ -7,63 +7,46 @@ on:
 
 jobs:
   deploy_staging:
+    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
-          chmod 600 ~/.ssh/github_actions
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy to VPS
-        run: |
-          ssh -i ~/.ssh/github_actions \
-            -p ${{ secrets.SSH_PORT }} \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} <<'EOF'
-
-            set -euo pipefail
-
-            APP_DIR=~/apps/fitness-saas
-            APP_NAME=fitness-saas
-            PORT=45235
-
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
-
+      - name: Connect with VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            mkdir -p apps/fitness-saas && cd apps/fitness-saas
+            
             if [ -d ".git" ]; then
-              echo "Updating existing repository..."
-              git reset --hard
-              git clean -fd
+              git stash
               git pull origin staging
             else
-              echo "Cloning repository..."
-              git clone -b staging git@github.com:ShalOps/gym-sass-backend.git .
+              git clone -b staging https://github.com/ShalOps/gym-sass-backend.git .
             fi
-
-            echo "Installing dependencies..."
-            npm ci
-
-            echo "Running Prisma..."
+            
+            npm install --force
+            
+            # Run Prisma migrations
             npx prisma generate
-            npx prisma db push
-
-            echo "Building application..."
+            npx prisma migrate deploy
+            
+            # Build the application
             npm run build
 
-            if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
-              echo "Reloading PM2 process..."
-              pm2 reload "$APP_NAME"
+            pid=$(pm2 pid "fitness-saas" 2>/dev/null)
+            if [ -n "$pid" ]; then
+              echo "Reloading fitness-saas"
+              pm2 reload "fitness-saas"
+              pm2 save
             else
-              echo "Starting PM2 process..."
-              PORT=$PORT pm2 start npm --name "$APP_NAME" -- start
+              echo "New application"
+              pm2 start npm --name "fitness-saas" -- start -- -p 64389
+              pm2 startup
+              pm2 save
             fi
-
-            pm2 save
-            echo "Deployment completed successfully 🚀"
-
-          EOF
