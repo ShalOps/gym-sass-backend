@@ -1,4 +1,4 @@
-name: Deploy Fitness SaaS API
+name: Deploy Fitness SaaS (Staging)
 
 on:
   push:
@@ -7,20 +7,25 @@ on:
 
 jobs:
   deploy_staging:
-    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Connect with VPS
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
+          chmod 600 ~/.ssh/github_actions
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: |
+          ssh -i ~/.ssh/github_actions \
+            -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} <<'EOF'
+
             set -euo pipefail
 
             ROOT_DIR=~/apps/fitness-saas
@@ -32,10 +37,13 @@ jobs:
             cd "$ROOT_DIR"
 
             if [ -d ".git" ]; then
-              git stash
+              echo "Updating existing repository..."
+              git reset --hard
+              git clean -fd
               git pull origin staging
             else
-              git clone -b staging https://github.com/ShalOps/gym-sass-backend.git .
+              echo "Cloning repository..."
+              git clone -b staging git@github.com:ShalOps/gym-sass-backend.git .
             fi
 
             cd "$APP_DIR"
@@ -45,16 +53,14 @@ jobs:
 
             echo "Running Prisma..."
             npx prisma generate
-            npx prisma migrate deploy
-            
-            # Build the application
+            npx prisma db push
+
+            echo "Building application..."
             npm run build
 
-            pid=$(pm2 pid "fitness-saas" 2>/dev/null)
-            if [ -n "$pid" ]; then
-              echo "Reloading fitness-saas"
-              pm2 reload "fitness-saas"
-              pm2 save
+            if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
+              echo "Reloading PM2 process..."
+              pm2 reload "$APP_NAME"
             else
               echo "Starting PM2 process..."
               PORT=$PORT pm2 start npm \
@@ -64,4 +70,6 @@ jobs:
             fi
 
             pm2 save
-            echo "Deployment completed successfully"
+            echo "Deployment completed successfully 🚀"
+
+          EOF
