@@ -20,10 +20,20 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  // Security Headers
+  // Security Headers - Configure helmet to allow Swagger UI
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Required for Swagger UI
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'", 'data:'],
+          connectSrc: ["'self'"],
+        },
+      },
     }),
   );
   app.enableCors(getHttpCorsConfig());
@@ -73,7 +83,13 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+    customSiteTitle: 'Gym Platform API Documentation',
+    customCss: '.swagger-ui .topbar { display: none }',
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }
