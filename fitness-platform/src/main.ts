@@ -83,7 +83,13 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
+  
+  // Use root path for Swagger when behind reverse proxy at /api
+  // The proxy already adds /api prefix, so Swagger should be at root to avoid /api/api paths
+  // For local dev without proxy, set SWAGGER_PATH=/api in .env
+  const swaggerPath = process.env.SWAGGER_PATH || '/';
+  
+  SwaggerModule.setup(swaggerPath, app, document, {
     swaggerOptions: {
       persistAuthorization: true,
     },
