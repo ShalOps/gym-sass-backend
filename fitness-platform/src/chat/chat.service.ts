@@ -20,6 +20,7 @@ import {
   ReportStatus,
   Role,
   Prisma,
+  NotificationType,
 } from '@prisma/client';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -469,11 +470,18 @@ export class ChatService {
         },
       });
 
+      // Create database notifications for all other participants in the conversation
+      // This is a fallback mechanism when Telegram notifications fail
+      // We create notifications directly in the database rather than using the email service
       for (const p of otherParticipants) {
-        await this.notificationsService.notifyUser(
-          p.userId,
-          `[Telegram Fallback] ${dto.content}`,
-        );
+        await this.db.notification.create({
+          data: {
+            userId: p.userId,
+            // Using NEW_GYM_CREATED as a placeholder - consider adding a CHAT_MESSAGE type to NotificationType enum
+            type: NotificationType.NEW_GYM_CREATED,
+            message: `[Telegram Fallback] ${dto.content}`,
+          },
+        });
       }
 
       return { success: true, message: 'Fallback message sent' };
@@ -569,12 +577,25 @@ export class ChatService {
     return { status: 'ok', conversationId, userId, readAt: new Date() };
   }
 
+  /**
+   * Notifies a user about a new message they received
+   * Creates a database notification entry so the user can see it in their notification list
+   * @param userId - The ID of the user to notify
+   * @param message - The message object containing the content
+   */
   async notifyRecipient(userId: number, message: Message) {
     const contentPreview = message.content || '[Attachment]';
-    await this.notificationsService.notifyUser(
-      userId,
-      `New message: ${contentPreview}`,
-    );
+    
+    // Create a database notification for the recipient
+    // This allows users to see new messages in their notification center
+    // Note: Using NEW_GYM_CREATED as placeholder - consider adding a CHAT_MESSAGE type to NotificationType enum
+    await this.db.notification.create({
+      data: {
+        userId: userId,
+        type: NotificationType.NEW_GYM_CREATED,
+        message: `New message: ${contentPreview}`,
+      },
+    });
   }
 
   async updateMessage(
@@ -1159,12 +1180,22 @@ export class ChatService {
         select: { userId: true },
       });
 
-      // Send notifications to all users
+      // Create database notifications for all users with the target role
+      // This ensures all users receive the broadcast message in their notification center
+      // We create notifications directly in the database for better reliability and tracking
       const notificationPromises = targetUsers.map((user) =>
-        this.notificationsService
-          .notifyUser(user.userId, `Broadcast: ${content}`)
+        this.db.notification
+          .create({
+            data: {
+              userId: user.userId,
+              // Using NEW_GYM_CREATED as placeholder - consider adding a BROADCAST_MESSAGE type to NotificationType enum
+              type: NotificationType.NEW_GYM_CREATED,
+              message: `Broadcast: ${content}`,
+            },
+          })
           .catch((error) => {
             // Log error but don't fail the entire broadcast
+            // Individual notification failures shouldn't prevent the broadcast from completing
             this.logger.error(`Failed to notify user ${user.userId}:`, error);
             return null;
           }),
