@@ -10,8 +10,8 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Connect with VPS
         uses: appleboy/ssh-action@master
@@ -21,18 +21,29 @@ jobs:
           key: ${{ secrets.PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            mkdir -p apps/fitness-saas && cd apps/fitness-saas
-            
+            set -euo pipefail
+
+            ROOT_DIR=~/apps/fitness-saas
+            APP_DIR="$ROOT_DIR/fitness-platform"
+            APP_NAME=fitness-saas
+            PORT=64389
+
+            mkdir -p "$ROOT_DIR"
+            cd "$ROOT_DIR"
+
             if [ -d ".git" ]; then
               git stash
               git pull origin staging
             else
               git clone -b staging https://github.com/ShalOps/gym-sass-backend.git .
             fi
-            
-            npm install --force
-            
-            # Run Prisma migrations
+
+            cd "$APP_DIR"
+
+            echo "Installing dependencies..."
+            npm ci
+
+            echo "Running Prisma..."
             npx prisma generate
             npx prisma migrate deploy
             
@@ -45,8 +56,12 @@ jobs:
               pm2 reload "fitness-saas"
               pm2 save
             else
-              echo "New application"
-              pm2 start npm --name "fitness-saas" -- start -- -p 64389
-              pm2 startup
-              pm2 save
+              echo "Starting PM2 process..."
+              PORT=$PORT pm2 start npm \
+                --name "$APP_NAME" \
+                --cwd "$APP_DIR" \
+                -- start
             fi
+
+            pm2 save
+            echo "Deployment completed successfully"
