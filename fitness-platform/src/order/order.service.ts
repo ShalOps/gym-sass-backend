@@ -2,9 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException, GatewayTime
 import { DatabaseService } from 'src/database/database.service';
 import { OrderStatus } from '@prisma/client';
 import { PaymentMarketPlaceService } from 'src/payments/payments-marketplace.service';
-import { PaymentType, Prisma } from '@prisma/client';
-
-
+import { PaymentType, Prisma, Order } from '@prisma/client';
+const PAGE_SIZE = 10;
 
 @Injectable()
 export class OrderService {
@@ -159,12 +158,29 @@ async create(userId: number, returnUrl: string) {
     }
   }
 
-  async findAll(userId: number) {
-    return this.databaseService.order.findMany({
+    async paginate(order: Order[]) {
+      const hasMore = order.length > PAGE_SIZE;
+      const data = hasMore ? order.slice(0, PAGE_SIZE) : order;
+      const nextCursor = hasMore
+        ? order[order.length - 1].id
+        : null;
+    
+      return { data, hasMore, nextCursor };
+    }
+
+  async findAll(userId: number, cursor?: number) {
+    const orders = await this.databaseService.order.findMany({
        where: {
         userId,
-      }
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      orderBy: { 
+        id: 'asc'
+      },
+      take: PAGE_SIZE + 1,
     })
+    return this.paginate(orders);
+
   }
 }
 
