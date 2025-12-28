@@ -20,6 +20,7 @@ import {
   PaymentType,
   Prisma,
   BookingStatus,
+  OrderStatus,
 } from '@prisma/client';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
@@ -30,6 +31,7 @@ import { RecordManualPaymentDto } from './dto/manual-payment.dto';
 import { ClassBookingsService } from '../bookings/class-bookings.service';
 import { ServiceBookingsService } from '../bookings/service-bookings.service';
 import { PaymentMapper } from './payment.mapper';
+import { PaymentMarketPlaceService } from './payments-marketplace.service';
 
 @Injectable()
 export class PaymentService {
@@ -43,6 +45,7 @@ export class PaymentService {
     private readonly classBookingsService: ClassBookingsService,
     @Inject(forwardRef(() => ServiceBookingsService))
     private readonly serviceBookingsService: ServiceBookingsService,
+    private readonly paymentMarketPlaceService: PaymentMarketPlaceService
   ) {}
 
   private async logPaymentAction(
@@ -541,7 +544,7 @@ export class PaymentService {
 
     const payment = await this.databaseService.payment.findUnique({
       where: { txRef },
-      include: { classBooking: true, serviceBooking: true },
+      include: { classBooking: true, serviceBooking: true, order: true },
     });
 
     if (!payment) {
@@ -583,6 +586,33 @@ export class PaymentService {
       return;
     }
 
+    const orderConfirmed = payment.order?.status === OrderStatus.PAID
+
+    if (orderConfirmed){
+
+      this.logger.warn(
+        `Webhook: Duplicate payment detected for ${txRef}. order already paid.`,
+      );
+      await this.databaseService.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.DUPLICATE,
+          chapaResponse: payload as unknown as Prisma.InputJsonObject,
+          metadata: {
+            ...(payment.metadata as Prisma.JsonObject),
+            duplicateReason: 'Order already paid by another payment',
+          },
+        },
+      });
+
+      await this.logPaymentAction(payment.id, 'WEBHOOK_DUPLICATE', {
+        reason: 'Order already paid',
+        payload,
+      });
+
+      return;
+    }
+
     // 2. Handle Events
     if (payload.event === 'charge.success' || payload.status === 'success') {
       // Double-check with Chapa API to ensure validity
@@ -590,7 +620,15 @@ export class PaymentService {
         const verifyResponse = await this.chapaService.verify({
           tx_ref: txRef,
         });
-        const result = await this._verifyAndProcess(payment, verifyResponse);
+        let result: {
+          processed: boolean;
+          dto: VerifyPaymentResponseDto;
+        }
+        if (payment.orderId){
+           result = await this.paymentMarketPlaceService._verifyAndProcess(payment, verifyResponse)
+        } else {
+           result = await this._verifyAndProcess(payment, verifyResponse);
+        }
         this.logger.log(`Webhook: Processed success for ${txRef}`);
 
         // Send Email Receipt (Fire-and-forget)

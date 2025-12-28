@@ -9,6 +9,7 @@ import { ConfigModule } from '@nestjs/config';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingsModule } from '../bookings/bookings.module';
 import { getChapaModuleConfig } from '../config/payments.config';
+import { PaymentMarketPlaceService } from './payments-marketplace.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { getChapaModuleConfig } from '../config/payments.config';
     }),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, PaymentExportService, PaymentHistoryService],
-  exports: [PaymentService, PaymentExportService, PaymentHistoryService],
+  providers: [PaymentService, PaymentExportService, PaymentHistoryService, PaymentMarketPlaceService],
+  exports: [PaymentService, PaymentExportService, PaymentHistoryService, PaymentMarketPlaceService],
 })
 export class PaymentsModule {}
