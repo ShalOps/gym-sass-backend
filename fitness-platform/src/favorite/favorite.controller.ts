@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException,Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
@@ -10,6 +10,14 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
+  private parseCursor(cursor?: string): number | undefined {
+    if (!cursor) return undefined;
+    const parsed = Number(cursor);
+    if (isNaN(parsed) || parsed <= 0) {
+      throw new BadRequestException('cursor must be a positive number');
+    }
+    return parsed;
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -23,8 +31,8 @@ export class FavoriteController {
   @Get()
   @ApiOperation({ summary: 'Get a users list of favorites' })
   @ApiBearerAuth('JWT-auth')
-  findAll(@Req() req: RequestWithUser) {
-    return this.favoriteService.findAll(req.user.userId);
+  findAll(@Req() req: RequestWithUser, @Query('cursor') cursor?: string) {
+    return this.favoriteService.findAll(req.user.userId, this.parseCursor(cursor));
   }
 
 }
