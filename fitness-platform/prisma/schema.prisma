@@ -143,11 +143,13 @@ model Payment {
   userId           Int?
   serviceBookingId Int?
   classBookingId   Int?
+  orderId          Int?    @unique 
 
   user           User?           @relation("UserPayments", fields: [userId], references: [userId], onDelete: SetNull)
   serviceBooking ServiceBooking? @relation("ServiceBookingPayments", fields: [serviceBookingId], references: [serviceBookingId], onDelete: SetNull)
   classBooking   ClassBooking?   @relation("ClassBookingPayments", fields: [classBookingId], references: [classBookingId], onDelete: SetNull)
   logs           PaymentLog[]
+  order          Order?  @relation(fields: [orderId], references: [id])
 
   @@index([txRef])
   @@index([chapaReference])
@@ -157,6 +159,7 @@ model Payment {
   @@index([serviceBookingId])
   @@index([classBookingId])
   @@index([createdAt])
+  @@index([orderId])
   @@map("payments")
 }
 
@@ -194,8 +197,11 @@ model User {
   broadcasts            BroadcastMessage[]
   products              Product[]   
   cart                  Cart? 
-  favorite              Favorite[]             
-
+  favorite              Favorite[]              
+  order                 Order[]       
+  library               PurchasedItem[]
+  review                Review[]
+  rating                Rating[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   lastLogin DateTime?
@@ -555,6 +561,10 @@ model Product {
   vendor          User        @relation(fields: [vendorID], references: [userId], onDelete: Restrict)
   cartItems       CartItem[]
   favorite        Favorite[]
+  orderItem       OrderItem[]
+  purchasedBy     PurchasedItem[]
+  review          Review[]
+  rating          Rating[]
   @@unique([name, vendorID])
 }
 
@@ -584,7 +594,6 @@ model CartItem{
   cartItemId    Int      @id @default(autoincrement())
   cartId        Int
   productId     Int 
-  quantity      Int      @default(1)
   
   cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -602,3 +611,78 @@ model Favorite{
 
   @@unique([productId, userId])
 }
+
+model Order {
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  totalAmount     Float
+  status          OrderStatus     @default(PENDING) 
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user            User            @relation(fields: [userId], references: [userId])
+  items           OrderItem[] 
+  payment         Payment?    
+  purchasedItems  PurchasedItem[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  price     Float   
+  
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model PurchasedItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  orderId   Int      
+  createdAt DateTime @default(now())
+
+  
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order   @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, productId]) 
+}
+
+model Review {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  productId     Int
+  comment        String
+
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+model Rating {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  productId     Int
+  rating        Int
+
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, productId])
+}
+
