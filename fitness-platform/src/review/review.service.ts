@@ -2,6 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { DatabaseService } from 'src/database/database.service';
+import { Review } from '@prisma/client';
+const PAGE_SIZE = 10;
+
 
 @Injectable()
 export class ReviewService {
@@ -31,7 +34,17 @@ export class ReviewService {
     })
   }
 
-  async getProductReviews(productId: number) {
+  async paginate(review: Review[]) {
+    const hasMore = review.length > PAGE_SIZE;
+    const data = hasMore ? review.slice(0, PAGE_SIZE) : review;
+    const nextCursor = hasMore
+      ? review[review.length - 1].id
+      : null;
+  
+    return { data, hasMore, nextCursor };
+  }
+
+  async getProductReviews(productId: number, cursor?: number) {
 
     const check = await this.databaseService.product.findUnique(
       {
@@ -45,9 +58,10 @@ export class ReviewService {
       throw new NotFoundException("Product doesn't exist")
     }
     
-    return await this.databaseService.review.findMany({
+    const reviews = await this.databaseService.review.findMany({
       where: {
         productId: productId,
+         ...(cursor ? { id: { gt: cursor } } : {}),
       },
       include: {
         user: {
@@ -59,10 +73,13 @@ export class ReviewService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc', // Show newest reviews first
+      orderBy: { 
+        id: 'asc'
       },
+      take: PAGE_SIZE + 1,
     });
+
+    return this.paginate(reviews)
 }
 
 }
