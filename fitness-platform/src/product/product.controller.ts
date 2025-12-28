@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query, BadRequestException, UseInterceptors, UploadedFiles, ParseFilePipe, MaxFileSizeValidator, } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query, BadRequestException, UseInterceptors, UploadedFiles, ParseFilePipe, MaxFileSizeValidator, ForbiddenException, NotFoundException, StreamableFile, } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -11,6 +11,8 @@ import { extname } from 'path';
 import { ProductType } from '@prisma/client';
 import * as fs from 'fs';
 import { error } from 'console';
+import { DatabaseService } from 'src/database/database.service';
+import { join } from 'path';
 
   const diskStorageConfig = diskStorage({
     destination: (req, file, callback) => {
@@ -29,7 +31,7 @@ import { error } from 'console';
 
 @Controller('product')
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: ProductService, private readonly databaseService: DatabaseService) {}
 
   private cleanupFiles(files: { image?: string; document?: string | null }) {
   if (files.image && fs.existsSync(files.image)) {
@@ -137,6 +139,23 @@ export class ProductController {
     return this.productService.getProductsByType(type, this.parseCursor(cursor));
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'List of  purchased items a user owns' })
+  @Get('purchased')
+  @ApiBearerAuth('JWT-auth')
+  async purchasedItems(@Req() req: RequestWithUser,) {
+    return this.productService.purchasedItems(req.user.userId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("revenue")
+  @ApiOperation({ summary: 'Get vendors revenue' })
+  @ApiBearerAuth('JWT-auth')
+  async getVendorSalesHistory(@Req() req: RequestWithUser)
+  {
+    return this.productService.getVendorRevenue(req.user.userId, req.user.isVendor)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })
   findOne(@Param('id') id: string) {
@@ -207,5 +226,63 @@ export class ProductController {
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.productService.remove(+id, req.user.userId, req.user.isVendor);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Download purchased item' })
+  @Get('download/:id')
+  @ApiBearerAuth('JWT-auth')
+  async downloadDigitalProduct(
+   @Param('id') id: string,
+    @Req() req: RequestWithUser,
+  ) {
+    const userId = req.user.userId
+    const productId = +id
+    const ownership = await this.databaseService.purchasedItem.findUnique({
+      where: {
+        userId_productId: { userId, productId },
+      },
+      include: { product: true }
+    });
+
+    if (!ownership) {
+      throw new ForbiddenException('You have not purchased this product.');
+    }
+
+    const product = ownership.product;
+
+    if (product.document){
+      const absolutePath = join(process.cwd(), '', product.document);
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new NotFoundException('The requested file is missing from the server.');
+    }
+
+
+    const fileExt = extname(product.document); 
+    const fileName = `${product.name.replace(/\s+/g, '_')}${fileExt}`;
+
+    const mimeTypes: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.zip': 'application/zip',
+      '.mp4': 'video/mp4',
+      '.mp3': 'audio/mpeg',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+    };
+    
+    const contentType = mimeTypes[fileExt.toLowerCase()] || 'application/octet-stream';
+
+    const file = fs.createReadStream(absolutePath);
+    
+    return new StreamableFile(file, {
+      type: contentType,
+      disposition: `attachment; filename="${fileName}"`,
+    });
+  }
+    else {
+      throw new NotFoundException("Product doesn't contain a file")
+    }
+  }
+
 
 }

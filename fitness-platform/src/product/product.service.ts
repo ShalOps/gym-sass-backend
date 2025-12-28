@@ -229,4 +229,35 @@ export class ProductService {
     });
   }
 
+  async purchasedItems(userId: number){
+    return await this.databaseService.purchasedItem.findMany({
+      where: {
+        userId
+      }
+    })
+  }
+
+  async getVendorRevenue(vendorId: number, isVendor: boolean) {
+
+    if (!isVendor) {
+      throw new UnauthorizedException('Only vendors can create products');
+    }
+    const sales = await this.databaseService.purchasedItem.findMany({
+      where: {
+        product: { vendorID: vendorId }
+      },
+      include: {
+        product: true
+      }
+    });
+
+    const totalRevenue = sales.reduce((sum, item) => sum + item.product.price, 0);
+    const totalUnitsSold = sales.length;
+
+    return {
+      totalRevenue,
+      totalUnitsSold,
+    };
+  }
+
 }
