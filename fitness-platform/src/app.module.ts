@@ -28,6 +28,7 @@ import { EmailModule } from './email/email.module';
 import { ChatModule } from './chat/chat.module';
 import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { TrainerModule } from './trainers/trainers.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { TelegramModule } from './telegram/telegram.module';
     BookingsModule,
     AdminAnalyticsModule,
     ReviewsModule,
+    TrainerModule,
     GymClassReviewModule,
     PaymentsModule,
     NotificationsModule,

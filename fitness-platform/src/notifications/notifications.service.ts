@@ -393,4 +393,15 @@ export class NotificationsService {
 
     await this.queueEmail([email], subject, html);
   }
+
+  async notifyAdminVerificationRequest(email: string) {
+    const subject = `New Trainer Verification Request 🛡️`;
+    const html = `
+      <h1>New Trainer Verification Request</h1>
+      <p>A new trainer has submitted a verification request. Please review and take the necessary actions in the admin panel.</p>
+    `;
+
+    const adminEmail = email;
+    await this.queueEmail([adminEmail], subject, html);
+  }
 }
