@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { TrainerService } from "./trainers.service";
 import { CreateTrainerDto } from "./dto/create-trainer.dto";
-import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "src/auth/guards/roles.guard";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
 import { Roles } from "src/auth/roles.decorator";
@@ -10,6 +9,7 @@ import { Role } from "@prisma/client";
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
+import { CheckAvailabilityDto } from "./dto/availability.dto";
 
 @Controller('trainers')
 export class TrainerController {
@@ -93,6 +93,19 @@ export class TrainerController {
     const userId = req.user.userId;
     return this.trainerService.verifyTrainer(trainerId, userId, verifyTrainer);
   }
+
+  @Post('/:id/availability/check')
+  checkAvailability(
+    @Body() body: CheckAvailabilityDto,
+    @Param('id', ParseIntPipe) id: number
+  ) {
+  return this.trainerService.isTrainerAvailable(
+    id,
+    body.date,
+    body.startTime,
+    body.endTime,
+  );
+}
 }
 
 

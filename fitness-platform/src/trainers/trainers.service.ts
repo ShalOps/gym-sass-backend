@@ -4,6 +4,7 @@ import { CreateTrainerDto } from "./dto/create-trainer.dto";
 import { Prisma, Role } from "@prisma/client";
 import { UpdateTrainerDto } from "./dto/update-trainer.dto";
 import { NotificationsService } from "src/notifications/notifications.service";
+import { parseAvailabilityTime } from "src/utils/time.util";
 
 
 @Injectable()
@@ -349,4 +350,74 @@ export class TrainerService {
       throw new InternalServerErrorException('failed to verify trainer');
     }
   }
+
+  async isTrainerAvailable(
+    trainerId: number,
+    dateStr: string,
+    startStr: string,
+    endStr: string
+  ) {
+    const requestedStart = new Date(startStr);
+    const requestedEnd = new Date(endStr);
+    const checkDate = new Date(dateStr);
+    const dayOfWeek = checkDate.getDay();
+
+    if (requestedStart >= requestedEnd) {
+      return { available: false, reason: "Invalid time range" };
+    }
+
+    const allSlots = await this.databaseService.trainerAvailability.findMany({
+      where: {
+        trainerId,
+        OR: [
+          { date: checkDate },
+          { dayOfWeek, isRecurring: true }
+        ]
+      },
+    });
+
+    if (allSlots.length === 0) {
+      return { available: false, reason: "No availability defined for this day" };
+    }
+
+    const specificDateSlots = allSlots.filter(s => s.date !== null);
+    const activeSlots = specificDateSlots.length > 0
+      ? specificDateSlots
+      : allSlots.filter(s => s.isRecurring);
+
+    const fitsInSlot = activeSlots.some(slot => {
+      const [sH, sM] = slot.startTime.split(':').map(Number);
+      const [eH, eM] = slot.endTime.split(':').map(Number);
+
+      const slotStart = new Date(checkDate);
+      slotStart.setHours(sH, sM, 0, 0);
+
+      const slotEnd = new Date(checkDate);
+      slotEnd.setHours(eH, eM, 0, 0);
+
+      return requestedStart >= slotStart && requestedEnd <= slotEnd;
+    });
+
+    if (!fitsInSlot) {
+      return { available: false, reason: "Time is outside trainer's working hours" };
+    }
+
+    const conflict = await this.databaseService.trainerBooking.findFirst({
+      where: {
+        trainerId,
+        status: { not: 'CANCELLED' },
+        AND: [
+          { startTime: { lt: requestedEnd } },
+          { endTime: { gt: requestedStart } },
+        ],
+      },
+    });
+
+    if (conflict) {
+      return { available: false, reason: "Trainer is already booked" };
+    }
+
+    return { available: true, reason: "Available" };
+}
+
 }

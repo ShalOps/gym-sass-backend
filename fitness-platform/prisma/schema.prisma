@@ -578,8 +578,9 @@ model TrainerAvailability {
   id          Int      @id @default(autoincrement())
   trainerId   Int
   dayOfWeek   Int      // 0 = Sunday, 6 = Saturday
-  startTime   DateTime
-  endTime     DateTime
+  date        DateTime?
+  startTime   String
+  endTime     String
   isRecurring Boolean  @default(true)
 
   trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)

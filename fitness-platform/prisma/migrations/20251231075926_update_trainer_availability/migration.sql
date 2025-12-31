@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "TrainerAvailability" ADD COLUMN     "date" TIMESTAMP(3),
+ALTER COLUMN "startTime" SET DATA TYPE TEXT,
+ALTER COLUMN "endTime" SET DATA TYPE TEXT;
