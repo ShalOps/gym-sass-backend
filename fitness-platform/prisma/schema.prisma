@@ -116,6 +116,12 @@ enum Channel {
   EMAIL
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Payment {
   id                Int           @id @default(autoincrement())
   txRef             String        @unique @map("tx_ref") // Our generated unique reference (required by Chapa)
@@ -192,6 +198,10 @@ model User {
   messagesSent          Message[]
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
+  trainers              Trainer?
+  TrainerBookings       TrainerBooking[]
+  TrainerReviews        TrainerReview[]
+
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -220,6 +230,7 @@ model Gym {
   coverPhoto              Photo?                    @relation("gymCover", fields: [coverPhotoId], references: [id])
   coverPhotoId            Int?                      @unique
   reviews                 GymReview[]
+  trainersGyms            TrainerGym[]
 
   @@index([location])
   @@index([verified])
@@ -536,3 +547,91 @@ model FailedNotification {
   payload     String
   attemptedAt DateTime @default(now())
 }
+
+model Trainer {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @unique
+  bio                String?
+  gender             String?
+  dob                DateTime?
+  hourlyRate         Decimal  @db.Decimal(10, 2)
+  specializations    Json
+  yearsOfExperience  Int
+  profilePicture     String?
+  certificationFiles Json
+  verified           Boolean  @default(false)
+  verificationStatus VerificationStatus   @default(PENDING)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  /// Relations
+  user          User                 @relation(fields: [userId], references: [userId])
+  availability  TrainerAvailability[]
+  gyms          TrainerGym[]
+  bookings      TrainerBooking[]
+  reviews       TrainerReview[]
+}
+
+model TrainerAvailability {
+  id          Int      @id @default(autoincrement())
+  trainerId   Int
+  dayOfWeek   Int      // 0 = Sunday, 6 = Saturday
+  startTime   DateTime
+  endTime     DateTime
+  isRecurring Boolean  @default(true)
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, dayOfWeek])
+}
+
+model TrainerGym {
+  id        Int @id @default(autoincrement())
+  trainerId Int
+  gymId     Int
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  gym     Gym     @relation(fields: [gymId], references: [gymId], onDelete: Cascade)
+
+  @@unique([trainerId, gymId])
+}
+
+
+model TrainerBooking {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  trainerId        Int
+  date             DateTime
+  startTime        DateTime
+  endTime          DateTime
+  sessionType      String
+  status           BookingStatus @default(PENDING)
+  rescheduledFrom  Int?
+  createdAt        DateTime @default(now())
+
+  /// Relations
+  user     User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  trainer  Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  review   TrainerReview?
+
+  originalBooking TrainerBooking? @relation("Reschedule", fields: [rescheduledFrom], references: [id])
+  reschedules      TrainerBooking[] @relation("Reschedule")
+
+  @@index([trainerId, date])
+}
+
+model TrainerReview {
+  id        Int    @id @default(autoincrement())
+  trainerId Int
+  userId    Int
+  bookingId Int   @unique
+  rating    Int
+  comment   String?
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  booking TrainerBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+
+
