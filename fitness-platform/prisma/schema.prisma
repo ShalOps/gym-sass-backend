@@ -91,6 +91,18 @@ enum ConversationContext {
   ADMIN_ANNOUNCEMENT
 }
 
+enum EnergyLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FitnessLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
 enum AttachmentType {
   IMAGE
   FILE
@@ -174,6 +186,21 @@ model User {
   profilePic            String?
   bio                   String?
   location              String
+  fitnessLevel          FitnessLevel?
+  goals                 String[]                  @default([])
+  preferences           Json?
+  healthNotes           String?
+  height                Float?
+  weight                Float?
+  preferredTimes        String[]                  @default([])
+  preferredLocations    String[]                  @default([])
+  classTypes            String[]                  @default([])
+  instructors           Int[]                     @default([])
+  priceRange            Json?
+  equipmentAtHome       String[]                  @default([])
+  injuries              String[]                  @default([])
+  consentFlags          Json?
+  lastActiveAt          DateTime?
   goal                  Goal?
   role                  Role                      @default(CUSTOMER)
   telegramChatId        BigInt?
@@ -193,11 +220,18 @@ model User {
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  lastLogin DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  lastLogin       DateTime?
+  searchQueries   SearchQuery[]
+  userMetrics     UserMetrics[]
+  aifeedbacks     AIFeedback[]
+  viewHistories   ViewHistory[]
+  aiconversations AIConversation[]
 
   @@index([location])
+  @@index([fitnessLevel])
+  @@index([lastActiveAt])
   @@index([gender])
   @@index([goal])
   @@index([role])
@@ -301,14 +335,24 @@ model Photo {
 }
 
 model ClassBooking {
-  classBookingId Int           @id @default(autoincrement())
-  userId         Int
-  classId        Int
-  status         BookingStatus @default(PENDING)
-  bookedAt       DateTime      @default(now())
-  startTime      DateTime?
-  endTime        DateTime?
-  notes          String?
+  classBookingId     Int           @id @default(autoincrement())
+  userId             Int
+  classId            Int
+  status             BookingStatus @default(PENDING)
+  bookedAt           DateTime      @default(now())
+  startTime          DateTime?
+  endTime            DateTime?
+  notes              String?
+  preferredTimes     String[]      @default([])
+  medicalConstraints String?
+  energyLevel        EnergyLevel?  @default(MEDIUM)
+
+  // post-session/enhanced fields
+  sessionRating Int?
+  microFeedback String?
+  caloriesEst   Int?
+  attended      Boolean? @default(false)
+  searchQuery   String?
 
   payments Payment[] @relation("ClassBookingPayments")
 
@@ -524,7 +568,7 @@ model BroadcastMessage {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  sender      User     @relation(fields: [senderId], references: [userId])
+  sender User @relation(fields: [senderId], references: [userId])
 
   @@map("broadcast_messages")
 }
@@ -535,4 +579,74 @@ model FailedNotification {
   channel     Channel
   payload     String
   attemptedAt DateTime @default(now())
+}
+
+model SearchQuery {
+  id      Int     @id @default(autoincrement())
+  query   String
+  userId  Int
+  results Json?
+  intent  String?
+
+  user User @relation(fields: [userId], references: [userId])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([intent])
+}
+
+model UserMetrics {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  weight Float?
+  height Float?
+  date   DateTime @default(now())
+  photos Json?
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@index([date])
+}
+
+model AIFeedback {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  feature   String
+  rating    Int
+  timestamp DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@index([feature])
+}
+
+model ViewHistory {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  entityType String
+  entityId   Int
+  timestamp  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([timestamp])
+}
+
+model AIConversation {
+  id        String    @id @default(cuid())
+  userId    Int
+  state     Json
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@map("ai_conversations")
 }

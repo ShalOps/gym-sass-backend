@@ -4,16 +4,22 @@ import type { Queue } from 'bull';
 import { DateUtil } from '../common/utils/date.util';
 import { User } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { DatabaseService } from '../database/database.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    @InjectQueue('email-queue') private readonly emailQueue: Queue
+    @InjectQueue('email-queue') private readonly emailQueue: Queue,
+    private readonly db: DatabaseService,
   ) {}
 
-  private async queueEmail(recipients: string[], subject: string, html: string) {
+  private async queueEmail(
+    recipients: string[],
+    subject: string,
+    html: string,
+  ) {
     try {
       await this.emailQueue.add(
         'send-email',
@@ -29,12 +35,111 @@ export class NotificationsService {
         },
       );
       this.logger.log(`Queued email to: ${recipients.join(', ')}`);
-    } catch (error) {
-      this.logger.error(`Failed to queue email to ${recipients}: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to queue email to ${recipients.join(', ')}: ${
+          error && typeof error === 'object' && 'message' in error
+            ? (error as { message?: string }).message
+            : String(error)
+        }`,
+      );
       throw error;
     }
   }
 
+  /**
+   * Sends a notification for a new chat message
+   */
+  async notifyChatMessage(userId: number, senderName: string, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = `New message from ${senderName} 💬`;
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>You have a new message from <b>${senderName}</b>:</p>
+        <blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; margin: 10px 0;">
+          ${content}
+        </blockquote>
+        <p>Log in to the platform to reply.</p>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send chat notification to user ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Sends a notification for a Telegram fallback message
+   */
+  async notifyTelegramFallback(userId: number, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = 'Telegram Fallback Message 📱';
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>A message was sent to you via Telegram fallback:</p>
+        <blockquote style="border-left: 4px solid #ccc; padding-left: 10px; color: #666; margin: 10px 0;">
+          ${content}
+        </blockquote>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send telegram fallback notification to user ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Sends a notification for a broadcast message
+   */
+  async notifyBroadcast(userId: number, content: string) {
+    try {
+      const user = await this.db.user.findUnique({
+        where: { userId },
+        select: { email: true, firstName: true },
+      });
+
+      if (!user) return;
+
+      const subject = 'Important Announcement 📢';
+      const html = `
+        <p>Hello ${user.firstName},</p>
+        <p>We have an important announcement for you:</p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; margin: 10px 0;">
+          ${content}
+        </div>
+        <p>Best regards,<br/>Fitness Platform Team</p>
+      `;
+
+      await this.queueEmail([user.email], subject, html);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send broadcast notification to user ${userId}:`,
+        error,
+      );
+    }
+  }
 
   async sendEmailReceipt(email: string, amount: Decimal, txRef: string) {
     const formattedAmount = amount.toFixed(2);
@@ -49,7 +154,12 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-  async sendRefundPayment(email: string, refundAmount: number, txRef: string, reason: string) {
+  async sendRefundPayment(
+    email: string,
+    refundAmount: number,
+    txRef: string,
+    reason: string,
+  ) {
     const subject = `Refund Processed Successfully 💸`;
     const html = `
       <h2>Your Refund is Completed</h2>
@@ -66,7 +176,6 @@ export class NotificationsService {
 
     await this.queueEmail([email], subject, html);
   }
-
 
   async notifyUserBookingConfirmation(
     email: string,
@@ -173,7 +282,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffClassBookingCancellation(
     emails: string[],
     bookingDetails: {
@@ -222,7 +330,6 @@ export class NotificationsService {
     }
   }
 
-
   async notifyUserServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -232,7 +339,7 @@ export class NotificationsService {
       duration: number;
       userName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
@@ -253,7 +360,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffServiceBookingConfirmation(
     email: string,
     bookingDetails: {
@@ -263,7 +369,7 @@ export class NotificationsService {
       duration: number;
       userName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       bookingDetails.startTime,
@@ -287,7 +393,6 @@ export class NotificationsService {
     await this.queueEmail([email], subject, html);
   }
 
-
   async notifyStaffServiceBookingCancellation(
     email: string,
     bookingDetails: {
@@ -296,7 +401,7 @@ export class NotificationsService {
       startTime: string;
       serviceName: string;
       timezone: string;
-    }
+    },
   ) {
     const formattedTime = DateUtil.formatInTimezone(
       new Date(bookingDetails.startTime),
@@ -325,8 +430,8 @@ export class NotificationsService {
       gymId: number;
       gymName: string;
       ownerName: string;
-      ownerEmail: string
-    }
+      ownerEmail: string;
+    },
   ) {
     const html = `
       <h1>New Gym Created</h1>
@@ -350,9 +455,8 @@ export class NotificationsService {
       paymentDate: Date;
       paymentId: number;
       txRef: string;
-    }
-
-  ){
+    },
+  ) {
     const formattedDate = DateUtil.formatInTimezone(
       paymentDetails.paymentDate,
       'EAT',
@@ -372,7 +476,6 @@ export class NotificationsService {
     const subject = `Payment Failed Notification 💳`;
     await this.queueEmail([user.email], subject, html);
   }
-
 
   async sendBookingReminder(
     email: string,

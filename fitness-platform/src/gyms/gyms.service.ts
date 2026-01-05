@@ -24,85 +24,85 @@ export class GymsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-async create(createGymsDto: CreateGymsDto, currentUserId: number) {
-  const gymOwner = await this.databaseservice.user.findUnique({
-    where: { userId: currentUserId },
-    select: { userId: true, role: true },
-  });
-
-  if (!gymOwner) {
-    throw new NotFoundException(`User with ID ${currentUserId} not found`);
-  }
-
-  if (gymOwner.role !== 'GYMOWNER') {
-    throw new ForbiddenException(
-      `User with ID ${currentUserId} is not a Gym owner`,
-    );
-  }
-
-  if (
-    createGymsDto.timezone &&
-    !DateUtil.isValidTimezone(createGymsDto.timezone)
-  ) {
-    throw new BadRequestException(
-      `Invalid timezone: ${createGymsDto.timezone}`,
-    );
-  }
-
-  return await this.databaseservice.$transaction(async (tx) => {
-    // Create gym
-    const newGym = await tx.gym.create({
-      data: { ...createGymsDto, gymOwnerId: currentUserId },
+  async create(createGymsDto: CreateGymsDto, currentUserId: number) {
+    const gymOwner = await this.databaseservice.user.findUnique({
+      where: { userId: currentUserId },
+      select: { userId: true, role: true },
     });
 
-    // Notify ALL admins (in-app)
-    const adminIdList = await tx.user.findMany({
-      where: { role: Role.ADMIN },
-      select: { userId: true },
-    });
-
-    for (const admin of adminIdList) {
-      await tx.notification.create({
-        data: {
-          userId: admin.userId,
-          type: NotificationType.NEW_GYM_CREATED,
-          message: `Gym "${newGym.gymName}" was created. Please verify the gym.`,
-        },
-      });
+    if (!gymOwner) {
+      throw new NotFoundException(`User with ID ${currentUserId} not found`);
     }
 
-    // Fetch one admin (e.g. the main admin)
-    const admin = await tx.user.findFirst({
-      where: { role: Role.ADMIN },
-      select: { email: true },
-    });
+    if (gymOwner.role !== 'GYMOWNER') {
+      throw new ForbiddenException(
+        `User with ID ${currentUserId} is not a Gym owner`,
+      );
+    }
 
-    if (admin?.email) {
-      // Fire-and-forget email
-      const owner = await tx.user.findUnique({
-        where: { userId: currentUserId },
-        select: { userName: true, email: true },
+    if (
+      createGymsDto.timezone &&
+      !DateUtil.isValidTimezone(createGymsDto.timezone)
+    ) {
+      throw new BadRequestException(
+        `Invalid timezone: ${createGymsDto.timezone}`,
+      );
+    }
+
+    return await this.databaseservice.$transaction(async (tx) => {
+      // Create gym
+      const newGym = await tx.gym.create({
+        data: { ...createGymsDto, gymOwnerId: currentUserId },
       });
-      if(owner){
-      this.notificationsService
-        .notifyAdmin(admin.email, {
-          gymName: newGym.gymName,
-          ownerName: owner.userName,
-          gymId: newGym.gymId,
-          ownerEmail: owner.email
-        })
-        .catch((error) => {
-          this.logger.error(
-            'Error sending new gym creation email to admin:',
-            error,
-          );
+
+      // Notify ALL admins (in-app)
+      const adminIdList = await tx.user.findMany({
+        where: { role: Role.ADMIN },
+        select: { userId: true },
+      });
+
+      for (const admin of adminIdList) {
+        await tx.notification.create({
+          data: {
+            userId: admin.userId,
+            type: NotificationType.NEW_GYM_CREATED,
+            message: `Gym "${newGym.gymName}" was created. Please verify the gym.`,
+          },
         });
       }
-    }
 
-    return newGym;
-  });
-}
+      // Fetch one admin (e.g. the main admin)
+      const admin = await tx.user.findFirst({
+        where: { role: Role.ADMIN },
+        select: { email: true },
+      });
+
+      if (admin?.email) {
+        // Fire-and-forget email
+        const owner = await tx.user.findUnique({
+          where: { userId: currentUserId },
+          select: { userName: true, email: true },
+        });
+        if (owner) {
+          this.notificationsService
+            .notifyAdmin(admin.email, {
+              gymName: newGym.gymName,
+              ownerName: owner.userName,
+              gymId: newGym.gymId,
+              ownerEmail: owner.email,
+            })
+            .catch((error) => {
+              this.logger.error(
+                'Error sending new gym creation email to admin:',
+                error,
+              );
+            });
+        }
+      }
+
+      return newGym;
+    });
+  }
 
   async findAll(pagination: PaginationDto) {
     const {

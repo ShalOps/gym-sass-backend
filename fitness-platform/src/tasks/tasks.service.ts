@@ -99,7 +99,7 @@ export class TasksService {
   async sendBookingReminders() {
     this.logger.log('Running booking reminders check...');
     const startWindow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const endWindow = new Date(startWindow.getTime() + 60 * 60 * 1000); 
+    const endWindow = new Date(startWindow.getTime() + 60 * 60 * 1000);
     try {
       // 1. Find Class Bookings
       const classBookings = await this.databaseService.classBooking.findMany({

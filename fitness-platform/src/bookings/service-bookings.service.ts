@@ -317,19 +317,18 @@ export class ServiceBookingsService extends BookingsService {
         : 'N/A';
 
       this.notificationsService
-        .notifyStaffServiceBookingCancellation(
-          ownerEmail,
-          {
-            BookingName: serviceName,
-            startTime: startTime,
-            userName: userName,
-            serviceName: serviceName,
-            timezone: cancelledBooking.service.gym.timezone
-          }
-        )
+        .notifyStaffServiceBookingCancellation(ownerEmail, {
+          BookingName: serviceName,
+          startTime: startTime,
+          userName: userName,
+          serviceName: serviceName,
+          timezone: cancelledBooking.service.gym.timezone,
+        })
         .catch((err) => {
           this.logger.error('Failed to notify owner of cancellation', err);
-          throw new InternalServerErrorException('Failed to notify owner of cancellation');
+          throw new InternalServerErrorException(
+            'Failed to notify owner of cancellation',
+          );
         });
     }
 
@@ -622,9 +621,7 @@ export class ServiceBookingsService extends BookingsService {
     // Send confirmation email with localized time
     if (booking.user?.email && booking.startTime) {
       this.notificationsService
-        .notifyUserServiceBookingConfirmation(
-          booking.user.email,
-          {
+        .notifyUserServiceBookingConfirmation(booking.user.email, {
           BookingName: booking.service.name,
           serviceName: booking.service.name,
           duration: Number(booking.service.duration),
@@ -633,8 +630,13 @@ export class ServiceBookingsService extends BookingsService {
           timezone: booking.service.gym.timezone,
         })
         .catch((err) => {
-          this.logger.error(`Failed to send booking confirmation for ${bookingId}`, err);
-          throw new InternalServerErrorException('Failed to send booking confirmation');
+          this.logger.error(
+            `Failed to send booking confirmation for ${bookingId}`,
+            err,
+          );
+          throw new InternalServerErrorException(
+            'Failed to send booking confirmation',
+          );
         });
     }
 
@@ -645,9 +647,7 @@ export class ServiceBookingsService extends BookingsService {
 
       if (owner?.email) {
         this.notificationsService
-          .notifyStaffServiceBookingConfirmation(
-            owner.email,
-            {
+          .notifyStaffServiceBookingConfirmation(owner.email, {
             BookingName: booking.service.name,
             serviceName: booking.service.name,
             duration: Number(booking.service.duration),
