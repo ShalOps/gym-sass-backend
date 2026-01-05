@@ -1,0 +1,75 @@
+name: Deploy Fitness SaaS (Staging)
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy_staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions
+          chmod 600 ~/.ssh/github_actions
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: |
+          ssh -i ~/.ssh/github_actions \
+            -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} <<'EOF'
+
+            set -euo pipefail
+
+            ROOT_DIR=~/apps/fitness-saas
+            APP_DIR="$ROOT_DIR/fitness-platform"
+            APP_NAME=fitness-saas
+            PORT=64389
+
+            mkdir -p "$ROOT_DIR"
+            cd "$ROOT_DIR"
+
+            if [ -d ".git" ]; then
+              echo "Updating existing repository..."
+              git reset --hard
+              git clean -fd
+              git pull origin staging
+            else
+              echo "Cloning repository..."
+              git clone -b staging git@github.com:ShalOps/gym-sass-backend.git .
+            fi
+
+            cd "$APP_DIR"
+
+            echo "Installing dependencies..."
+            npm ci
+
+            echo "Running Prisma..."
+            npx prisma generate
+            npx prisma db push
+
+            echo "Building application..."
+            npm run build
+
+            if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
+              echo "Reloading PM2 process..."
+              pm2 reload "$APP_NAME"
+            else
+              echo "Starting PM2 process..."
+              PORT=$PORT pm2 start npm \
+                --name "$APP_NAME" \
+                --cwd "$APP_DIR" \
+                -- start
+            fi
+
+            pm2 save
+            echo "Deployment completed successfully"
+
+          EOF
