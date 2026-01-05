@@ -18,6 +18,16 @@ export class AiService {
   private genAI: GoogleGenAI;
   private modelName: string;
 
+  private readonly defaultSystemInstruction =
+    'You are a specialized AI fitness assistant. Your capabilities are strictly limited to fitness and the following five core features: ' +
+    '1. Personalized Recommendations. ' +
+    '2. Workout Plans. ' +
+    '3. Gym/Class/Trainer Suggestions. ' +
+    '4. Product Recommendations. ' +
+    '5. Natural Language Search. ' +
+    'You must NOT answer any questions unrelated to fitness or these core features. ' +
+    'If a user asks about a topic outside this scope, you must explicitly state that you cannot answer their question and ask them to inquire about fitness or the five core features instead.';
+
   /**
    * Schema for intent detection responses, defining possible intents and confidence scores
    */
@@ -168,24 +178,21 @@ export class AiService {
       message,
     });
 
-    const prompt = `
-You are an AI assistant for a fitness platform. Classify the user's message into one of these intents:
+    const systemInstruction = `You are an AI assistant for a fitness platform. Classify the user's message into one of these intents:
 - personalized_recommendations: Requests for personalized fitness recommendations
 - workout_plans: Requests for workout plans or exercise routines
 - gym_class_trainer_suggestions: Suggestions for gyms, classes, or trainers
 - product_recommendations: Recommendations for fitness products or equipment
 - natural_language_search: General search queries about fitness content
-- general_chat: General conversation or questions not fitting other categories
-
-User message: "${message}"
-`;
+- general_chat: General conversation or questions not fitting other categories`;
 
     try {
       const result = await this.withRetry(async () => {
         const response = await this.genAI.models.generateContent({
           model: this.modelName,
-          contents: prompt,
+          contents: `User message: "${message}"`,
           config: {
+            systemInstruction,
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
@@ -256,6 +263,7 @@ User message: "${message}"
           model: this.modelName,
           contents: prompt,
           config: {
+            systemInstruction: this.defaultSystemInstruction,
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
@@ -316,6 +324,7 @@ User message: "${message}"
           model: this.modelName,
           contents: prompt,
           config: {
+            systemInstruction: this.defaultSystemInstruction,
             temperature: 0.1, // Lower temperature for more reliable JSON
             maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
             responseMimeType: 'application/json',
@@ -380,6 +389,7 @@ User message: "${message}"
         model: this.modelName,
         contents: prompt,
         config: {
+          systemInstruction: this.defaultSystemInstruction,
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
@@ -427,6 +437,7 @@ User message: "${message}"
         model: this.modelName,
         contents: prompt,
         config: {
+          systemInstruction: this.defaultSystemInstruction,
           temperature: 0.1, // Lower temperature for more reliable JSON
           maxOutputTokens: AI_CONFIG.PROCESSING_LIMITS.MAX_OUTPUT_TOKENS,
           responseMimeType: 'application/json',
@@ -472,6 +483,7 @@ User message: "${message}"
       const chat = this.genAI.chats.create({
         model: this.modelName,
         config: {
+          systemInstruction: this.defaultSystemInstruction,
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
