@@ -45,7 +45,7 @@ export class PaymentService {
     private readonly classBookingsService: ClassBookingsService,
     @Inject(forwardRef(() => ServiceBookingsService))
     private readonly serviceBookingsService: ServiceBookingsService,
-    private readonly paymentMarketPlaceService: PaymentMarketPlaceService
+    private readonly paymentMarketPlaceService: PaymentMarketPlaceService,
   ) {}
 
   private async logPaymentAction(
@@ -586,10 +586,9 @@ export class PaymentService {
       return;
     }
 
-    const orderConfirmed = payment.order?.status === OrderStatus.PAID
+    const orderConfirmed = payment.order?.status === OrderStatus.PAID;
 
-    if (orderConfirmed){
-
+    if (orderConfirmed) {
       this.logger.warn(
         `Webhook: Duplicate payment detected for ${txRef}. order already paid.`,
       );
@@ -623,30 +622,31 @@ export class PaymentService {
         let result: {
           processed: boolean;
           dto: VerifyPaymentResponseDto;
-        }
-        if (payment.orderId){
-           result = await this.paymentMarketPlaceService._verifyAndProcess(payment, verifyResponse)
+        };
+        if (payment.orderId) {
+          result = await this.paymentMarketPlaceService._verifyAndProcess(
+            payment,
+            verifyResponse,
+          );
         } else {
-           result = await this._verifyAndProcess(payment, verifyResponse);
+          result = await this._verifyAndProcess(payment, verifyResponse);
         }
         this.logger.log(`Webhook: Processed success for ${txRef}`);
 
         // Send Email Receipt (Fire-and-forget)
         if (result.processed && payment.customerEmail) {
-          try{
-          this.notificationsService
-            .sendEmailReceipt(
+          try {
+            this.notificationsService.sendEmailReceipt(
               payment.customerEmail,
               payment.amount,
               txRef,
-            )
+            );
+          } catch (err) {
+            this.logger.error(
+              `Failed to send email receipt for ${txRef}`,
+              err instanceof Error ? err.stack : String(err),
+            );
           }
-            catch(err){
-              this.logger.error(
-                `Failed to send email receipt for ${txRef}`,
-                err instanceof Error ? err.stack : String(err),
-              )
-            }
         }
       } catch (error) {
         this.logger.error(
@@ -673,29 +673,24 @@ export class PaymentService {
       // Notify User (Fire-and-forget)
       if (payment.userId) {
         const user = await this.databaseService.user.findUnique({
-          where: { userId: payment.userId }
+          where: { userId: payment.userId },
         });
-        if (user){
-        try{
-          await this.notificationsService
-            .notifyUserPaymentFailed(
-              user,
-              {
-                paymentId: payment.id,
-                paymentDate: payment.createdAt,
-                amount: Number(payment.amount),
-                txRef: payment.txRef,
-              }
-            )
-          }
-          catch(err){
+        if (user) {
+          try {
+            await this.notificationsService.notifyUserPaymentFailed(user, {
+              paymentId: payment.id,
+              paymentDate: payment.createdAt,
+              amount: Number(payment.amount),
+              txRef: payment.txRef,
+            });
+          } catch (err) {
             this.logger.error(
               `Failed to notify user ${payment.userId} of failure`,
               err instanceof Error ? err.stack : String(err),
             );
+          }
         }
       }
-    }
     } else {
       await this.logPaymentAction(payment.id, 'WEBHOOK_IGNORED', payload);
       this.logger.log(`Webhook: Unhandled event ${payload.event} for ${txRef}`);
@@ -929,7 +924,7 @@ export class PaymentService {
             payment.user.email,
             refundAmount,
             payment.txRef,
-            dto.reason || "Refund processed"
+            dto.reason || 'Refund processed',
           )
           .catch((err) =>
             this.logger.error(
@@ -938,7 +933,6 @@ export class PaymentService {
             ),
           );
       }
-
 
       return {
         status: 'success',

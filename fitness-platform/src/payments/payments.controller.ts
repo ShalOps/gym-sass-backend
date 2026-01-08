@@ -193,7 +193,7 @@ export class PaymentController {
     const user = req.user as User;
     return this.paymentService.verifyPayment(txRef, user);
   }
-@Get('verify/order/:txRef')
+  @Get('verify/order/:txRef')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
@@ -218,7 +218,6 @@ export class PaymentController {
     const user = req.user as User;
     return this.paymentMarketPlaceService.verifyPayment(txRef, user);
   }
-
 
   @Get('transactions/:txRef')
   @UseGuards(JwtAuthGuard)

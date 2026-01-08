@@ -5,13 +5,8 @@ import {
   BadRequestException,
   UnprocessableEntityException,
   ForbiddenException,
-  ConflictException,
-  InternalServerErrorException,
-  Inject,
-  forwardRef,
   HttpException,
 } from '@nestjs/common';
-import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { ChapaService } from 'chapa-nestjs';
 import {
@@ -23,46 +18,42 @@ import {
 } from '@prisma/client';
 import { InitializePaymentResponseDto } from './dto/initialize-payment.dto';
 import { VerifyPaymentResponseDto } from './dto/verify-payment.dto';
-import { ChapaWebhookDto } from './dto/webhook.dto';
-import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { PaymentMapper } from './payment.mapper';
 import { OrderStatus } from '@prisma/client';
-import { PaymentService } from './payments.service';
 
 @Injectable()
 export class PaymentMarketPlaceService {
-    private readonly logger = new Logger(PaymentMarketPlaceService.name);
+  private readonly logger = new Logger(PaymentMarketPlaceService.name);
 
-
-    constructor(
+  constructor(
     private readonly databaseService: DatabaseService,
     private readonly chapaService: ChapaService,
   ) {}
 
-    private async logPaymentAction(
-      paymentId: number | undefined | null,
-      action: string,
-      details?: any,
-      tx?: Prisma.TransactionClient,
-    ) {
-      const db = tx || this.databaseService;
-      try {
-        await db.paymentLog.create({
-          data: {
-            paymentId: paymentId ?? null,
-            action,
-            details: details as Prisma.InputJsonObject,
-          },
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to log payment action ${action} for payment ${paymentId}`,
-          error,
-        );
-      }
+  private async logPaymentAction(
+    paymentId: number | undefined | null,
+    action: string,
+    details?: any,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.databaseService;
+    try {
+      await db.paymentLog.create({
+        data: {
+          paymentId: paymentId ?? null,
+          action,
+          details: details as Prisma.InputJsonObject,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log payment action ${action} for payment ${paymentId}`,
+        error,
+      );
     }
+  }
 
-    private sanitizePaymentError(error: unknown): HttpException {
+  private sanitizePaymentError(error: unknown): HttpException {
     if (error instanceof HttpException) {
       this.logger.warn(`Payment operation warning: ${error.message}`);
       return error;
@@ -111,7 +102,6 @@ export class PaymentMarketPlaceService {
     );
   }
 
-  
   async initializePaymentOrder(
     user: { userId: number; role: string },
     params: {
@@ -122,7 +112,7 @@ export class PaymentMarketPlaceService {
       lastName: string;
       returnUrl: string;
       metadata?: Record<string, any>;
-      orderId: number; 
+      orderId: number;
       type?: PaymentType;
     },
     tx?: Prisma.TransactionClient,
@@ -136,8 +126,8 @@ export class PaymentMarketPlaceService {
       lastName,
       returnUrl,
       metadata,
-      orderId, 
-      type = PaymentType.PURCHASE, 
+      orderId,
+      type = PaymentType.PURCHASE,
     } = params;
     const userId = user.userId;
 
@@ -149,8 +139,10 @@ export class PaymentMarketPlaceService {
       throw new BadRequestException('Payable amount must be greater than zero');
     }
 
-    if (amount < 10) throw new BadRequestException('Amount must be at least 10 ETB');
-    if (amount > 100000) throw new BadRequestException('Amount exceeds limit of 100,000 ETB');
+    if (amount < 10)
+      throw new BadRequestException('Amount must be at least 10 ETB');
+    if (amount > 100000)
+      throw new BadRequestException('Amount exceeds limit of 100,000 ETB');
 
     const order = await db.order.findUnique({
       where: { id: orderId },
@@ -161,16 +153,17 @@ export class PaymentMarketPlaceService {
     }
 
     if (order.userId !== userId) {
-      throw new ForbiddenException('You can only initiate payment for your own orders');
+      throw new ForbiddenException(
+        'You can only initiate payment for your own orders',
+      );
     }
 
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException('This order has already been paid');
     }
 
-
     if (Number(order.totalAmount) !== amount) {
-       throw new BadRequestException('Payment amount mismatch with order total');
+      throw new BadRequestException('Payment amount mismatch with order total');
     }
 
     let payment = await db.payment.findUnique({
@@ -187,14 +180,14 @@ export class PaymentMarketPlaceService {
     }
 
     const txRef = await this.chapaService.generateTransactionReference({
-      prefix: 'ORD', 
+      prefix: 'ORD',
     });
 
     if (payment) {
       payment = await db.payment.update({
         where: { id: payment.id },
         data: {
-          txRef, 
+          txRef,
           amount,
           status: PaymentStatus.PENDING,
           checkoutUrl: null,
@@ -215,7 +208,7 @@ export class PaymentMarketPlaceService {
           returnUrl,
           metadata: metadata as Prisma.InputJsonObject,
           user: { connect: { userId } },
-          order: { connect: { id: orderId } }, 
+          order: { connect: { id: orderId } },
         },
       });
     }
@@ -246,29 +239,33 @@ export class PaymentMarketPlaceService {
       });
 
       await db.payment.update({
-        where: { id: payment.id }, 
+        where: { id: payment.id },
         data: {
           checkoutUrl: chapaResponse.data.checkout_url,
           chapaResponse: chapaResponse as unknown as Prisma.InputJsonObject,
         },
       });
 
-      this.logger.log(`Payment initialized for Order #${orderId}, txRef: ${txRef}`);
+      this.logger.log(
+        `Payment initialized for Order #${orderId}, txRef: ${txRef}`,
+      );
 
       return {
         txRef,
         checkoutUrl: chapaResponse.data.checkout_url,
       };
-
     } catch (error) {
       try {
         await db.payment.update({
           where: { id: payment.id },
           data: { status: PaymentStatus.FAILED },
         });
-      } catch { /* Ignore update errors during rollback */ }
+      } catch {
+        /* Ignore update errors during rollback */
+      }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
 
       await this.logPaymentAction(
         undefined,
@@ -287,8 +284,8 @@ export class PaymentMarketPlaceService {
   ): Promise<VerifyPaymentResponseDto> {
     const payment = await this.databaseService.payment.findUnique({
       where: { txRef },
-      include: { 
-        order: true 
+      include: {
+        order: true,
       },
     });
 
@@ -330,94 +327,88 @@ export class PaymentMarketPlaceService {
       );
     }
 
-    const result = await this._verifyAndProcess(
-      payment,
-      verifyResponse
-    );
+    const result = await this._verifyAndProcess(payment, verifyResponse);
 
     return result.dto;
   }
 
-
   async _verifyAndProcess(
-      payment: Payment,
-      verifyResponse: {
+    payment: Payment,
+    verifyResponse: {
+      status: string;
+      data: {
         status: string;
-        data: {
-          status: string;
-          amount: number | string;
-          reference: string;
-          payment_method?: string;
-        };
-      },
-    ) {
-   
-      try {
-        if (
-          verifyResponse.status === 'success' &&
-          verifyResponse.data.status === 'success'
-        ) {
-          const chapaAmount = Number(verifyResponse.data.amount).toFixed(2);
-          const dbAmount = Number(payment.amount).toFixed(2);
-  
-          if (chapaAmount !== dbAmount) {
-            this.logger.error(
-              `Payment amount mismatch for ${payment.txRef}. Expected: ${dbAmount}, Received: ${chapaAmount}`,
-            );
-            throw new UnprocessableEntityException('Payment amount mismatch');
-          }
-  
-          const processed = await this.processSuccessfulPayment(
-            payment.id,
-            verifyResponse.data.reference,
-            verifyResponse,
+        amount: number | string;
+        reference: string;
+        payment_method?: string;
+      };
+    },
+  ) {
+    try {
+      if (
+        verifyResponse.status === 'success' &&
+        verifyResponse.data.status === 'success'
+      ) {
+        const chapaAmount = Number(verifyResponse.data.amount).toFixed(2);
+        const dbAmount = Number(payment.amount).toFixed(2);
+
+        if (chapaAmount !== dbAmount) {
+          this.logger.error(
+            `Payment amount mismatch for ${payment.txRef}. Expected: ${dbAmount}, Received: ${chapaAmount}`,
           );
-  
-          if (processed) {
-            await this.logPaymentAction(payment.id, 'VERIFY', {
-              status: 'SUCCESS',
-              chapaRef: verifyResponse.data.reference,
-            });
-          }
-  
-          const updatedPayment = await this.databaseService.payment.findUnique({
-            where: { id: payment.id },
-          });
-          return {
-            processed,
-            dto: PaymentMapper.toVerifyResponse(updatedPayment!),
-          };
-        } else {
-          await this.databaseService.payment.update({
-            where: { id: payment.id },
-            data: {
-              status: PaymentStatus.FAILED,
-              chapaResponse: verifyResponse as unknown as Prisma.InputJsonObject,
-            },
-          });
-  
-          await this.logPaymentAction(payment.id, 'VERIFY_FAILED', {
-            chapaResponse: verifyResponse,
-          });
-  
-          throw new BadRequestException('Payment verification failed at gateway');
+          throw new UnprocessableEntityException('Payment amount mismatch');
         }
-      } catch (error) {
-        const errorMessage =
-          error &&
-          typeof error === 'object' &&
-          error !== null &&
-          'message' in error &&
-          typeof (error as { message?: unknown }).message === 'string'
-            ? (error as { message: string }).message
-            : String(error);
-        this.logger.error(
-          `Verification error for ${payment.txRef}: ${errorMessage}`,
+
+        const processed = await this.processSuccessfulPayment(
+          payment.id,
+          verifyResponse.data.reference,
+          verifyResponse,
         );
-        throw error;
+
+        if (processed) {
+          await this.logPaymentAction(payment.id, 'VERIFY', {
+            status: 'SUCCESS',
+            chapaRef: verifyResponse.data.reference,
+          });
+        }
+
+        const updatedPayment = await this.databaseService.payment.findUnique({
+          where: { id: payment.id },
+        });
+        return {
+          processed,
+          dto: PaymentMapper.toVerifyResponse(updatedPayment!),
+        };
+      } else {
+        await this.databaseService.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.FAILED,
+            chapaResponse: verifyResponse as unknown as Prisma.InputJsonObject,
+          },
+        });
+
+        await this.logPaymentAction(payment.id, 'VERIFY_FAILED', {
+          chapaResponse: verifyResponse,
+        });
+
+        throw new BadRequestException('Payment verification failed at gateway');
       }
+    } catch (error) {
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message?: unknown }).message === 'string'
+          ? (error as { message: string }).message
+          : String(error);
+      this.logger.error(
+        `Verification error for ${payment.txRef}: ${errorMessage}`,
+      );
+      throw error;
     }
-  
+  }
 
   private async processSuccessfulPayment(
     paymentId: number,
@@ -435,7 +426,7 @@ export class PaymentMarketPlaceService {
         include: {
           order: {
             include: {
-              items: true, 
+              items: true,
             },
           },
         },
@@ -443,38 +434,42 @@ export class PaymentMarketPlaceService {
 
       if (updatedPayment.orderId) {
         await tx.order.update({
-          where: { id: updatedPayment.orderId }, 
+          where: { id: updatedPayment.orderId },
           data: {
-            status: OrderStatus.PAID, 
+            status: OrderStatus.PAID,
           },
         });
-        
+
         this.logger.log(`Order #${updatedPayment.orderId} marked as PAID`);
 
         if (!updatedPayment.userId || !updatedPayment.order) {
-          throw new Error('Cannot fulfill digital items: Missing User or Order data');
+          throw new Error(
+            'Cannot fulfill digital items: Missing User or Order data',
+          );
         }
 
         const fulfillmentPromises = updatedPayment.order.items.map((item) => {
-        return tx.purchasedItem.upsert({
-          where: {
-            userId_productId: {
+          return tx.purchasedItem.upsert({
+            where: {
+              userId_productId: {
+                userId: updatedPayment.userId as number,
+                productId: item.productId,
+              },
+            },
+            update: {},
+            create: {
               userId: updatedPayment.userId as number,
               productId: item.productId,
+              orderId: updatedPayment.orderId!,
             },
-          },
-          update: {}, 
-          create: {
-            userId: updatedPayment.userId as number,
-            productId: item.productId,
-            orderId: updatedPayment.orderId!,
-          },
+          });
         });
-      });
 
-      await Promise.all(fulfillmentPromises);
-      this.logger.log(`Order #${updatedPayment.orderId} fulfilled to User Library`);
-    }
+        await Promise.all(fulfillmentPromises);
+        this.logger.log(
+          `Order #${updatedPayment.orderId} fulfilled to User Library`,
+        );
+      }
 
       return true;
     });

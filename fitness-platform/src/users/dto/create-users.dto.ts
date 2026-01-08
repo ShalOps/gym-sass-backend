@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsDateString,
   IsEnum,
-  IsBoolean
+  IsBoolean,
 } from 'class-validator';
 import { Gender, Goal, Role } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';

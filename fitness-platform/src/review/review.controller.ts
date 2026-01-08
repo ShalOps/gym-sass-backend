@@ -1,7 +1,16 @@
-import { BadRequestException, Controller, Get, Post, Body, Param, UseGuards, Req, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  Query,
+} from '@nestjs/common';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { UpdateReviewDto } from './dto/update-review.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -23,7 +32,10 @@ export class ReviewController {
   @ApiOperation({ summary: 'Add review to product' })
   @ApiBearerAuth('JWT-auth')
   @Post()
-  create(@Body() createReviewDto: CreateReviewDto, @Req() req: RequestWithUser) {
+  create(
+    @Body() createReviewDto: CreateReviewDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.reviewService.create(createReviewDto, req.user.userId);
   }
 
@@ -33,6 +45,4 @@ export class ReviewController {
   getProductReviews(@Param('id') id: string, @Query('cursor') cursor?: string) {
     return this.reviewService.getProductReviews(+id, this.parseCursor(cursor));
   }
-
-
 }

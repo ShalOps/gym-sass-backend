@@ -1,17 +1,16 @@
-import { 
-  IsString, 
-  IsEnum, 
-  IsOptional, 
-  IsNumber, 
-  IsPositive, 
-  Min 
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsNumber,
+  IsPositive,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductType, ProductCategory } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class CreateProductDto {
-
   @ApiProperty({
     description: 'The name of the product',
     example: 'Organic Whey Protein',
@@ -52,6 +51,4 @@ export class CreateProductDto {
   @Type(() => Number)
   @Min(0)
   price: number;
-
-
 }

@@ -1,4 +1,12 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, GatewayTimeoutException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  GatewayTimeoutException,
+  InternalServerErrorException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { OrderStatus } from '@prisma/client';
 import { PaymentMarketPlaceService } from 'src/payments/payments-marketplace.service';
@@ -8,39 +16,39 @@ const PAGE_SIZE = 10;
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
-  
+
   constructor(
-    private readonly databaseService: DatabaseService, 
-    private readonly paymentMarketPlaceService: PaymentMarketPlaceService
+    private readonly databaseService: DatabaseService,
+    private readonly paymentMarketPlaceService: PaymentMarketPlaceService,
   ) {}
 
+  async retryPayment(userId: number, orderId: number, returnUrl: string) {
+    const order = await this.databaseService.order.findUnique({
+      where: { id: orderId },
+      include: { user: true },
+    });
 
-async retryPayment(userId: number, orderId: number, returnUrl: string) {
-  const order = await this.databaseService.order.findUnique({
-    where: { id: orderId },
-    include: { user: true }
-  });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.userId !== userId) throw new ForbiddenException('Not your order');
+    if (order.status === OrderStatus.PAID)
+      throw new BadRequestException('Order already paid');
 
-  if (!order) throw new NotFoundException('Order not found');
-  if (order.userId !== userId) throw new ForbiddenException('Not your order');
-  if (order.status === OrderStatus.PAID) throw new BadRequestException('Order already paid');
+    return await this.paymentMarketPlaceService.initializePaymentOrder(
+      { userId, role: order.user.role },
+      {
+        amount: Number(order.totalAmount),
+        currency: 'ETB',
+        email: order.user.email,
+        firstName: order.user.firstName,
+        lastName: order.user.lastName,
+        returnUrl: returnUrl,
+        orderId: order.id,
+        metadata: { orderId: order.id },
+      },
+    );
+  }
 
-  return await this.paymentMarketPlaceService.initializePaymentOrder(
-    { userId, role: order.user.role },
-    {
-      amount: Number(order.totalAmount),
-      currency: 'ETB',
-      email: order.user.email,
-      firstName: order.user.firstName,
-      lastName: order.user.lastName,
-      returnUrl: returnUrl,
-      orderId: order.id,
-      metadata: { orderId: order.id },
-    }
-  );
-}
-
-async create(userId: number, returnUrl: string) {
+  async create(userId: number, returnUrl: string) {
     const cart = await this.databaseService.cart.findUnique({
       where: { cartOwnerId: userId },
       include: {
@@ -74,7 +82,7 @@ async create(userId: number, returnUrl: string) {
               items: {
                 create: cart.cartItems.map((item) => ({
                   productId: item.productId,
-                  price: item.product.price, 
+                  price: item.product.price,
                 })),
               },
             },
@@ -85,7 +93,7 @@ async create(userId: number, returnUrl: string) {
           });
 
           let paymentResponse;
-          
+
           const user = await this.databaseService.user.findUnique({
             where: { userId },
             select: {
@@ -97,23 +105,24 @@ async create(userId: number, returnUrl: string) {
           });
 
           if (user) {
-            paymentResponse = await this.paymentMarketPlaceService.initializePaymentOrder(
-              { userId, role: user.role },
-              {
-                amount: totalAmount,
-                currency: 'ETB',
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                returnUrl: returnUrl,
-                metadata: {
-                  orderId: order.id, 
+            paymentResponse =
+              await this.paymentMarketPlaceService.initializePaymentOrder(
+                { userId, role: user.role },
+                {
+                  amount: totalAmount,
+                  currency: 'ETB',
+                  email: user.email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  returnUrl: returnUrl,
+                  metadata: {
+                    orderId: order.id,
+                  },
+                  orderId: order.id,
+                  type: PaymentType.PURCHASE,
                 },
-                orderId: order.id, 
-                type: PaymentType.PURCHASE,
-              },
-              tx,
-            );
+                tx,
+              );
           }
 
           return {
@@ -158,29 +167,25 @@ async create(userId: number, returnUrl: string) {
     }
   }
 
-    async paginate(order: Order[]) {
-      const hasMore = order.length > PAGE_SIZE;
-      const data = hasMore ? order.slice(0, PAGE_SIZE) : order;
-      const nextCursor = hasMore
-        ? order[order.length - 1].id
-        : null;
-    
-      return { data, hasMore, nextCursor };
-    }
+  paginate(order: Order[]) {
+    const hasMore = order.length > PAGE_SIZE;
+    const data = hasMore ? order.slice(0, PAGE_SIZE) : order;
+    const nextCursor = hasMore ? order[order.length - 1].id : null;
+
+    return { data, hasMore, nextCursor };
+  }
 
   async findAll(userId: number, cursor?: number) {
     const orders = await this.databaseService.order.findMany({
-       where: {
+      where: {
         userId,
         ...(cursor ? { id: { gt: cursor } } : {}),
       },
-      orderBy: { 
-        id: 'asc'
+      orderBy: {
+        id: 'asc',
       },
       take: PAGE_SIZE + 1,
-    })
+    });
     return this.paginate(orders);
-
   }
 }
-

@@ -6,10 +6,12 @@ export class CreateRatingDto {
   @IsInt()
   productId: number;
 
-  @ApiProperty({ example: "A number from 1 to 5", description: 'rating given for the product' })
+  @ApiProperty({
+    example: 'A number from 1 to 5',
+    description: 'rating given for the product',
+  })
   @IsInt()
   @Min(1)
   @Max(5)
   rating: number;
 }
-

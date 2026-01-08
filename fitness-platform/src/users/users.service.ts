@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { PaginationDto } from './dto/pagination.dto';
@@ -78,10 +82,15 @@ export class UsersService {
     };
   }
 
-  async update(updateUsersDto: UpdateUsersDto, currentUserId: number, isVendor: boolean) {
-    
+  async update(
+    updateUsersDto: UpdateUsersDto,
+    currentUserId: number,
+    isVendor: boolean,
+  ) {
     if (isVendor && updateUsersDto.isVendor === false) {
-      throw new BadRequestException("Cannot change account type from vendor back to regular user")
+      throw new BadRequestException(
+        'Cannot change account type from vendor back to regular user',
+      );
     }
     const user = await this.databaseservice.user.findUnique({
       where: {

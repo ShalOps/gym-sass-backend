@@ -1,67 +1,65 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { UpdateReviewDto } from './dto/update-review.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { Review } from '@prisma/client';
 const PAGE_SIZE = 10;
 
-
 @Injectable()
 export class ReviewService {
-
   constructor(private readonly databaseService: DatabaseService) {}
-  
+
   async create(createReviewDto: CreateReviewDto, userId: number) {
     const check = await this.databaseService.purchasedItem.findUnique({
       where: {
         userId_productId: {
           userId: userId,
-          productId: createReviewDto.productId
-        }
-      }
-    })
+          productId: createReviewDto.productId,
+        },
+      },
+    });
 
-    if(!check){
-      throw new BadRequestException("Cannot review a product you have not purchased")
+    if (!check) {
+      throw new BadRequestException(
+        'Cannot review a product you have not purchased',
+      );
     }
 
     return await this.databaseService.review.create({
-      data:{
+      data: {
         userId,
         productId: createReviewDto.productId,
-        comment: createReviewDto.comment
-      }
-    })
+        comment: createReviewDto.comment,
+      },
+    });
   }
 
-  async paginate(review: Review[]) {
+  paginate(review: Review[]) {
     const hasMore = review.length > PAGE_SIZE;
     const data = hasMore ? review.slice(0, PAGE_SIZE) : review;
-    const nextCursor = hasMore
-      ? review[review.length - 1].id
-      : null;
-  
+    const nextCursor = hasMore ? review[review.length - 1].id : null;
+
     return { data, hasMore, nextCursor };
   }
 
   async getProductReviews(productId: number, cursor?: number) {
+    const check = await this.databaseService.product.findUnique({
+      where: {
+        id: productId,
+      },
+    });
 
-    const check = await this.databaseService.product.findUnique(
-      {
-        where: {
-          id: productId
-        }
-      }
-    )
-
-    if(!check){
-      throw new NotFoundException("Product doesn't exist")
+    if (!check) {
+      throw new NotFoundException("Product doesn't exist");
     }
-    
+
     const reviews = await this.databaseService.review.findMany({
       where: {
         productId: productId,
-         ...(cursor ? { id: { gt: cursor } } : {}),
+        ...(cursor ? { id: { gt: cursor } } : {}),
       },
       include: {
         user: {
@@ -73,13 +71,12 @@ export class ReviewService {
           },
         },
       },
-      orderBy: { 
-        id: 'asc'
+      orderBy: {
+        id: 'asc',
       },
       take: PAGE_SIZE + 1,
     });
 
-    return this.paginate(reviews)
-}
-
+    return this.paginate(reviews);
+  }
 }

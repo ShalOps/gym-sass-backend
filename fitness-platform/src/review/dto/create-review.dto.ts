@@ -6,9 +6,10 @@ export class CreateReviewDto {
   @IsInt()
   productId: number;
 
-  @ApiProperty({ example: "This product was great", description: 'comment given for the product' })
+  @ApiProperty({
+    example: 'This product was great',
+    description: 'comment given for the product',
+  })
   @IsString()
   comment: string;
 }
-
-

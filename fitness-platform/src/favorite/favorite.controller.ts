@@ -1,7 +1,15 @@
-import { BadRequestException,Controller, Get, Post, Body, UseGuards, Req, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Query,
+} from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
-import { UpdateFavoriteDto } from './dto/update-favorite.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -21,10 +29,19 @@ export class FavoriteController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @ApiOperation({ summary: 'Toggle favorite (if favorite exists deletes it otherwise creates favorite)' })
+  @ApiOperation({
+    summary:
+      'Toggle favorite (if favorite exists deletes it otherwise creates favorite)',
+  })
   @ApiBearerAuth('JWT-auth')
-  toggleFavorite(@Body() createFavoriteDto: CreateFavoriteDto, @Req() req: RequestWithUser) {
-    return this.favoriteService.toggleFavorite(createFavoriteDto, req.user.userId);
+  toggleFavorite(
+    @Body() createFavoriteDto: CreateFavoriteDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.favoriteService.toggleFavorite(
+      createFavoriteDto,
+      req.user.userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -32,7 +49,9 @@ export class FavoriteController {
   @ApiOperation({ summary: 'Get a users list of favorites' })
   @ApiBearerAuth('JWT-auth')
   findAll(@Req() req: RequestWithUser, @Query('cursor') cursor?: string) {
-    return this.favoriteService.findAll(req.user.userId, this.parseCursor(cursor));
+    return this.favoriteService.findAll(
+      req.user.userId,
+      this.parseCursor(cursor),
+    );
   }
-
 }

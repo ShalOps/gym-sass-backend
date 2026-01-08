@@ -22,7 +22,17 @@ import { PaymentMarketPlaceService } from './payments-marketplace.service';
     }),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, PaymentExportService, PaymentHistoryService, PaymentMarketPlaceService],
-  exports: [PaymentService, PaymentExportService, PaymentHistoryService, PaymentMarketPlaceService],
+  providers: [
+    PaymentService,
+    PaymentExportService,
+    PaymentHistoryService,
+    PaymentMarketPlaceService,
+  ],
+  exports: [
+    PaymentService,
+    PaymentExportService,
+    PaymentHistoryService,
+    PaymentMarketPlaceService,
+  ],
 })
 export class PaymentsModule {}
