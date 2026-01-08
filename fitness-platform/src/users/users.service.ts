@@ -81,7 +81,7 @@ export class UsersService {
   async update(updateUsersDto: UpdateUsersDto, currentUserId: number, isVendor: boolean) {
     
     if (isVendor && updateUsersDto.isVendor === false) {
-      throw new BadRequestException("Cannot change back from vendor")
+      throw new BadRequestException("Cannot change account type from vendor back to regular user")
     }
     const user = await this.databaseservice.user.findUnique({
       where: {
