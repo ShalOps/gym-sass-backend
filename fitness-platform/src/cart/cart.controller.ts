@@ -5,7 +5,6 @@ import { UpdateCartItemDto } from './dto/update-cart.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { RequestWithUser } from '../auth/express-request-with-user.interface';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { th } from 'zod/v4/locales';
 
 @Controller('cart')
 export class CartController {
