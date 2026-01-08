@@ -187,7 +187,6 @@ export class ProductService {
             where: { id },
             data: { 
               ...updateProductDto,
-              document: newDocumentPath
             },
           });
 
@@ -206,13 +205,13 @@ export class ProductService {
   async remove(id: number, userId: number, isVendor: boolean) {
 
     if (!isVendor) {
-      throw new UnauthorizedException('Only vendors can update products');
+      throw new UnauthorizedException('Only vendors can delete products');
     }
 
     const product = await this.findOne(id);
 
     if (product.vendorID !== userId) {
-      throw new UnauthorizedException('Vendors can only update their own products');
+      throw new UnauthorizedException('Vendors can only delete their own products');
     }
 
     const imagePath = product.image
@@ -240,7 +239,7 @@ export class ProductService {
   async getVendorRevenue(vendorId: number, isVendor: boolean) {
 
     if (!isVendor) {
-      throw new UnauthorizedException('Only vendors can create products');
+      throw new UnauthorizedException('Only vendors can check their revenue');
     }
     const sales = await this.databaseService.purchasedItem.findMany({
       where: {
