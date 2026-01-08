@@ -12,7 +12,7 @@ export class ReviewService {
   constructor(private readonly databaseService: DatabaseService) {}
   
   async create(createReviewDto: CreateReviewDto, userId: number) {
-    const check = this.databaseService.purchasedItem.findUnique({
+    const check = await this.databaseService.purchasedItem.findUnique({
       where: {
         userId_productId: {
           userId: userId,
