@@ -24,14 +24,12 @@ export class RatingController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get average rating value for a given product' })
-  @ApiBearerAuth('JWT-auth')
   getProductRatingStats(@Param('id') id: string) {
     return this.ratingService.getProductRatingStats(+id);
   }
 
   @Get('distribution/:id')
   @ApiOperation({ summary: 'Get rating distribution for a given product' })
-  @ApiBearerAuth('JWT-auth')
   getRatingDistribution(@Param('id') id: string) {
     return this.ratingService.getRatingDistribution(+id);
   }
