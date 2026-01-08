@@ -15,9 +15,9 @@ export class CartService {
     const hasMore = cartItem.length > PAGE_SIZE;
     const data = hasMore ? cartItem.slice(0, PAGE_SIZE) : cartItem;
     const nextCursor = hasMore
-      ? cartItem[cartItem.length - 1].cartId
+      ? cartItem[cartItem.length - 1].cartItemId
       : null;
-    
+
     return { data, hasMore, nextCursor };
   }
 
@@ -67,10 +67,10 @@ export class CartService {
         cart: {
           cartOwnerId: userId
         },
-        ...(cursor ? { cartId: { gt: cursor } } : {}),
+        ...(cursor ? { cartItemId: { gt: cursor } } : {}),
       },
       orderBy: { 
-        cartId: 'asc'
+        cartItemId: 'asc'
       },
       take: PAGE_SIZE + 1,
       });
@@ -92,7 +92,7 @@ export class CartService {
       throw new NotFoundException('User does not own a cart');
     }
 
-    const checkProductExistsInCart = this.databaseService.cartItem.findUnique({
+    const checkProductExistsInCart = await this.databaseService.cartItem.findUnique({
       where: {
         cartId_productId: {
           cartId: checkIfUserOwnsCart.id,
