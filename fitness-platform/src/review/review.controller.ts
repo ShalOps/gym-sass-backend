@@ -20,7 +20,6 @@ export class ReviewController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post()
   @ApiOperation({ summary: 'Add review to product' })
   @ApiBearerAuth('JWT-auth')
   @Post()
