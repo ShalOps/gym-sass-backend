@@ -18,7 +18,6 @@ enum Role {
   ADMIN
   GYMOWNER
   TRAINER
-  VENDOR
 }
 
 enum Gender {
@@ -144,11 +143,13 @@ model Payment {
   userId           Int?
   serviceBookingId Int?
   classBookingId   Int?
+  orderId          Int?    @unique 
 
   user           User?           @relation("UserPayments", fields: [userId], references: [userId], onDelete: SetNull)
   serviceBooking ServiceBooking? @relation("ServiceBookingPayments", fields: [serviceBookingId], references: [serviceBookingId], onDelete: SetNull)
   classBooking   ClassBooking?   @relation("ClassBookingPayments", fields: [classBookingId], references: [classBookingId], onDelete: SetNull)
   logs           PaymentLog[]
+  order          Order?  @relation(fields: [orderId], references: [id])
 
   @@index([txRef])
   @@index([chapaReference])
@@ -158,6 +159,7 @@ model Payment {
   @@index([serviceBookingId])
   @@index([classBookingId])
   @@index([createdAt])
+  @@index([orderId])
   @@map("payments")
 }
 
@@ -177,6 +179,7 @@ model User {
   goal                  Goal?
   role                  Role                      @default(CUSTOMER)
   telegramChatId        BigInt?
+  isVendor              Boolean                   @default(false)
   gyms                  Gym[]
   gymclasses            GymClasses[]
   ClassBooking          ClassBooking[]
@@ -192,7 +195,13 @@ model User {
   messagesSent          Message[]
   chatReports           ChatReport[]
   broadcasts            BroadcastMessage[]
-
+  products              Product[]   
+  cart                  Cart? 
+  favorite              Favorite[]              
+  order                 Order[]       
+  library               PurchasedItem[]
+  review                Review[]
+  rating                Rating[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   lastLogin DateTime?
@@ -536,3 +545,144 @@ model FailedNotification {
   payload     String
   attemptedAt DateTime @default(now())
 }
+
+model Product {
+  id	            Int      @id @default(autoincrement())
+  name            String
+  type            ProductType
+  category        ProductCategory
+  description     String?
+  price           Float
+  image           String
+  document        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  vendorID        Int
+  vendor          User        @relation(fields: [vendorID], references: [userId], onDelete: Restrict)
+  cartItems       CartItem[]
+  favorite        Favorite[]
+  orderItem       OrderItem[]
+  purchasedBy     PurchasedItem[]
+  review          Review[]
+  rating          Rating[]
+  @@unique([name, vendorID])
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+}
+
+enum ProductCategory {
+  PROGRAMS      // PDF guides, training templates
+  ACCESSORIES
+  APPAREL
+  SUPPLEMENTS
+  EQUIPMENT
+  OTHER
+}
+
+model Cart {
+  id                 Int         @id @default(autoincrement())
+  cartOwnerId        Int         @unique
+  cartOwner          User        @relation(fields: [cartOwnerId], references: [userId], onDelete: Cascade)
+  cartItems          CartItem[]
+  createdAt          DateTime    @default(now())
+}
+
+model CartItem{
+  cartItemId    Int      @id @default(autoincrement())
+  cartId        Int
+  productId     Int 
+  
+  cart          Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model Favorite{
+  id            Int         @id @default(autoincrement())
+  productId     Int 
+  userId        Int
+
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([productId, userId])
+}
+
+model Order {
+  id              Int             @id @default(autoincrement())
+  userId          Int
+  totalAmount     Float
+  status          OrderStatus     @default(PENDING) 
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  user            User            @relation(fields: [userId], references: [userId])
+  items           OrderItem[] 
+  payment         Payment?    
+  purchasedItems  PurchasedItem[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  price     Float   
+  
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model PurchasedItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  orderId   Int      
+  createdAt DateTime @default(now())
+
+  
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order   @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, productId]) 
+}
+
+model Review {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  productId     Int
+  comment        String
+
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+}
+
+model Rating {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  productId     Int
+  rating        Int
+
+  user      User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, productId])
+}
+

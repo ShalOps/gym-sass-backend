@@ -470,9 +470,9 @@ export class ChatService {
       });
 
       for (const p of otherParticipants) {
-        await this.notificationsService.notifyUser(
+        await this.notificationsService.notifyTelegramFallback(
           p.userId,
-          `[Telegram Fallback] ${dto.content}`,
+          dto.content,
         );
       }
 
@@ -569,11 +569,16 @@ export class ChatService {
     return { status: 'ok', conversationId, userId, readAt: new Date() };
   }
 
-  async notifyRecipient(userId: number, message: Message) {
+  async notifyRecipient(
+    userId: number,
+    message: { content: string | null; sender?: { firstName: string } },
+  ) {
     const contentPreview = message.content || '[Attachment]';
-    await this.notificationsService.notifyUser(
+    const senderName = message.sender?.firstName || 'Someone';
+    await this.notificationsService.notifyChatMessage(
       userId,
-      `New message: ${contentPreview}`,
+      senderName,
+      contentPreview,
     );
   }
 
@@ -1162,7 +1167,7 @@ export class ChatService {
       // Send notifications to all users
       const notificationPromises = targetUsers.map((user) =>
         this.notificationsService
-          .notifyUser(user.userId, `Broadcast: ${content}`)
+          .notifyBroadcast(user.userId, content)
           .catch((error) => {
             // Log error but don't fail the entire broadcast
             this.logger.error(`Failed to notify user ${user.userId}:`, error);

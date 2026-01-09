@@ -4,6 +4,11 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
 import { Channel } from '@prisma/client';
+import { AxiosResponse, AxiosError } from 'axios';
+interface TelegramResponse {
+  ok: boolean;
+  description?: string;
+}
 
 @Injectable()
 export class TelegramService {
@@ -32,7 +37,7 @@ export class TelegramService {
     }
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const response = await firstValueFrom(
+        const response: AxiosResponse<TelegramResponse> = await firstValueFrom(
           this.httpService.post(
             `https://api.telegram.org/bot${this.botToken}/sendMessage`,
             {
@@ -48,7 +53,7 @@ export class TelegramService {
         }
         this.logger.verbose(`Telegram message sent to chat`);
         break;
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (attempt === 3) {
           await this.databaseService.failedNotification.create({
             data: {
@@ -58,10 +63,15 @@ export class TelegramService {
             },
           });
 
-          this.logger.error(
-            'Failed to send Telegram message',
-            error.response?.data || error.message,
-          );
+          let errorMessage = 'Unknown error';
+
+          if (error instanceof AxiosError && error.response?.data) {
+            errorMessage = JSON.stringify(error.response.data);
+          } else if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+
+          this.logger.error('Failed to send Telegram message', errorMessage);
         }
         await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       }
@@ -93,11 +103,16 @@ export class TelegramService {
         ),
       );
       this.logger.log(`Webhook successfully set to ${url}`);
-    } catch (error: any) {
-      this.logger.error(
-        'Failed to set webhook',
-        error.response?.data || error.message,
-      );
+    } catch (error: unknown) {
+      let errorMessage = 'Unknown error';
+
+      if (error instanceof AxiosError && error.response?.data) {
+        errorMessage = JSON.stringify(error.response.data);
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      this.logger.error('Failed to set webhook', errorMessage);
       throw error;
     }
   }

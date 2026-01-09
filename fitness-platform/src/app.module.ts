@@ -28,6 +28,12 @@ import { EmailModule } from './email/email.module';
 import { ChatModule } from './chat/chat.module';
 import { UtilsModule } from './utils/utils.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { ProductModule } from './product/product.module';
+import { CartModule } from './cart/cart.module';
+import { FavoriteModule } from './favorite/favorite.module';
+import { OrderModule } from './order/order.module';
+import { ReviewModule } from './review/review.module';
+import { RatingModule } from './rating/rating.module';
 
 @Module({
   imports: [
@@ -61,6 +67,12 @@ import { TelegramModule } from './telegram/telegram.module';
     EmailModule,
     ChatModule,
     TelegramModule,
+    ProductModule,
+    CartModule,
+    FavoriteModule,
+    OrderModule,
+    ReviewModule,
+    RatingModule,
   ],
   controllers: [AppController],
   providers: [

@@ -42,6 +42,7 @@ import { ServiceBookingsService } from '../bookings/service-bookings.service';
 import { PaymentType, PaymentStatus } from '@prisma/client';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { PaymentMarketPlaceService } from './payments-marketplace.service';
 
 interface User {
   userId: number;
@@ -58,6 +59,7 @@ export class PaymentController {
     private readonly paymentHistoryService: PaymentHistoryService,
     private readonly classBookingsService: ClassBookingsService,
     private readonly serviceBookingsService: ServiceBookingsService,
+    private readonly paymentMarketPlaceService: PaymentMarketPlaceService,
   ) {}
 
   @Post('create')
@@ -190,6 +192,31 @@ export class PaymentController {
   ): Promise<VerifyPaymentResponseDto> {
     const user = req.user as User;
     return this.paymentService.verifyPayment(txRef, user);
+  }
+  @Get('verify/order/:txRef')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Manually verify payment status for order (used by frontend)',
+  })
+  @ApiParam({
+    name: 'txRef',
+    description: 'Transaction reference',
+    type: 'string',
+  })
+  @ApiOkResponse({ type: VerifyPaymentResponseDto })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User cannot verify this payment',
+  })
+  async verifyOrder(
+    @Param('txRef') txRef: string,
+    @Req() req: Request,
+  ): Promise<VerifyPaymentResponseDto> {
+    const user = req.user as User;
+    return this.paymentMarketPlaceService.verifyPayment(txRef, user);
   }
 
   @Get('transactions/:txRef')
